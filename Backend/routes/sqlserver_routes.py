@@ -2,6 +2,9 @@ from flask import Blueprint, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 import logging
+import pyodbc
+
+from config import SQLSERVER_ODBC_CONNECT
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -84,8 +87,8 @@ def get_batch_materials():
             limit = 1000
         if limit < 1:
             limit = 100
-            
-                # Build the base query with pyodbc parameter placeholders
+
+        # Build the base query with pyodbc parameter placeholders
         base_query = """
             SELECT TOP (?)
                 [Source Server],
@@ -129,16 +132,9 @@ def get_batch_materials():
         # Add ORDER BY for consistent results
         base_query += " ORDER BY [Batch Act Start] DESC"
         
-        # Execute query using direct pyodbc connection
+        # Execute query using direct pyodbc connection (SQL auth — same DSN as config)
         print("Using direct pyodbc connection to SQL Server...")
-        conn_str = (
-            "DRIVER={ODBC Driver 17 for SQL Server};"
-            "SERVER=DESKTOP-N8PGI9S\\FAKIEH_REPORTING;"
-            "DATABASE=ASMBatchReports;"
-            "Trusted_Connection=yes;"
-        )
-        import pyodbc
-        conn = pyodbc.connect(conn_str)
+        conn = pyodbc.connect(SQLSERVER_ODBC_CONNECT)
         cursor = conn.cursor()
         cursor.execute(base_query, params)
         result = cursor.fetchall()
@@ -183,16 +179,9 @@ def get_batch_materials():
 def get_batch_materials_count():
     """Get total count of records in BatchMaterials table"""
     try:
-        # Use direct pyodbc connection for SQL Server
+        # Use direct pyodbc connection for SQL Server (SQL auth — same DSN as config)
         print("Using direct pyodbc connection to SQL Server for count...")
-        conn_str = (
-            "DRIVER={ODBC Driver 17 for SQL Server};"
-            "SERVER=DESKTOP-N8PGI9S\\FAKIEH_REPORTING;"
-            "DATABASE=ASMBatchReports;"
-            "Trusted_Connection=yes;"
-        )
-        import pyodbc
-        conn = pyodbc.connect(conn_str)
+        conn = pyodbc.connect(SQLSERVER_ODBC_CONNECT)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as total FROM [ASMBatchReports].[dbo].[BatchMaterials]")
         result = cursor.fetchone()
@@ -216,16 +205,9 @@ def get_batch_materials_count():
 def get_batch_material_by_guid(batch_guid):
     """Get specific batch material by Batch GUID"""
     try:
-        # Use direct pyodbc connection for SQL Server
+        # Use direct pyodbc connection for SQL Server (SQL auth — same DSN as config)
         print("Using direct pyodbc connection to SQL Server for GUID lookup...")
-        conn_str = (
-            "DRIVER={ODBC Driver 17 for SQL Server};"
-            "SERVER=DESKTOP-N8PGI9S\\FAKIEH_REPORTING;"
-            "DATABASE=ASMBatchReports;"
-            "Trusted_Connection=yes;"
-        )
-        import pyodbc
-        conn = pyodbc.connect(conn_str)
+        conn = pyodbc.connect(SQLSERVER_ODBC_CONNECT)
         cursor = conn.cursor()
         
         query = """

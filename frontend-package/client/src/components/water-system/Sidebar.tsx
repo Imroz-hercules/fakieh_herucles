@@ -57,7 +57,7 @@ const menuItems = [
   { 
     path: '/water-system/orders', 
     icon: Truck, 
-    label: 'Orders',
+    label: 'Live orders',
     description: 'Real-time Orders from SCADA'
   },
   { 
