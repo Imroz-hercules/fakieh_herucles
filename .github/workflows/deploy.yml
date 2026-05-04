@@ -1,0 +1,40 @@
+name: Fakieh OTA Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Pull latest code
+        shell: cmd
+        run: |
+          cd /d C:\Users\Hercu\OneDrive\Desktop\main_code\fakieh_27aug\fakieh_27aug
+          git pull origin main
+
+      - name: Install backend dependencies
+        shell: cmd
+        run: |
+          cd /d C:\Users\Hercu\OneDrive\Desktop\main_code\fakieh_27aug\fakieh_27aug\Backend
+          C:\Users\Hercu\AppData\Local\Programs\Python\Python311\python.exe -m pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        shell: cmd
+        run: |
+          cd /d C:\Users\Hercu\OneDrive\Desktop\main_code\fakieh_27aug\fakieh_27aug\frontend-package
+          npm install
+
+      - name: Restart NSSM services
+        shell: cmd
+        run: |
+          C:\nssm\nssm.exe restart Fakieh_backend
+          C:\nssm\nssm.exe restart Fakieh_frontend
+
+      - name: Check backend health
+        shell: cmd
+        run: |
+          curl http://localhost:5000/api/health
