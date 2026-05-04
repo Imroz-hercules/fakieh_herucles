@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLC WebSocket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .data-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .data-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .data-item {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <h1>PLC WebSocket Test</h1>
+    
+    <div class="container">
+        <h2>Connection Status</h2>
+        <div id="status" class="status disconnected">Disconnected</div>
+        <button id="connectBtn" onclick="connect()">Connect</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        <button id="subscribeBtn" onclick="subscribe()" disabled>Subscribe to PLC Data</button>
+        <button id="unsubscribeBtn" onclick="unsubscribe()" disabled>Unsubscribe</button>
+    </div>
+
+    <div class="container">
+        <h2>PLC Data</h2>
+        <div id="plcData">
+            <p>No data received yet. Connect and subscribe to see real-time PLC data.</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Event Log</h2>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        let socket = null;
+        let isSubscribed = false;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div><span class="timestamp">[${timestamp}]</span> ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const subscribeBtn = document.getElementById('subscribeBtn');
+            const unsubscribeBtn = document.getElementById('unsubscribeBtn');
+
+            if (connected) {
+                statusDiv.textContent = 'Connected';
+                statusDiv.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                subscribeBtn.disabled = false;
+                unsubscribeBtn.disabled = !isSubscribed;
+            } else {
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                subscribeBtn.disabled = true;
+                unsubscribeBtn.disabled = true;
+                isSubscribed = false;
+            }
+        }
+
+        function connect() {
+            log('Attempting to connect...');
+            socket = io('http://localhost:5000');
+
+            socket.on('connect', function() {
+                log('Connected to server');
+                updateStatus(true);
+            });
+
+            socket.on('disconnect', function() {
+                log('Disconnected from server');
+                updateStatus(false);
+            });
+
+            socket.on('plc_data', function(data) {
+                log(`Received PLC data (${data.type})`);
+                displayPlcData(data);
+            });
+
+            socket.on('status', function(data) {
+                log(`Status: ${data.message}`);
+            });
+
+            socket.on('error', function(data) {
+                log(`Error: ${data.message}`);
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                log('Disconnected');
+            }
+        }
+
+        function subscribe() {
+            if (socket) {
+                socket.emit('subscribe_plc');
+                isSubscribed = true;
+                document.getElementById('unsubscribeBtn').disabled = false;
+                log('Subscribed to PLC data');
+            }
+        }
+
+        function unsubscribe() {
+            if (socket) {
+                socket.emit('unsubscribe_plc');
+                isSubscribed = false;
+                document.getElementById('unsubscribeBtn').disabled = true;
+                log('Unsubscribed from PLC data');
+            }
+        }
+
+        function displayPlcData(data) {
+            const plcDataDiv = document.getElementById('plcData');
+            const timestamp = new Date(data.timestamp).toLocaleString();
+            
+            let html = `<div class="timestamp">Last updated: ${timestamp}</div>`;
+            
+            if (data.data.intake && data.data.intake.length > 0) {
+                html += '<div class="data-section"><h3>Intake Orders</h3>';
+                data.data.intake.forEach((order, index) => {
+                    html += `<div class="data-item">
+                        <strong>Line ${order.line}:</strong> 
+                        Badge: ${order.badge_no || 'N/A'}, 
+                        Material: ${order.material_code || 'N/A'}, 
+                        Qty: ${order.declared_qty_kg || 'N/A'} kg,
+                        Status: ${order.status_word?.label || 'N/A'}
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            if (data.data.outloading && data.data.outloading.length > 0) {
+                html += '<div class="data-section"><h3>Outloading Orders</h3>';
+                data.data.outloading.forEach((order, index) => {
+                    html += `<div class="data-item">
+                        <strong>Line ${order.line}:</strong> 
+                        Badge: ${order.badge_no || 'N/A'}, 
+                        Material: ${order.material_code || 'N/A'}, 
+                        Qty: ${order.declared_qty_kg || 'N/A'} kg,
+                        Status: ${order.status_word?.label || 'N/A'}
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            if (data.data.bulk) {
+                html += '<div class="data-section"><h3>Bulk Line</h3>';
+                html += `<div class="data-item">
+                    Source Silo: ${data.data.bulk.source_silo || 'N/A'}, 
+                    Qty: ${data.data.bulk.declared_qty_kg || 'N/A'} kg,
+                    Status: ${data.data.bulk.status_word?.code || 'N/A'}
+                </div>`;
+                html += '</div>';
+            }
+
+            if (data.data.pit) {
+                html += '<div class="data-section"><h3>Pit Line</h3>';
+                html += `<div class="data-item">
+                    Pit: ${data.data.pit.pit_no || 'N/A'}, 
+                    Material: ${data.data.pit.raw_code || 'N/A'}, 
+                    Qty: ${data.data.pit.declared_qty_kg || 'N/A'} kg,
+                    Status: ${data.data.pit.status_word?.code || 'N/A'}
+                </div>`;
+                html += '</div>';
+            }
+
+            if (!data.data.intake && !data.data.outloading && !data.data.bulk && !data.data.pit) {
+                html += '<p>No active orders found.</p>';
+            }
+
+            plcDataDiv.innerHTML = html;
+        }
+
+        // Auto-connect on page load
+        window.onload = function() {
+            log('Page loaded. Click "Connect" to start.');
+        };
+    </script>
+</body>
+</html>

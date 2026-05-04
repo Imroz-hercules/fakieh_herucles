@@ -1,0 +1,2161 @@
+import React, { useState, useEffect, useCallback } from 'react'
+import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayout'
+import { Truck, Package, Calendar, MapPin, CheckCircle, Clock, FileText, Search, RefreshCw, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination'
+import { useSilos } from '../../contexts/SiloContext'
+import axios from 'axios'
+import { API_BASE_URL, PLC_BASE_URL } from '../../config/api'
+import { useToast } from '@/hooks/use-toast'
+
+const baseUrl = API_BASE_URL
+const plcBase = PLC_BASE_URL;
+
+type OrderType = 'intake' | 'outloading' | 'bulk' | 'pit';
+const toNum = (v: any) => (v === '' || v === null || v === undefined ? 0 : Number(v));
+
+const plcEndpointFor = (orderType: OrderType, line?: number, isMineralOrder: boolean = false) => {
+  if (orderType === 'intake') {
+    if (isMineralOrder) {
+      return `${plcBase}/db/3/intake/line/${line}/write`;  // Mineral orders use DB3
+    } else {
+      return `${plcBase}/db/1/intake/line/${line}/write`;  // Regular intake uses DB1
+    }
+  }
+  if (orderType === 'outloading')return `${plcBase}/db/2/outloading/line/${line}/write`;
+  if (orderType === 'bulk')      return `${plcBase}/db/4/bulk/write`;
+  if (orderType === 'pit')        return `${plcBase}/db/4/pit/write`;
+  throw new Error('Unknown orderType');
+};
+
+const payloadFor = (orderType: OrderType, item: any) => {
+  if (orderType === 'intake' || orderType === 'outloading') {
+    // Extract just the material code (e.g., "100" from "100 - Yellow Maize 7.8%")
+    const materialCode = item.sourceMaterialCode && item.sourceMaterialCode.includes(' - ') 
+      ? item.sourceMaterialCode.split(' - ')[0] 
+      : item.sourceMaterialCode;
+    
+    const p: any = {
+      badge_no: item.badgeNo,                          // STRING or INT (ok)
+      material_code: materialCode,                     // STRING - just the code part
+      declared_qty_kg: toNum(item.declaredQuantityKG), // REAL
+      dest1: toNum(item.destinationSilo1),             // INT
+      dest2: toNum(item.destinationSilo2),             // INT
+    };
+    // Optional sel (if mapped on your PLC)
+    if (item.destSel !== undefined && item.destSel !== null) p.dest_sel = toNum(item.destSel);
+    return p;
+  }
+  if (orderType === 'bulk') {
+    return {
+      source_silo: toNum(item.sourceSilo),
+      dest1: toNum(item.destinationSilo1),
+      dest2: toNum(item.destinationSilo2),
+      cc25_sel: toNum(item.cc25Sel),
+      declared_qty_kg: toNum(item.declaredQuantityKG),
+      scale_sel: toNum(item.scaleSel),
+    };
+  }
+  if (orderType === 'pit') {
+    // Extract just the material code (e.g., "100" from "100 - Yellow Maize 7.8%")
+    const rawCode = item.rawCode && item.rawCode.includes(' - ') 
+      ? item.rawCode.split(' - ')[0] 
+      : item.rawCode;
+    
+    return {
+      pit_no: toNum(item.pitNo),
+      raw_code: rawCode,  // STRING - just the code part
+      dest1: toNum(item.destinationSilo1),
+      dest2: toNum(item.destinationSilo2),
+      declared_qty_kg: toNum(item.declaredQuantityKG),
+      scale_sel: toNum(item.scaleSel),
+    };
+  }
+};
+
+const sendToPLC = async (orderType: OrderType, item: any, line?: number, isMineralOrder: boolean = false) => {
+  try {
+    const url = plcEndpointFor(orderType, line, isMineralOrder);
+    const payload = payloadFor(orderType, item);
+    const { data } = await axios.post(url, payload);
+
+    if (data?.ok) {
+      const dbStatus = data.db_success ? '✅' : '⚠️';
+      const dbMessage = data.db_success ? 'stored in database' : 'failed to store in database';
+      alert(`✅ Sent to PLC (${orderType}${line ? ` / line ${line}` : ''}) ${dbStatus} ${dbMessage}`);
+    } else {
+      alert(`⚠️ PLC response: ${JSON.stringify(data)}`);
+    }
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status;
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message;
+
+      // common backend rejections you'll see
+      if (status === 409) {
+        alert(`⛔ Line not Idle. PLC says: ${msg}`);
+      } else if (status === 422) {
+        // Your HL/LOCK rule
+        alert(`⛔ Blocked by HL/LOCK: ${msg}`);
+      } else {
+        alert(`❌ PLC write failed: ${msg}`);
+      }
+    } else {
+      alert(`❌ PLC write failed: ${(err as Error).message}`);
+    }
+  }
+};
+
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'Idle':
+      return 'text-green-400 light:text-green-600 bg-green-500/10 light:bg-green-100 border-green-500/20 light:border-green-300'
+    case 'Starting':
+      return 'text-blue-400 light:text-blue-600 bg-blue-500/10 light:bg-blue-100 border-blue-500/20 light:border-blue-300'
+    case 'Running':
+      return 'text-purple-400 light:text-purple-600 bg-purple-500/10 light:bg-purple-100 border-purple-500/20 light:border-purple-300'
+    case 'Stopping':
+      return 'text-orange-400 light:text-orange-600 bg-orange-500/10 light:bg-orange-100 border-orange-500/20 light:border-orange-300'
+    case 'No Status':
+      return 'text-slate-400 light:text-slate-600 bg-slate-500/10 light:bg-slate-100 border-slate-500/20 light:border-slate-300'
+    // Legacy status types for backward compatibility
+    case 'Completed':
+      return 'text-green-400 light:text-green-600 bg-green-500/10 light:bg-green-100 border-green-500/20 light:border-green-300'
+    case 'Active':
+    case 'Loading':
+      return 'text-blue-400 light:text-blue-600 bg-blue-500/10 light:bg-blue-100 border-blue-500/20 light:border-blue-300'
+    case 'Pending':
+    case 'Scheduled':
+      return 'text-orange-400 light:text-orange-600 bg-orange-500/10 light:bg-orange-100 border-orange-500/20 light:border-orange-300'
+    case 'Processing':
+    case 'Preparing':
+      return 'text-purple-400 light:text-purple-600 bg-purple-500/10 light:bg-purple-100 border-purple-500/20 light:border-purple-300'
+    default:
+      return 'text-slate-400 light:text-slate-600 bg-slate-500/10 light:bg-slate-100 border-slate-500/20 light:border-slate-300'
+  }
+}
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'Idle':
+      return <CheckCircle className="h-3 w-3" />
+    case 'Starting':
+      return <Clock className="h-3 w-3" />
+    case 'Running':
+      return <Clock className="h-3 w-3" />
+    case 'Stopping':
+      return <Clock className="h-3 w-3" />
+    case 'No Status':
+      return <Clock className="h-3 w-3" />
+    // Legacy status types for backward compatibility
+    case 'Completed':
+      return <CheckCircle className="h-3 w-3" />
+    case 'Active':
+    case 'Loading':
+    case 'Processing':
+      return <Clock className="h-3 w-3" />
+    case 'Pending':
+    case 'Scheduled':
+    case 'Preparing':
+      return <Clock className="h-3 w-3" />
+    default:
+      return <Clock className="h-3 w-3" />
+  }
+}
+
+export function Orders() {
+  const { getSilosForOrder, getAvailableSilos } = useSilos();
+  const { toast } = useToast();
+  
+  // Hardcoded material codes and names from XML data
+  const materialCodes = [
+    { code: "None", name: "None" },
+    { code: "002", name: "Soya" },
+    { code: "5000", name: "PRODUCT1" },
+    { code: "202", name: "Salt" },
+    { code: "000", name: "Empty" },
+    { code: "100", name: "Yellow Maize 7.8%" },
+    { code: "112", name: "Bran 15.7%" },
+    { code: "105", name: "Soya O/C 47.5%" },
+    { code: "210", name: "Soya Oil" },
+    { code: "113", name: "Limestone 36%" },
+    { code: "204", name: "Monocalcium Phos" },
+    { code: "035", name: "Sodium Bicarbonate" },
+    { code: "012", name: "DL Methionine" },
+    { code: "073", name: "L Isoleucine" },
+    { code: "060", name: "L Threonine" },
+    { code: "072", name: "L Valine" },
+    { code: "8", name: "Lysine HCL" },
+    { code: "71", name: "Broiler Finisher PX" },
+    { code: "70", name: "Broiler Grower PX" },
+    { code: "31", name: "Broiler Mineral Mix" },
+    { code: "69", name: "Broiler Starter PX" },
+    { code: "26", name: "Choline Chloride" },
+    { code: "21", name: "Provi Oxi Stop" },
+    { code: "132", name: "Salmocid - F" },
+    { code: "79", name: "Sangrovit" },
+    { code: "62", name: "Econase XT25(100g)" },
+    { code: "44", name: "Phytase 10000 1000FTU (100g)" },
+    { code: "91", name: "Sacox (500g)" },
+    { code: "49", name: "Pelcin" },
+    { code: "300", name: "Water" }
+  ];
+  
+  // Helper function to get material name for a silo number
+  const getMaterialNameForSilo = (siloNumber: string | number) => {
+    if (!siloNumber || siloNumber === '') return '-';
+    
+    const allSilos = getAvailableSilos();
+    
+    const silo = allSilos.find(s => {
+      // Try multiple ways to match the silo number
+      const siloNum = s.silo_no || parseInt(s.bin_name.split(' ')[1]) || 0;
+      return siloNum === Number(siloNumber) || s.bin_name === `Silo ${siloNumber}`;
+    });
+    
+    
+    if (silo && silo.material_name) {
+      return silo.material_name;
+    }
+    
+    if (silo && silo.material_code) {
+      // Fallback to material code if no name available
+      return silo.material_code;
+    }
+    
+    return `Silo ${siloNumber}`;
+  };
+  
+  // Helper function to get material name from material code
+  const getMaterialNameFromCode = (materialCode: string | number) => {
+    if (!materialCode || materialCode === '') return '-';
+    
+    const material = materialCodes.find(m => m.code === String(materialCode));
+    return material ? material.name : String(materialCode);
+  };
+  
+  // Helper function to extract used silos from current orders
+  const extractUsedSilos = (orders: any[]) => {
+    const used = new Set<string>();
+    orders.forEach(order => {
+      // Add destination silos that are currently being used
+      if (order.destinationSilo1 && order.destinationSilo1 !== 'None' && order.destinationSilo1 !== '') {
+        used.add(order.destinationSilo1);
+      }
+      if (order.destinationSilo2 && order.destinationSilo2 !== 'None' && order.destinationSilo2 !== '') {
+        used.add(order.destinationSilo2);
+      }
+      // Add source silos for bulk orders
+      if (order.sourceSilo && order.sourceSilo !== 'None' && order.sourceSilo !== '') {
+        used.add(order.sourceSilo);
+      }
+    });
+    return used;
+  };
+  
+  // Helper function to get available silos count for user feedback
+  const getAvailableSilosCount = (fieldName: string) => {
+    if (fieldName === 'destinationSilo1' || fieldName === 'destinationSilo2') {
+      return getAvailableSilos().filter(silo => !silo.lock_active && !silo.hl_active && !usedSilos.has(silo.bin_name)).length;
+    } else if (fieldName === 'sourceSilo') {
+      return getAvailableSilos().filter(silo => (silo.material_code || silo.material_name) && !usedSilos.has(silo.bin_name)).length;
+    }
+    return getAvailableSilos().filter(silo => !usedSilos.has(silo.bin_name)).length;
+  };
+
+  // Helper to get silos for specific order type based on your exact silo mapping order
+  const getSilosForOrderType = (orderType: string, line?: number, isMineralOrder: boolean = false, isDestination: boolean = false) => {
+    // Get silos from the appropriate database based on order type
+    let availableSilos = []
+    
+    
+    switch (orderType) {
+      case 'intake':
+        if (isMineralOrder) {
+          // Mineral Intake: Use DB3 silos (401-408)
+          availableSilos = getAvailableSilos().filter(silo => silo.dbSource === 'DB3')
+        } else {
+          // Regular Intake Line 1 & 2: Use DB1 silos
+          availableSilos = getAvailableSilos().filter(silo => silo.dbSource === 'DB1')
+        }
+        break
+      
+      case 'outloading':
+        // Outloading: Use DB2 silos
+        availableSilos = getAvailableSilos().filter(silo => silo.dbSource === 'DB2')
+        break
+      
+      case 'bulk':
+        if (isDestination) {
+          // Bulk Line Destinations: Use only silos 301-322 (destination silos for bulk line)
+          availableSilos = getAvailableSilos().filter(silo => {
+            const siloNumber = parseInt(silo.bin_name.split(' ')[1]);
+            return siloNumber >= 301 && siloNumber <= 322;
+          })
+        } else {
+          // Bulk Line Sources: Use only silos 101-115 (source silos for bulk line)
+          availableSilos = getAvailableSilos().filter(silo => {
+            const siloNumber = parseInt(silo.bin_name.split(' ')[1]);
+            return siloNumber >= 101 && siloNumber <= 115;
+          })
+        }
+        break
+      
+      case 'pit':
+        // PIT Line: Use only silos 301-322 for destinations
+        availableSilos = getAvailableSilos().filter(silo => {
+          const siloNumber = parseInt(silo.bin_name.split(' ')[1]);
+          return siloNumber >= 301 && siloNumber <= 322;
+        })
+        break
+      
+      default:
+        availableSilos = getAvailableSilos()
+    }
+    
+    // Define the exact order of silos as per your spreadsheet
+    const siloOrderMappings = {
+      'intake': {
+        // Intake Line 1 & 2: Silo 101-115, then 201-203, then 301-322 (in exact order)
+        silos: [
+          'Silo 101', 'Silo 102', 'Silo 103', 'Silo 104', 'Silo 105', 'Silo 106', 'Silo 107', 'Silo 108', 'Silo 109', 'Silo 110',
+          'Silo 111', 'Silo 112', 'Silo 113', 'Silo 114', 'Silo 115',
+          'Silo 201', 'Silo 202', 'Silo 203',
+          'Silo 301', 'Silo 302', 'Silo 303', 'Silo 304', 'Silo 305', 'Silo 306', 'Silo 307', 'Silo 308', 'Silo 309', 'Silo 310',
+          'Silo 311', 'Silo 312', 'Silo 313', 'Silo 314', 'Silo 315', 'Silo 316', 'Silo 317', 'Silo 318', 'Silo 319', 'Silo 320',
+          'Silo 321', 'Silo 322'
+        ]
+      },
+      'mineral': {
+        // Mineral Intake: Silo 401-408 (in exact order)
+        silos: [
+          'Silo 401', 'Silo 402', 'Silo 403', 'Silo 404', 'Silo 405', 'Silo 406', 'Silo 407', 'Silo 408'
+        ]
+      },
+      'outloading': {
+        // Outloading: Silo 801-848 (in exact order)
+        silos: [
+          'Silo 801', 'Silo 802', 'Silo 803', 'Silo 804', 'Silo 805', 'Silo 806', 'Silo 807', 'Silo 808', 'Silo 809', 'Silo 810',
+          'Silo 811', 'Silo 812', 'Silo 813', 'Silo 814', 'Silo 815', 'Silo 816', 'Silo 817', 'Silo 818', 'Silo 819', 'Silo 820',
+          'Silo 821', 'Silo 822', 'Silo 823', 'Silo 824', 'Silo 825', 'Silo 826', 'Silo 827', 'Silo 828', 'Silo 829', 'Silo 830',
+          'Silo 831', 'Silo 832', 'Silo 833', 'Silo 834', 'Silo 835', 'Silo 836', 'Silo 837', 'Silo 838', 'Silo 839', 'Silo 840',
+          'Silo 841', 'Silo 842', 'Silo 843', 'Silo 844', 'Silo 845', 'Silo 846', 'Silo 847', 'Silo 848'
+        ]
+      },
+      'bulk': {
+        // Bulk Source: Silo 101-118, Bulk Destination: Silo 301-322 (in exact order)
+        silos: [
+          'Silo 101', 'Silo 102', 'Silo 103', 'Silo 104', 'Silo 105', 'Silo 106', 'Silo 107', 'Silo 108', 'Silo 109', 'Silo 110',
+          'Silo 111', 'Silo 112', 'Silo 113', 'Silo 114', 'Silo 115', 'Silo 116', 'Silo 117', 'Silo 118',
+          'Silo 301', 'Silo 302', 'Silo 303', 'Silo 304', 'Silo 305', 'Silo 306', 'Silo 307', 'Silo 308', 'Silo 309', 'Silo 310',
+          'Silo 311', 'Silo 312', 'Silo 313', 'Silo 314', 'Silo 315', 'Silo 316', 'Silo 317', 'Silo 318', 'Silo 319', 'Silo 320',
+          'Silo 321', 'Silo 322'
+        ]
+      },
+      'pit': {
+        // PIT Line: Use only silos 301-322 for destinations
+        silos: [
+          'Silo 301', 'Silo 302', 'Silo 303', 'Silo 304', 'Silo 305', 'Silo 306', 'Silo 307', 'Silo 308', 'Silo 309', 'Silo 310',
+          'Silo 311', 'Silo 312', 'Silo 313', 'Silo 314', 'Silo 315', 'Silo 316', 'Silo 317', 'Silo 318', 'Silo 319', 'Silo 320',
+          'Silo 321', 'Silo 322'
+        ]
+      }
+    }
+    
+    let targetSilos: string[] = []
+    
+    switch (orderType) {
+      case 'intake':
+        if (isMineralOrder) {
+          // Mineral Intake
+          targetSilos = siloOrderMappings.mineral.silos
+        } else {
+          // Intake Line 1 & 2
+          targetSilos = siloOrderMappings.intake.silos
+        }
+        break
+      
+      case 'outloading':
+        targetSilos = siloOrderMappings.outloading.silos
+        break
+      
+      case 'bulk':
+        targetSilos = siloOrderMappings.bulk.silos
+        break
+      
+      case 'pit':
+        targetSilos = siloOrderMappings.pit.silos
+        break
+      
+      default:
+        availableSilos = getAvailableSilos()
+    }
+    
+    // Filter and sort available silos according to the exact order from your spreadsheet
+    const orderedSilos = targetSilos
+      .map(siloName => availableSilos.find(silo => silo.bin_name === siloName))
+      .filter(silo => silo !== undefined) // Remove undefined entries
+    return orderedSilos
+  }
+  
+  const [showModal, setShowModal] = useState(false)
+  const [activeTab, setActiveTab] = useState('intake-line-1')
+  
+  // State to track currently used silos
+  const [usedSilos, setUsedSilos] = useState<Set<string>>(new Set())
+  
+  // Debug: Log activeTab changes
+  useEffect(() => {
+  }, [activeTab]);
+  const [formData, setFormData] = useState<Record<string, string | number>>({})
+  const [viewModal, setViewModal] = useState(false)
+  const [viewOrder, setViewOrder] = useState<any>(null)
+  const [editModal, setEditModal] = useState(false)
+  const [editOrder, setEditOrder] = useState<any>(null)
+  const [editFormData, setEditFormData] = useState<any>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+
+  
+  const [intakeLine1Data, setIntakeLine1Data] = useState<any[]>([])
+  const [intakeLine2Data, setIntakeLine2Data] = useState<any[]>([])
+  const [mineralIntakeData, setMineralIntakeData] = useState<any[]>([])
+  const [outloading1Data, setOutloading1Data] = useState<any[]>([])
+  const [outloading2Data, setOutloading2Data] = useState<any[]>([])
+  const [outloading3Data, setOutloading3Data] = useState<any[]>([])
+  const [bulkLineData, setBulkLineData] = useState<any[]>([])
+  const [ptLineData, setPtLineData] = useState<any[]>([])
+  const [binMaterials, setBinMaterials] = useState<any[]>([])
+  const [rfidConfigs, setRfidConfigs] = useState<any[]>([])
+  
+  // Note: Pagination removed since we're getting live PLC data
+
+  const [broadcastStatus, setBroadcastStatus] = useState<'running' | 'stopped' | 'starting' | 'stopping'>('stopped');
+
+
+  const fetchBinMaterials = useCallback(async () => {
+    try {
+      const response = await axios.get(`${baseUrl}/bin-materials`)
+      setBinMaterials(response.data || [])
+    } catch (error) {
+      
+    }
+  }, [])
+
+  const fetchRfidConfigs = useCallback(async () => {
+    try {
+      const response = await axios.get(`${baseUrl}/rfid/config`)
+      setRfidConfigs(response.data || [])
+    } catch (error) {
+      
+    }
+  }, [])
+
+  const startBroadcast = useCallback(async () => {
+    try {
+      setBroadcastStatus('starting')
+      const response = await axios.post(`${baseUrl}/websocket/start-broadcast`)
+      if (response.data.status === 'started') {
+        setBroadcastStatus('running')
+      } else {
+        setBroadcastStatus('stopped')
+        
+      }
+    } catch (error) {
+      setBroadcastStatus('stopped')
+      
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.message
+        
+      }
+    }
+  }, [])
+
+  const stopBroadcast = useCallback(async () => {
+    try {
+      setBroadcastStatus('stopping')
+      const response = await axios.post(`${baseUrl}/websocket/stop-broadcast`)
+      if (response.data.status === 'stopped') {
+        setBroadcastStatus('stopped')
+      } else {
+        setBroadcastStatus('running')
+        
+      }
+    } catch (error) {
+      setBroadcastStatus('running')
+      
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.message
+        
+      }
+    }
+  }, [])
+
+  const checkBroadcastStatus = useCallback(async () => {
+    try {
+      const response = await axios.get(`${baseUrl}/websocket/status`)
+      if (response.data.broadcast_running === true) {
+        setBroadcastStatus('running')
+      } else {
+        setBroadcastStatus('stopped')
+      }
+    } catch (error) {
+      // If status endpoint doesn't exist, assume stopped
+      setBroadcastStatus('stopped')
+    }
+  }, [])
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      // Fetch data directly from PLC
+      const plcResponse = await axios.get(`${plcBase}/plant/orders`);
+      const plcData = plcResponse.data;
+
+      // Mineral orders are now included in the PLC data
+
+      // Helper function to convert PLC data to frontend format
+      const convertPlcToFrontend = (plcOrder: any) => ({
+        id: `plc_${plcOrder.line}_${plcOrder.badge_no || 'empty'}_${Date.now()}`, // Generate unique ID
+        badgeNo: plcOrder.badge_no || '',
+        sourceMaterialCode: plcOrder.material_code || '',
+        declaredQuantityKG: plcOrder.declared_qty_kg || 0,
+        destinationSilo1: plcOrder.dest1 || '',
+        destinationSilo2: plcOrder.dest2 || '',
+        activeDestination: plcOrder.active_destination || '',
+        statusWord: typeof plcOrder.status_word === 'object' ? plcOrder.status_word?.label || 'Unknown' : 'Unknown',
+        statusCode: typeof plcOrder.status_word === 'object' ? plcOrder.status_word?.code || 0 : plcOrder.status_word || 0,
+        rfidBadgeReading: plcOrder.rfid_badge_reading || '',
+        activeBadge: plcOrder.active_badge || '',
+        destSel: plcOrder.dest_sel || '',
+        line: plcOrder.line,
+        // Add timestamp for real-time tracking
+        lastUpdated: new Date().toISOString()
+      });
+
+
+      // Process intake data (lines 1 and 2)
+      const intakeOrders = plcData.intake || [];
+      const intake1Orders = intakeOrders
+        .filter((order: any) => order.line === 1)
+        .map(convertPlcToFrontend);
+      const intake2Orders = intakeOrders
+        .filter((order: any) => order.line === 2)
+        .map(convertPlcToFrontend);
+      
+      // Process mineral orders from PLC data
+      const mineralOrders = (plcData.mineral || []).map(convertPlcToFrontend);
+
+      // Process outloading data (lines 1, 2, 3)
+      const outloadingOrders = plcData.outloading || [];
+      const outloading1Orders = outloadingOrders
+        .filter((order: any) => order.line === 1)
+        .map(convertPlcToFrontend);
+      const outloading2Orders = outloadingOrders
+        .filter((order: any) => order.line === 2)
+        .map(convertPlcToFrontend);
+      const outloading3Orders = outloadingOrders
+        .filter((order: any) => order.line === 3)
+        .map(convertPlcToFrontend);
+
+      // Process bulk data
+      const bulkData = plcData.bulk;
+      const bulkOrders = bulkData ? [{
+        id: `plc_bulk_${Date.now()}`,
+        sourceSilo: bulkData.source_silo || '',
+        destinationSilo1: bulkData.dest1 || '',
+        destinationSilo2: bulkData.dest2 || '',
+        cc25Sel: bulkData.cc25_sel || '',
+        declaredQuantityKG: bulkData.declared_qty_kg || 0,
+        scaleSel: bulkData.scale_sel || '',
+        statusWord: typeof bulkData.status_word === 'object' ? bulkData.status_word?.label || 'Unknown' : 'Unknown',
+        statusCode: typeof bulkData.status_word === 'object' ? bulkData.status_word?.code || 0 : bulkData.status_word || 0,
+        lastUpdated: new Date().toISOString()
+      }] : [];
+
+      // Process pit data
+      const pitData = plcData.pit;
+      const ptOrders = pitData ? [{
+        id: `plc_pit_${Date.now()}`,
+        pitNo: pitData.pit_no || '',
+        rawCode: pitData.raw_code || '',
+        destinationSilo1: pitData.dest1 || '',
+        destinationSilo2: pitData.dest2 || '',
+        declaredQuantityKG: pitData.declared_qty_kg || 0,
+        scaleSel: pitData.scale_sel || '',
+        statusWord: typeof pitData.status_word === 'object' ? pitData.status_word?.label || 'Unknown' : 'Unknown',
+        statusCode: typeof pitData.status_word === 'object' ? pitData.status_word?.code || 0 : pitData.status_word || 0,
+        lastUpdated: new Date().toISOString()
+      }] : [];
+
+      // Set the data directly from PLC
+      setIntakeLine1Data(intake1Orders);
+      setIntakeLine2Data(intake2Orders);
+      setMineralIntakeData(mineralOrders);
+      setOutloading1Data(outloading1Orders);
+      setOutloading2Data(outloading2Orders);
+      setOutloading3Data(outloading3Orders);
+      setBulkLineData(bulkOrders);
+      setPtLineData(ptOrders);
+      
+      // Note: Pagination removed since we're getting live PLC data
+      
+      // Extract used silos from all current orders
+      const allCurrentOrders = [
+        ...intake1Orders,
+        ...intake2Orders,
+        ...outloading1Orders,
+        ...outloading2Orders,
+        ...outloading3Orders,
+        ...bulkOrders,
+        ...ptOrders,
+        ...mineralOrders
+      ];
+      const usedSilosSet = extractUsedSilos(allCurrentOrders);
+      setUsedSilos(usedSilosSet);
+      
+      setLastUpdate(new Date())
+      setIsLoading(false)
+      
+    } catch (error) {
+      
+      setIsLoading(false)
+      
+      // Show user-friendly error message
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.message
+        
+        alert(`❌ Failed to fetch PLC data: ${errorMessage}`);
+      }
+    }
+  }, []) // Remove currentPage and itemsPerPage dependencies since we're getting live data
+
+  useEffect(() => {
+    // Initial fetch
+    fetchOrders()
+    fetchBinMaterials()
+    fetchRfidConfigs()
+    checkBroadcastStatus()
+
+    // Set up real-time updates every 5 seconds for live PLC status
+    const interval = setInterval(fetchOrders, 5000)
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval)
+  }, [])
+
+  // Handler for viewing an order
+  const handleView = (order: any) => {
+    setViewOrder(order)
+    setViewModal(true)
+  }
+
+  // Handler for editing an order
+  const handleEdit = (order: any) => {
+    setEditOrder(order)
+    setEditFormData({
+      badgeNo: order.badgeNo || '',
+      sourceMaterialCode: order.sourceMaterialCode || '',
+      declaredQuantityKG: order.declaredQuantityKG || '',
+      destinationSilo1: order.destinationSilo1 || '',
+      destinationSilo2: order.destinationSilo2 || ''
+    })
+    setEditModal(true)
+  }
+
+  // Function to create orders in both PLC and database
+  const createOrderComprehensive = async (orderType: OrderType, item: any, line?: number, isMineralOrder: boolean = false) => {
+    try {
+      const payload = {
+        order_type: orderType,
+        line: line,
+        is_mineral_order: isMineralOrder,
+        ...payloadFor(orderType, item)
+      };
+      
+      const { data } = await axios.post(`${plcBase}/orders/create`, payload);
+
+      if (data?.ok) {
+        const plcStatus = data.plc_success ? '✅' : '❌';
+        const dbStatus = data.db_success ? '✅' : '❌';
+        const dbOrderId = data.db_order_id ? ` (DB ID: ${data.db_order_id})` : '';
+        
+        toast({
+          title: "Order Created Successfully! 🎉",
+          description: `PLC: ${plcStatus} | Database: ${dbStatus}${dbOrderId}`,
+          variant: "default",
+        });
+        return true;
+      } else {
+        toast({
+          title: "Order Creation Failed",
+          description: `Failed to create order: ${JSON.stringify(data)}`,
+          variant: "destructive",
+        });
+        return false;
+      }
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+        const msg = err.response?.data?.error || err.response?.data?.message || err.message;
+        toast({
+          title: "Order Creation Failed",
+          description: msg,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Order Creation Failed",
+          description: (err as Error).message,
+          variant: "destructive",
+        });
+      }
+      return false;
+    }
+  };
+
+  // Handler for editing an order
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!editOrder) return
+    
+    try {
+      setIsLoading(true)
+      
+      // Determine order type and line from the editOrder
+      // Check the current active tab to determine the order type
+      let orderType = 'intake'
+      let line = 1
+      
+      if (activeTab === 'intake-line-1') {
+        orderType = 'intake'
+        line = 1
+      } else if (activeTab === 'intake-line-2') {
+        orderType = 'intake'
+        line = 2
+      } else if (activeTab === 'mineral-intake') {
+        orderType = 'intake'
+        line = 3 // ✅ CORRECT! Mineral intake uses line 3
+      } else if (activeTab === 'outloading-1') {
+        orderType = 'outloading'
+        line = 1
+      } else if (activeTab === 'outloading-2') {
+        orderType = 'outloading'
+        line = 2
+      } else if (activeTab === 'outloading-3') {
+        orderType = 'outloading'
+        line = 3
+      } else if (activeTab === 'bulk-line') {
+        orderType = 'bulk'
+        line = 1
+      } else if (activeTab === 'pt-line') {
+        orderType = 'pit'
+        line = 1
+      }
+      
+      // Create updated order data (only editable fields)
+      // Note: API expects specific field names
+      // Add validation to prevent None values
+      const updatedOrderData = {
+        badge_no: editFormData.badgeNo || "",
+        material_code: editFormData.sourceMaterialCode || "",
+        declared_qty_kg: Number(editFormData.declaredQuantityKG) || 0,
+        dest1: Number(editFormData.destinationSilo1) || 0,
+        dest2: Number(editFormData.destinationSilo2) || 0
+      }
+      
+      // Validate required fields
+      if (!updatedOrderData.badge_no || !updatedOrderData.material_code) {
+        alert("❌ Please fill in all required fields (RFID Badge and Material Code)")
+        return
+      }
+      
+      if (updatedOrderData.declared_qty_kg <= 0) {
+        alert("❌ Please enter a valid quantity greater than 0")
+        return
+      }
+      
+      if (updatedOrderData.dest1 <= 0 || updatedOrderData.dest2 <= 0) {
+        alert("❌ Please select valid destination silos")
+        return
+      }
+      
+      // Call the comprehensive order creation API to update the order
+      const response = await axios.post(`http://localhost:5000/api/plc/orders/create`, {
+        order_type: orderType,
+        line: line,
+        ...updatedOrderData
+      })
+      
+      if (response.data.ok) {
+        toast({
+          title: "Order Updated Successfully! ✅",
+          description: `RFID: ${updatedOrderData.badge_no} | Material: ${getMaterialNameFromCode(updatedOrderData.material_code)} | Quantity: ${updatedOrderData.declared_qty_kg} KG | Destinations: ${updatedOrderData.dest1}, ${updatedOrderData.dest2}`,
+          variant: "default",
+        });
+        setEditModal(false)
+        setEditOrder(null)
+        setEditFormData({})
+        // Refresh the orders data
+        fetchOrders()
+      } else {
+        alert(`❌ Failed to update order: ${response.data.error || 'Unknown error'}`)
+      }
+      
+    } catch (error: any) {
+      
+      alert(`❌ Error updating order: ${error.response?.data?.error || error.message || 'Unknown error'}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Handler for deleting an order (Note: PLC data cannot be deleted directly)
+  const handleDelete = async (orderType: string, id: number, line?: string) => {
+    alert(`ℹ️ Cannot delete PLC data directly. Orders shown are live data from the PLC.\n\nTo clear an order from the PLC, you would need to:\n1. Reset the PLC status\n2. Clear the order data in the PLC\n3. Or wait for the order to complete naturally\n\nThis data refreshes every 5 seconds from the PLC.`)
+  }
+  
+
+  // Note: Pagination helpers removed since we're getting live PLC data
+
+  // Helper to get fields for each line
+  const getFieldsForLine = (line: string) => {
+    switch (line) {
+      case 'intake-line-1':
+      case 'intake-line-2':
+      case 'mineral-intake':
+        return [
+          { name: 'badgeNo', label: 'RFID', type: 'select' },
+          { name: 'sourceMaterialCode', label: 'Source Material Code', type: 'select' },
+          { name: 'declaredQuantityKG', label: 'Declared Quantity (KG)', type: 'number' },
+          { name: 'destinationSilo1', label: 'Destination Silo 1 (Available Only)', type: 'select' },
+          { name: 'destinationSilo2', label: 'Destination Silo 2 (Available Only)', type: 'select' },
+          // NOTE: removed rfidBadgeReading, active*, statusWord (read-only)
+        ]
+      case 'outloading-1':
+      case 'outloading-2':
+      case 'outloading-3':
+        return [
+          { name: 'badgeNo', label: 'RFID', type: 'select' },
+          { name: 'sourceMaterialCode', label: 'Source Material Code', type: 'select' },
+          { name: 'declaredQuantityKG', label: 'Declared Quantity (KG)', type: 'number' },
+          { name: 'destinationSilo1', label: 'Destination Silo 1 (Available Only)', type: 'select' },
+          { name: 'destinationSilo2', label: 'Destination Silo 2 (Available Only)', type: 'select' },
+          // Optional if your PLC supports it:
+          // { name: 'destSel', label: 'Dest Selection', type: 'number' },
+        ]
+      case 'bulk-line':
+        return [
+          { name: 'sourceSilo', label: 'Source Silo (With Material)', type: 'select' },
+          { name: 'destinationSilo1', label: 'Destination 1 (Available Only)', type: 'select' },
+          { name: 'destinationSilo2', label: 'Destination 2 (Available Only)', type: 'select' },
+          { name: 'cc25Sel', label: 'CC25 Selection', type: 'text' },
+          { name: 'declaredQuantityKG', label: 'Weight Quantity (KG)', type: 'number' },
+          { name: 'scaleSel', label: 'Scale Selection', type: 'text' },
+        ]
+      case 'pt-line':
+        return [
+          { name: 'pitNo', label: 'Pit Number', type: 'text' },
+          { name: 'rawCode', label: 'Raw Material Code', type: 'select' },
+          { name: 'destinationSilo1', label: 'Destination 1 (Available Only)', type: 'select' },
+          { name: 'destinationSilo2', label: 'Destination 2 (Available Only)', type: 'select' },
+          { name: 'declaredQuantityKG', label: 'Weight Quantity (KG)', type: 'number' },
+          { name: 'scaleSel', label: 'Scale Selection', type: 'text' },
+        ]
+      default:
+        return []
+    }
+  }
+
+  // Helper function to render table for intake lines
+  const renderIntakeTable = (data: any[], title: string, line: string) => {
+    const lineNo = Number(line.split('-').pop()) || 1;
+    const currentData = data; // Live PLC data
+
+    return (
+    <div className="bg-slate-950/50 light:bg-white border border-slate-700/30 light:border-gray-200 rounded-lg backdrop-blur-sm light:shadow-lg">
+      <div className="p-6 border-b border-slate-700/30 light:border-gray-200">
+        <h3 className="text-lg font-semibold text-white light:text-gray-900">{title}</h3>
+      </div>
+      <div className="p-6">
+        <div className="rounded-md border border-slate-700/30 light:border-gray-200">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
+                <TableHead className="text-white light:text-gray-900 font-semibold">RFID</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Source/Line Material</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Declared Quantity_KG</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Destination 1 (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Destination 2 (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Active Destination (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Status Word</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+                {Array.isArray(currentData) && currentData.map((item, index) => (
+                <TableRow key={item.id} className={`border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-slate-900/20 light:bg-gray-50' : 'bg-slate-800/10 light:bg-gray-100'}`}>
+                  <TableCell className="text-cyan-400 light:text-blue-600 font-medium">{item.badgeNo}</TableCell>
+                  <TableCell className="text-white light:text-gray-900">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 light:text-gray-500">{item.sourceMaterialCode || '-'}</span>
+                      <span className="font-medium">{getMaterialNameFromCode(item.sourceMaterialCode)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 light:bg-yellow-100 border border-yellow-500/20 light:border-yellow-300 text-yellow-400 light:text-yellow-600">
+                      {item.declaredQuantityKG}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-slate-300 light:text-gray-700">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.destinationSilo1}</span>
+                      <span className="font-medium">{getMaterialNameForSilo(item.destinationSilo1)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-slate-300 light:text-gray-700">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.destinationSilo2}</span>
+                      <span className="font-medium">{getMaterialNameForSilo(item.destinationSilo2)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-slate-300 light:text-gray-700">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.activeDestination || '-'}</span>
+                      <span className="font-medium">{getMaterialNameForSilo(item.activeDestination)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(item.statusWord)}`}>
+                      {getStatusIcon(item.statusWord)}
+                      <span className="ml-1">{item.statusWord}</span>
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className="text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700">View</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 light:bg-orange-600 light:text-white light:hover:bg-orange-700 border-2 border-orange-500 font-bold">✏️ Edit</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+  };
+
+  // Helper function to render table for outloading lines
+  const renderOutloadingTable = (data: any[], title: string, line: string) => {
+    const lineNo = Number(line.split('-').pop()) || 1;
+    const currentData = data; // Live PLC data
+
+    return (
+    <div className="bg-slate-950/50 light:bg-white border border-slate-700/30 light:border-gray-200 rounded-lg backdrop-blur-sm light:shadow-lg">
+      <div className="p-6 border-b border-slate-700/30 light:border-gray-200">
+        <h3 className="text-lg font-semibold text-white light:text-gray-900">{title}</h3>
+      </div>
+      <div className="p-6">
+        <div className="rounded-md border border-slate-700/30 light:border-gray-200">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
+                <TableHead className="text-white light:text-gray-900 font-semibold">RFID</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Source/Line Material</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Declared Quantity_KG</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Destination 1 (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Destination 2 (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Active Destination (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Status Word</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.isArray(currentData) && currentData.map((item, index) => (
+                <TableRow key={item.id} className={`border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-slate-900/20 light:bg-gray-50' : 'bg-slate-800/10 light:bg-gray-100'}`}>
+                  <TableCell className="text-cyan-400 light:text-blue-600 font-medium">{item.badgeNo}</TableCell>
+                  <TableCell className="text-white light:text-gray-900">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 light:text-gray-500">{item.sourceMaterialCode || '-'}</span>
+                      <span className="font-medium">{getMaterialNameFromCode(item.sourceMaterialCode)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 light:bg-yellow-100 border border-yellow-500/20 light:border-yellow-300 text-yellow-400 light:text-yellow-600">
+                      {item.declaredQuantityKG}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-slate-300 light:text-gray-700">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.destinationSilo1}</span>
+                      <span className="font-medium">{getMaterialNameForSilo(item.destinationSilo1)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-slate-300 light:text-gray-700">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.destinationSilo2}</span>
+                      <span className="font-medium">{getMaterialNameForSilo(item.destinationSilo2)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-slate-300 light:text-gray-700">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.activeDestination || '-'}</span>
+                      <span className="font-medium">{getMaterialNameForSilo(item.activeDestination)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(item.statusWord)}`}>
+                      {getStatusIcon(item.statusWord)}
+                      <span className="ml-1">{item.statusWord}</span>
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className="text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700">View</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 light:bg-orange-600 light:text-white light:hover:bg-orange-700 border-2 border-orange-500 font-bold">✏️ Edit</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+  };
+
+  // Helper function to render table for bulk line
+  const renderBulkLineTable = (data: any[], title: string) => {
+    const currentData = data; // Live PLC data
+
+    return (
+    <div className="bg-slate-950/50 light:bg-white border border-slate-700/30 light:border-gray-200 rounded-lg backdrop-blur-sm light:shadow-lg">
+      <div className="p-6 border-b border-slate-700/30 light:border-gray-200">
+        <h3 className="text-lg font-semibold text-white light:text-gray-900">{title}</h3>
+      </div>
+      <div className="p-6">
+        <div className="rounded-md border border-slate-700/30 light:border-gray-200 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
+                <TableHead className="text-white light:text-gray-900 font-semibold">Source Silo (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Destination 1 (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Destination 2 (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">CC25 Sel</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Weight Quantity</TableHead>
+                  <TableHead className="text-white light:text-gray-900 font-semibold">Scale Sel</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Status</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.isArray(currentData) && currentData.map((item, index) => (
+                <TableRow key={item.id} className={`border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-slate-900/20 light:bg-gray-50' : 'bg-slate-800/10 light:bg-gray-100'}`}>
+                    <TableCell className="text-cyan-400 light:text-blue-600 font-medium">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.sourceSilo || '-'}</span>
+                        <span className="font-medium">{getMaterialNameForSilo(item.sourceSilo)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-white light:text-gray-900">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.destinationSilo1 || '-'}</span>
+                        <span className="font-medium">{getMaterialNameForSilo(item.destinationSilo1)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-slate-300 light:text-gray-700">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.destinationSilo2 || '-'}</span>
+                        <span className="font-medium">{getMaterialNameForSilo(item.destinationSilo2)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-slate-300 light:text-gray-700">{item.cc25Sel || '-'}</TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 light:bg-yellow-100 border border-yellow-500/20 light:border-yellow-300 text-yellow-400 light:text-yellow-600">
+                        {item.declaredQuantityKG || 0}
+                    </span>
+                  </TableCell>
+                    <TableCell className="text-slate-300 light:text-gray-700">{item.scaleSel || '-'}</TableCell>
+                  <TableCell>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(item.statusWord)}`}>
+                        {getStatusIcon(item.statusWord)}
+                        <span className="ml-1">{item.statusWord || 'Unknown'}</span>
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className="text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700">View</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 light:bg-orange-600 light:text-white light:hover:bg-orange-700 border-2 border-orange-500 font-bold">✏️ Edit</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+  };
+
+  // Helper function to render table for PIT line
+  const renderPTLineTable = (data: any[], title: string) => {
+    const currentData = data; // Live PLC data
+
+    return (
+    <div className="bg-slate-950/50 light:bg-white border border-slate-700/30 light:border-gray-200 rounded-lg backdrop-blur-sm light:shadow-lg">
+      <div className="p-6 border-b border-slate-700/30 light:border-gray-200">
+        <h3 className="text-lg font-semibold text-white light:text-gray-900">{title}</h3>
+      </div>
+      <div className="p-6">
+        <div className="rounded-md border border-slate-700/30 light:border-gray-200 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
+                  <TableHead className="text-white light:text-gray-900 font-semibold">Pit No</TableHead>
+                  <TableHead className="text-white light:text-gray-900 font-semibold">Raw Code</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Destination 1 (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Destination 2 (Material)</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Weight Quantity</TableHead>
+                  <TableHead className="text-white light:text-gray-900 font-semibold">Scale Sel</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Status</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.isArray(currentData) && currentData.map((item, index) => (
+                <TableRow key={item.id} className={`border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-slate-900/20 light:bg-gray-50' : 'bg-slate-800/10 light:bg-gray-100'}`}>
+                    <TableCell className="text-cyan-400 light:text-blue-600 font-medium">{item.pitNo || '-'}</TableCell>
+                    <TableCell className="text-white light:text-gray-900">{item.rawCode || '-'}</TableCell>
+                    <TableCell className="text-slate-300 light:text-gray-700">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.destinationSilo1 || '-'}</span>
+                        <span className="font-medium">{getMaterialNameForSilo(item.destinationSilo1)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-slate-300 light:text-gray-700">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-slate-400 light:text-gray-500">Silo {item.destinationSilo2 || '-'}</span>
+                        <span className="font-medium">{getMaterialNameForSilo(item.destinationSilo2)}</span>
+                      </div>
+                    </TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 light:bg-yellow-100 border border-yellow-500/20 light:border-yellow-300 text-yellow-400 light:text-yellow-600">
+                        {item.declaredQuantityKG || 0}
+                    </span>
+                  </TableCell>
+                    <TableCell className="text-slate-300 light:text-gray-700">{item.scaleSel || '-'}</TableCell>
+                  <TableCell>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(item.statusWord)}`}>
+                        {getStatusIcon(item.statusWord)}
+                        <span className="ml-1">{item.statusWord || 'Unknown'}</span>
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className="text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700">View</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 light:bg-orange-600 light:text-white light:hover:bg-orange-700 border-2 border-orange-500 font-bold">✏️ Edit</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+  };
+
+  return (
+    <WaterSystemLayout 
+      title="Orders Management" 
+      subtitle="Order processing, bay organization, and fulfillment"
+    >
+      <div className="space-y-6">
+        {/* Real-time Status Bar */}
+        <div className="flex items-center justify-between bg-slate-900/50 light:bg-gray-100 p-4 rounded-lg border border-slate-700/30 light:border-gray-200">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${
+                broadcastStatus === 'running' ? 'bg-green-500' : 
+                broadcastStatus === 'starting' || broadcastStatus === 'stopping' ? 'bg-yellow-500' : 'bg-red-500'
+              }`}></div>
+              <span className="text-sm text-white light:text-gray-700">
+                PLC orders: {broadcastStatus === 'running' ? 'Running' : 
+                           broadcastStatus === 'starting' ? 'Starting...' :
+                           broadcastStatus === 'stopping' ? 'Stopping...' : 'Stopped'}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-sm text-white light:text-gray-700">
+                Live PLC Data (5s updates)
+              </span>
+            </div>
+            <span className="text-xs text-slate-400 light:text-gray-500">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            {isLoading && (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-500"></div>
+                <span className="text-sm text-slate-400 light:text-gray-500">Loading...</span>
+              </div>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchOrders}
+              disabled={isLoading}
+              className="text-xs bg-cyan-600 hover:bg-cyan-700 text-white border-cyan-600 hover:border-cyan-700 light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white light:border-cyan-600 light:hover:border-cyan-700"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh
+            </Button>
+            <Button 
+              variant={broadcastStatus === 'running' ? 'destructive' : 'default'}
+              size="sm" 
+              onClick={broadcastStatus === 'running' ? stopBroadcast : startBroadcast}
+              disabled={broadcastStatus === 'starting' || broadcastStatus === 'stopping'}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700 light:bg-red-600 light:hover:bg-red-700 light:text-white light:border-red-600 light:hover:border-red-700"
+            >
+              {broadcastStatus === 'running' ? 'Stop Broadcast' : 
+               broadcastStatus === 'starting' ? 'Starting...' :
+               broadcastStatus === 'stopping' ? 'Stopping...' : 'Start Broadcast'}
+            </Button>
+          </div>
+        </div>
+
+        <Button className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white mb-4" onClick={() => setShowModal(true)}>
+          Add Order
+        </Button>
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-slate-900 p-4 rounded-xl w-full max-w-xl space-y-3 border border-slate-700 shadow-xl overflow-y-auto max-h-[90vh]">
+              <h2 className="text-lg font-semibold text-white mb-2 text-center">Add New Order ({activeTab === 'pt-line' ? 'PIT line' : activeTab.replace(/-/g, ' ')})</h2>
+              <form onSubmit={async e => {
+                    e.preventDefault()
+                    try {
+                      const newOrder = { ...formData }
+                      
+                      // Convert "none" values to empty strings for backend compatibility
+                      Object.keys(newOrder).forEach(key => {
+                        if (newOrder[key] === 'none') {
+                          newOrder[key] = '';
+                        }
+                      });
+
+                      let orderType: OrderType;
+                      let line: number | undefined;
+                      
+                      if (activeTab === 'intake-line-1') {
+                        orderType = 'intake';
+                        line = 1;
+                      } else if (activeTab === 'intake-line-2') {
+                        orderType = 'intake';
+                        line = 2;
+                      } else if (activeTab === 'mineral-intake') {
+                        orderType = 'intake';
+                        line = 3; // ✅ CORRECT! Mineral intake uses line 3
+                      } else if (activeTab === 'outloading-1') {
+                        orderType = 'outloading';
+                        line = 1;
+                      } else if (activeTab === 'outloading-2') {
+                        orderType = 'outloading';
+                        line = 2;
+                      } else if (activeTab === 'outloading-3') {
+                        orderType = 'outloading';
+                        line = 3;
+                      } else if (activeTab === 'bulk-line') {
+                        orderType = 'bulk';
+                      } else if (activeTab === 'pt-line') {
+                        orderType = 'pit';
+                      } else {
+                        throw new Error('Unknown order type');
+                      }
+
+                      // Create order in both PLC and database
+                      const isMineralOrder = activeTab === 'mineral-intake';
+                      
+                      // Validate mineral order destinations (401-408)
+                      if (isMineralOrder) {
+                        const dest1 = parseInt(String(newOrder.destinationSilo1));
+                        const dest2 = parseInt(String(newOrder.destinationSilo2));
+                        
+                        if ((dest1 < 401 || dest1 > 408) && (dest2 < 401 || dest2 > 408)) {
+                          toast({
+                            title: "Invalid Destination Silo",
+                            description: "Mineral orders must have at least one destination silo in range 401-408",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        
+                        if (dest1 >= 401 && dest1 <= 408 && (dest2 < 401 || dest2 > 408) && dest2 !== 0) {
+                          toast({
+                            title: "Invalid Destination Silo",
+                            description: "Mineral orders: If destination 2 is provided, it must be in range 401-408",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        
+                        if (dest2 >= 401 && dest2 <= 408 && (dest1 < 401 || dest1 > 408) && dest1 !== 0) {
+                          toast({
+                            title: "Invalid Destination Silo",
+                            description: "Mineral orders: If destination 1 is provided, it must be in range 401-408",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                      }
+                      
+                      const success = await createOrderComprehensive(orderType, newOrder, line, isMineralOrder);
+                      
+                      if (success) {
+                        // Refresh all data after successful creation
+                        await fetchOrders();
+                        setFormData({})
+                        setShowModal(false)
+                      }
+                    } catch (err) {
+                      
+                      if (axios.isAxiosError(err)) {
+                        const errorMessage = err.response?.data?.message || err.message
+                        
+                        toast({
+                          title: "Order Creation Failed",
+                          description: errorMessage,
+                          variant: "destructive",
+                        });
+                      } else {
+                        toast({
+                          title: "Order Creation Failed",
+                          description: (err as Error).message,
+                          variant: "destructive",
+                        });
+                      }
+                    }
+                  }}>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {getFieldsForLine(activeTab).map(field => {
+                    // Hide destination silo fields until source is selected (different logic for different order types)
+                    let shouldHideSiloFields = false;
+                    
+                    if (field.name === 'destinationSilo1' || field.name === 'destinationSilo2') {
+                      if (activeTab === 'bulk-line') {
+                        // For bulk orders, check if sourceSilo is selected
+                        shouldHideSiloFields = !formData.sourceSilo || formData.sourceSilo === '';
+                      } else if (activeTab === 'pt-line') {
+                        // For pit orders, check if rawCode is selected
+                        shouldHideSiloFields = !formData.rawCode || formData.rawCode === '';
+                      } else {
+                        // For intake/outloading orders, check if sourceMaterialCode is selected
+                        shouldHideSiloFields = !formData.sourceMaterialCode || formData.sourceMaterialCode === '';
+                      }
+                    }
+                    
+                    if (shouldHideSiloFields) {
+                      return null;
+                    }
+                    
+                    const availableCount = getAvailableSilosCount(field.name);
+                    const labelWithCount = field.type === 'select' && (field.name.includes('Silo') || field.name === 'sourceSilo') 
+                      ? `${field.label} (${availableCount} available)`
+                      : field.label;
+                    
+                    return (
+                    <div key={field.name} className="flex flex-col">
+                      <label className="block text-slate-300 mb-1 text-xs font-medium">{labelWithCount}</label>
+                      {field.type === 'select' ? (
+                        <Select
+                          value={String(formData[field.name] || '')}
+                          onValueChange={(value) => {
+                            const newFormData = { ...formData, [field.name]: value };
+                            
+                            // If changing destinationSilo1, clear destinationSilo2 if it's the same
+                            if (field.name === 'destinationSilo1' && formData.destinationSilo2 === value) {
+                              newFormData.destinationSilo2 = '';
+                            }
+                            
+                            setFormData(newFormData);
+                          }}
+                        >
+                          <SelectTrigger className="bg-slate-800/70 light:bg-white border-slate-600 light:border-gray-200 text-white light:text-gray-900 w-full h-8 text-sm">
+                            <SelectValue placeholder={`Select ${field.label}`} />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 light:bg-white border-slate-600 light:border-gray-200">
+                            <SelectItem value="none">None</SelectItem>
+                            {field.name === 'badgeNo' ? (
+                              // RFID configs for badge number
+                              rfidConfigs.map((rfid) => (
+                                <SelectItem key={rfid.id} value={rfid.rfid_number}>
+                                  {rfid.rfid_number} {rfid.rfid_used ? '(Used)' : '(Available)'}
+                                </SelectItem>
+                              ))
+                            ) : field.name === 'sourceMaterialCode' || field.name === 'rawCode' ? (
+                              // Material codes dropdown (for both sourceMaterialCode and rawCode)
+                              materialCodes.map((material) => (
+                                <SelectItem key={material.code} value={material.code}>
+                                  {material.code} - {material.name}
+                                </SelectItem>
+                              ))
+     ) : field.name === 'pitNo' ? (
+       // PIT Number is now a simple text input - no dropdown needed
+       null
+                              ) : (
+                                // Get available silos based on order type and filter by status and material
+                              (() => {
+                                let availableSilos = [];
+                                
+                                // Determine which silos to show based on field name and order type
+                                // Get order type and line for proper silo filtering
+                                let orderType = 'intake';
+                                let line = 1;
+                                
+                                if (activeTab === 'intake-line-1') {
+                                  orderType = 'intake';
+                                  line = 1;
+                                } else if (activeTab === 'intake-line-2') {
+                                  orderType = 'intake';
+                                  line = 2;
+                                } else if (activeTab === 'mineral-intake') {
+                                  orderType = 'intake';
+                                  line = 3; // ✅ CORRECT! Mineral intake uses line 3
+                                } else if (activeTab === 'outloading-1') {
+                                  orderType = 'outloading';
+                                  line = 1;
+                                } else if (activeTab === 'outloading-2') {
+                                  orderType = 'outloading';
+                                  line = 2;
+                                } else if (activeTab === 'outloading-3') {
+                                  orderType = 'outloading';
+                                  line = 3;
+                                } else if (activeTab === 'bulk-line') {
+                                  orderType = 'bulk';
+                                  line = 1;
+                                } else if (activeTab === 'pt-line') {
+                                  orderType = 'pit';
+                                  line = 1;
+                                }
+
+                                if (field.name === 'destinationSilo1' || field.name === 'destinationSilo2') {
+                                  // For destination silos, filter by order type, material code and status
+                                  const isMineralOrder = activeTab === 'mineral-intake';
+                                  const allSilosForType = getSilosForOrderType(orderType, line, isMineralOrder, true);
+                                  
+                                  // Get material code for filtering (declare outside filter function)
+                                    let materialCodeStr = '';
+                                    let materialCodeField = '';
+                                    if (activeTab === 'pt-line') {
+                                      materialCodeStr = String(formData.rawCode || '');
+                                      materialCodeField = 'rawCode';
+                                  } else if (activeTab === 'bulk-line') {
+                                    // For bulk orders, get material from selected source silo
+                                    const sourceSilos = getSilosForOrderType(orderType, line, isMineralOrder, false); // Get source silos (101-115)
+                                    
+                                    // Try multiple ways to find the selected source silo
+                                    let selectedSourceSilo = sourceSilos.find(s => s.bin_name === formData.sourceSilo);
+                                    
+                                    // If not found by full name, try by silo number
+                                    if (!selectedSourceSilo && formData.sourceSilo) {
+                                      const siloNumber = formData.sourceSilo.toString();
+                                      selectedSourceSilo = sourceSilos.find(s => s.bin_name.includes(siloNumber));
+                                      }
+                                    
+                                    if (selectedSourceSilo) {
+                                      // Use the full material display format like "210 - Soya Oil"
+                                      materialCodeStr = selectedSourceSilo.material_code && selectedSourceSilo.material_name 
+                                        ? `${selectedSourceSilo.material_code} - ${selectedSourceSilo.material_name}`
+                                        : selectedSourceSilo.material_name || selectedSourceSilo.material_code || '';
+                                      materialCodeField = 'sourceSilo';
+                                      } else {
+                                      }
+                                    } else {
+                                      materialCodeStr = String(formData.sourceMaterialCode || '');
+                                      materialCodeField = 'sourceMaterialCode';
+                                    }
+                                    
+                                  // FINAL: Filter by material code + exclude locked/high level silos + exclude already used silos
+                                  availableSilos = allSilosForType.filter(silo => {
+                                    // Must be unlocked and normal level
+                                    const isAvailable = !silo.lock_active && !silo.hl_active;
+                                    
+                                    // Must not be already used by another order
+                                    const isNotUsed = !usedSilos.has(silo.bin_name);
+                                    
+                                    let materialMatches = false;
+                                    if (activeTab === 'bulk-line') {
+                                      // For bulk orders, filter by material from source silo
+                                      if (materialCodeStr && materialCodeStr !== '' && materialCodeStr !== 'None' && materialCodeStr !== 'None - None') {
+                                        // Extract material code and name from source silo
+                                        const sourceMaterialCode = materialCodeStr.includes(' - ') ? materialCodeStr.split(' - ')[0] : materialCodeStr;
+                                        const sourceMaterialName = materialCodeStr.includes(' - ') ? materialCodeStr.split(' - ')[1] : materialCodeStr;
+                                        
+                                        // Check if destination silo matches source material (multiple ways to match)
+                                        materialMatches = Boolean(silo.material_code === sourceMaterialCode ||
+                                                        silo.material_name === sourceMaterialName ||
+                                                        silo.material_code === materialCodeStr ||
+                                                        silo.material_name === materialCodeStr ||
+                                                        // Also check if material names contain the same key words
+                                                        (sourceMaterialName && silo.material_name && 
+                                                         sourceMaterialName.toLowerCase().includes('soya') && 
+                                                         silo.material_name.toLowerCase().includes('soya')) ||
+                                                        (sourceMaterialName && silo.material_name && 
+                                                         sourceMaterialName.toLowerCase().includes('oil') && 
+                                                         silo.material_name.toLowerCase().includes('oil')));
+                                        
+                                        } else {
+                                        materialMatches = false;
+                                      }
+                                    } else {
+                                      // For other order types, use the original logic
+                                      materialMatches = Boolean(!materialCodeStr || 
+                                                          materialCodeStr === '' ||
+                                                          materialCodeStr === 'None' ||
+                                                          materialCodeStr === 'None - None' ||
+                                                          silo.material_code === materialCodeStr ||
+                                                          silo.material_name === materialCodeStr ||
+                                                          // Extract just the code part from "210 - Soya Oil" format
+                                                          (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                           silo.material_code === materialCodeStr.split(' - ')[0]) ||
+                                                          // Also check if silo material matches the full display text
+                                                          (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                           silo.material_name === materialCodeStr.split(' - ')[1]));
+                                    }
+                                    
+                                    // Debug logging for bulk orders
+                                    if (activeTab === 'bulk-line' && (field.name === 'destinationSilo1' || field.name === 'destinationSilo2')) {
+                                      }
+                                    
+                                    // For destinationSilo2, exclude the silo already selected in destinationSilo1
+                                    // Also exclude the pit number silo from destination dropdowns
+                                    const siloNumber = silo.bin_name.split(' ')[1] || 'unknown';
+                                    const isNotAlreadySelected = (field.name !== 'destinationSilo2' || 
+                                                               !formData.destinationSilo1 || 
+                                                               formData.destinationSilo1 !== siloNumber) &&
+                                                               // Exclude pit number silo from destination dropdowns
+                                                               (!formData.pitNo || formData.pitNo !== siloNumber);
+                                    
+                                    return isAvailable && isNotUsed && materialMatches && isNotAlreadySelected;
+                                  });
+                                  
+                                  // Summary for bulk orders
+                                  if (activeTab === 'bulk-line') {
+                                    }
+                                } else if (field.name === 'sourceSilo') {
+                                  // For source silos (bulk line), filter by material code + exclude locked/high level + exclude already used silos
+                                  const isMineralOrder = activeTab === 'mineral-intake';
+                                  availableSilos = getSilosForOrderType(orderType, line, isMineralOrder).filter(silo => {
+                                    // Must be unlocked and normal level
+                                    const isAvailable = !silo.lock_active && !silo.hl_active;
+                                    
+                                    // Must not be already used by another order
+                                    const isNotUsed = !usedSilos.has(silo.bin_name);
+                                    
+                                    // Must match the material code if one is specified
+                                    const materialCodeStr = String(formData.sourceMaterialCode || '');
+                                    const materialMatches = !formData.sourceMaterialCode || 
+                                                          materialCodeStr === '' ||
+                                                          materialCodeStr === 'None' ||
+                                                          materialCodeStr === 'None - None' ||
+                                                          silo.material_code === formData.sourceMaterialCode ||
+                                                          silo.material_name === formData.sourceMaterialCode ||
+                                                          // Extract just the code part from "210 - Soya Oil" format
+                                                          (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                           silo.material_code === materialCodeStr.split(' - ')[0]) ||
+                                                          // Also check if silo material matches the full display text
+                                                          (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                           silo.material_name === materialCodeStr.split(' - ')[1]);
+                                    
+                                    return isAvailable && isNotUsed && materialMatches;
+                                  });
+                                } else {
+                                  // For other fields, filter by material code + exclude locked/high level + exclude already used silos
+                                  const isMineralOrder = activeTab === 'mineral-intake';
+                                  availableSilos = getSilosForOrderType(orderType, line, isMineralOrder).filter(silo => {
+                                    // Must be unlocked and normal level
+                                    const isAvailable = !silo.lock_active && !silo.hl_active;
+                                    
+                                    // Must not be already used by another order
+                                    const isNotUsed = !usedSilos.has(silo.bin_name);
+                                    
+                                    // Must match the material code if one is specified
+                                    const materialCodeStr = String(formData.sourceMaterialCode || '');
+                                    const materialMatches = !formData.sourceMaterialCode || 
+                                                          materialCodeStr === '' ||
+                                                          materialCodeStr === 'None' ||
+                                                          materialCodeStr === 'None - None' ||
+                                                          silo.material_code === formData.sourceMaterialCode ||
+                                                          silo.material_name === formData.sourceMaterialCode ||
+                                                          // Extract just the code part from "210 - Soya Oil" format
+                                                          (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                           silo.material_code === materialCodeStr.split(' - ')[0]) ||
+                                                          // Also check if silo material matches the full display text
+                                                          (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                           silo.material_name === materialCodeStr.split(' - ')[1]);
+                                    
+                                    return isAvailable && isNotUsed && materialMatches;
+                                  });
+                                }
+                                
+                                return availableSilos.map((silo) => {
+                                  const siloNumber = silo.bin_name.split(' ')[1] || 'unknown';
+                                  const materialInfo = silo.material_name || silo.material_code || 'No Material';
+                                  const statusInfo = [];
+                                  
+                                  if (silo.lock_active) statusInfo.push('LOCKED');
+                                  if (silo.hl_active) statusInfo.push('HIGH LEVEL');
+                                  
+                                  const statusText = statusInfo.length > 0 ? ` (${statusInfo.join(', ')})` : '';
+                                  
+                                  return (
+                                    <SelectItem key={silo.bin_name} value={siloNumber}>
+                                      {silo.bin_name} - {materialInfo}{statusText}
+                                    </SelectItem>
+                                  );
+                                });
+                              })()
+                            )}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                      <Input
+                        type={field.type}
+                        value={formData[field.name] || ''}
+                        onChange={e => setFormData({ ...formData, [field.name]: e.target.value })}
+                        className="bg-slate-800/70 light:bg-white border-slate-600 light:border-gray-200 text-white light:text-gray-900 w-full h-8 text-sm px-2"
+                      />
+                      )}
+                    </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Helper message for destination silos */}
+                {(() => {
+                  let shouldShowTip = false;
+                  let tipMessage = '';
+                  
+                  if (activeTab === 'bulk-line') {
+                    shouldShowTip = !formData.sourceSilo || formData.sourceSilo === '';
+                    tipMessage = '💡 <strong>Tip:</strong> Select a source silo first to see available destination silos.';
+                  } else if (activeTab === 'pt-line') {
+                    shouldShowTip = !formData.rawCode || formData.rawCode === '';
+                    tipMessage = '💡 <strong>Tip:</strong> Enter a pit number and select raw material code first to see available destination silos.';
+                  } else {
+                    shouldShowTip = !formData.sourceMaterialCode || formData.sourceMaterialCode === '';
+                    tipMessage = '💡 <strong>Tip:</strong> Enter a material code first to see destination silos that can store that specific material.';
+                  }
+                  
+                  return shouldShowTip ? (
+                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      <p className="text-sm text-blue-400 light:text-blue-600" dangerouslySetInnerHTML={{ __html: tipMessage }} />
+                  </div>
+                  ) : null;
+                })()}
+                
+                {/* Helper message when source is selected but no matching silos */}
+                {((activeTab === 'bulk-line' && formData.sourceSilo && formData.sourceSilo !== '') ||
+                  (activeTab === 'pt-line' && formData.rawCode && formData.rawCode !== '') ||
+                  (activeTab !== 'bulk-line' && activeTab !== 'pt-line' && formData.sourceMaterialCode && formData.sourceMaterialCode !== '')) && (
+                  (() => {
+                    // Get order type and line for warning message
+                    let orderType = 'intake';
+                    let line = 1;
+                    
+                    if (activeTab === 'intake-line-1') {
+                      orderType = 'intake';
+                      line = 1;
+                    } else if (activeTab === 'intake-line-2') {
+                      orderType = 'intake';
+                      line = 2;
+                    } else if (activeTab === 'mineral-intake') {
+                      orderType = 'intake';
+                      line = 3; // ✅ CORRECT! Mineral intake uses line 3
+                    } else if (activeTab === 'outloading-1') {
+                      orderType = 'outloading';
+                      line = 1;
+                    } else if (activeTab === 'outloading-2') {
+                      orderType = 'outloading';
+                      line = 2;
+                    } else if (activeTab === 'outloading-3') {
+                      orderType = 'outloading';
+                      line = 3;
+                    } else if (activeTab === 'bulk-line') {
+                      orderType = 'bulk';
+                      line = 1;
+                    } else if (activeTab === 'pt-line') {
+                      orderType = 'pit';
+                      line = 1;
+                    }
+
+                    const isMineralOrder = activeTab === 'mineral-intake';
+                    let matchingSilos = [];
+                    let warningMessage = '';
+                    
+                    if (activeTab === 'bulk-line') {
+                      // For bulk orders, just check if there are any available destination silos (301-322)
+                      matchingSilos = getSilosForOrderType(orderType, line, isMineralOrder, true).filter(silo => {
+                        const isAvailable = !silo.lock_active && !silo.hl_active;
+                        return isAvailable;
+                      });
+                      warningMessage = `⚠️ <strong>No available destination silos:</strong> No available destination silos found for bulk transfer. Check if silos are locked or at high level.`;
+                    } else if (activeTab === 'pt-line') {
+                      // For pit orders, filter by raw material code
+                      matchingSilos = getSilosForOrderType(orderType, line, isMineralOrder).filter(silo => {
+                        const isAvailable = !silo.lock_active && !silo.hl_active;
+                        
+                        // Must match the raw material code if one is specified
+                        const materialCodeStr = String(formData.rawCode || '');
+                        const materialMatches = !formData.rawCode ||
+                                              materialCodeStr === '' ||
+                                              materialCodeStr === 'None' ||
+                                              materialCodeStr === 'None - None' ||
+                                              silo.material_code === formData.rawCode ||
+                                              silo.material_name === formData.rawCode ||
+                                              // Extract just the code part from "210 - Soya Oil" format
+                                              (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                               silo.material_code === materialCodeStr.split(' - ')[0]) ||
+                                              // Also check if silo material matches the full display text
+                                              (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                               silo.material_name === materialCodeStr.split(' - ')[1]);
+                        
+                        return isAvailable && materialMatches;
+                      });
+                      warningMessage = `⚠️ <strong>No matching silos:</strong> No available silos found that can store raw material "${formData.rawCode}". Check if the material code is correct or if silos are locked/full.`;
+                    } else {
+                      // For intake/outloading orders, filter by material code
+                      matchingSilos = getSilosForOrderType(orderType, line, isMineralOrder).filter(silo => {
+                      const isAvailable = !silo.lock_active && !silo.hl_active;
+                      
+                      // Must match the material code if one is specified
+                      const materialCodeStr = String(formData.sourceMaterialCode || '');
+                      const materialMatches = !formData.sourceMaterialCode ||
+                                            materialCodeStr === '' ||
+                                            materialCodeStr === 'None' ||
+                                              materialCodeStr === 'None - None' ||
+                                            silo.material_code === formData.sourceMaterialCode ||
+                                            silo.material_name === formData.sourceMaterialCode ||
+                                            // Extract just the code part from "210 - Soya Oil" format
+                                            (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                             silo.material_code === materialCodeStr.split(' - ')[0]) ||
+                                            // Also check if silo material matches the full display text
+                                            (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                             silo.material_name === materialCodeStr.split(' - ')[1]);
+                      
+                      return isAvailable && materialMatches;
+                    });
+                      warningMessage = `⚠️ <strong>No matching silos:</strong> No available silos found that can store material "${formData.sourceMaterialCode}". Check if the material code is correct or if silos are locked/full.`;
+                    }
+                    
+                    if (matchingSilos.length === 0) {
+                      return (
+                        <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                          <p className="text-sm text-orange-400 light:text-orange-600" dangerouslySetInnerHTML={{ __html: warningMessage }} />
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()
+                )}
+                
+                <div className="flex justify-end space-x-2 pt-3 mt-2">
+                  <Button variant="ghost" className="!text-slate-400 hover:!bg-slate-700/50 light:!text-white light:hover:!bg-gray-600 px-3 py-1 text-sm border border-slate-600 light:border-gray-300" onClick={() => setShowModal(false)} type="button">Cancel</Button>
+                  <Button className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white px-4 py-1 text-sm" type="submit">Add</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {viewModal && viewOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white light:bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-4xl space-y-3 border border-slate-700 light:border-gray-200 shadow-xl overflow-y-auto max-h-[90vh] relative">
+              {/* Cancel Icon at top right */}
+              <button
+                onClick={() => setViewModal(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              
+              <h2 className="text-lg font-semibold mb-4 text-center text-gray-900 light:text-gray-900 dark:text-white">Order Details</h2>
+              
+              {/* Form-like layout with two columns */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(viewOrder).map(([key, value]) => (
+                  <div key={key} className="flex flex-col space-y-1">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    </label>
+                    <div className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-200 dark:border-slate-600 min-h-[2rem] flex items-center">
+                      {value !== null && value !== undefined ? String(value) : '-'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Close button at bottom right */}
+              <div className="flex justify-end pt-4 mt-4 border-t border-gray-200 dark:border-slate-600">
+                <Button 
+                  onClick={() => setViewModal(false)}
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Edit Order Modal */}
+        {editModal && editOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white light:bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-4xl space-y-3 border border-slate-700 light:border-gray-200 shadow-xl overflow-y-auto max-h-[90vh] relative">
+              {/* Cancel Icon at top right */}
+              <button
+                onClick={() => setEditModal(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              
+              <h2 className="text-lg font-semibold mb-4 text-center text-gray-900 light:text-gray-900 dark:text-white">Edit Order</h2>
+              
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* RFID Badge */}
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      RFID Badge
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.badgeNo || ''}
+                      onChange={(e) => setEditFormData({...editFormData, badgeNo: e.target.value})}
+                      className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      placeholder="Enter RFID badge number"
+                    />
+                  </div>
+
+                  {/* Source Material Code */}
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Source Material Code
+                    </label>
+                    <select
+                      value={editFormData.sourceMaterialCode || ''}
+                      onChange={(e) => setEditFormData({...editFormData, sourceMaterialCode: e.target.value})}
+                      className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    >
+                      <option value="">Select Material</option>
+                      {materialCodes.map((material) => (
+                        <option key={material.code} value={material.code}>
+                          {material.code} - {material.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Declared Quantity */}
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Declared Quantity (KG)
+                    </label>
+                    <input
+                      type="number"
+                      value={editFormData.declaredQuantityKG || ''}
+                      onChange={(e) => setEditFormData({...editFormData, declaredQuantityKG: e.target.value})}
+                      className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      placeholder="Enter quantity in KG"
+                      min="0"
+                      step="0.1"
+                    />
+                  </div>
+
+                  {/* Destination Silo 1 */}
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Destination Silo 1
+                    </label>
+                    <select
+                      value={editFormData.destinationSilo1 || ''}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setEditFormData({
+                          ...editFormData, 
+                          destinationSilo1: newValue,
+                          // Clear destinationSilo2 if it's the same as the newly selected destinationSilo1
+                          destinationSilo2: editFormData.destinationSilo2 === newValue ? '' : editFormData.destinationSilo2
+                        });
+                      }}
+                      className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    >
+                      <option value="">Select Silo 1</option>
+                      {(() => {
+                        // Get order type and line for edit modal
+                        let orderType = 'intake';
+                        let line = 1;
+                        
+                        if (activeTab === 'intake-line-1') {
+                          orderType = 'intake';
+                          line = 1;
+                        } else if (activeTab === 'intake-line-2') {
+                          orderType = 'intake';
+                          line = 2;
+                        } else if (activeTab === 'mineral-intake') {
+                          orderType = 'intake';
+                          line = 3; // ✅ CORRECT! Mineral intake uses line 3
+                        } else if (activeTab === 'outloading-1') {
+                          orderType = 'outloading';
+                          line = 1;
+                        } else if (activeTab === 'outloading-2') {
+                          orderType = 'outloading';
+                          line = 2;
+                        } else if (activeTab === 'outloading-3') {
+                          orderType = 'outloading';
+                          line = 3;
+                        } else if (activeTab === 'bulk-line') {
+                          orderType = 'bulk';
+                          line = 1;
+                        } else if (activeTab === 'pt-line') {
+                          orderType = 'pit';
+                          line = 1;
+                        }
+
+                        const isMineralOrder = activeTab === 'mineral-intake';
+                        return getSilosForOrderType(orderType, line, isMineralOrder).filter(silo => {
+                          // FINAL: Filter by material code + exclude locked/high level silos
+                          const isAvailable = !silo.lock_active && !silo.hl_active;
+                          
+                          // Must match the material code if one is specified
+                          const materialCodeStr = String(editFormData.sourceMaterialCode || '');
+                          const materialMatches = !editFormData.sourceMaterialCode ||
+                                                materialCodeStr === '' ||
+                                                materialCodeStr === 'None' ||
+                                                materialCodeStr === 'None - None' ||
+                                                silo.material_code === editFormData.sourceMaterialCode ||
+                                                silo.material_name === editFormData.sourceMaterialCode ||
+                                                // Extract just the code part from "210 - Soya Oil" format
+                                                (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                 silo.material_code === materialCodeStr.split(' - ')[0]) ||
+                                                // Also check if silo material matches the full display text
+                                                (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                 silo.material_name === materialCodeStr.split(' - ')[1]);
+                          
+                          return isAvailable && materialMatches;
+                        }).map((silo) => {
+                        const materialInfo = silo.material_name ? ` - ${silo.material_name}` : '';
+                        const statusText = silo.lock_active ? ' (Locked)' : silo.hl_active ? ' (High Level)' : ' (Available)';
+                        return (
+                          <option key={silo.bin_name} value={silo.silo_no || 0}>
+                            {silo.bin_name}{materialInfo}{statusText}
+                          </option>
+                        );
+                      });
+                    })()}
+                    </select>
+                  </div>
+
+                  {/* Destination Silo 2 */}
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Destination Silo 2
+                    </label>
+                    <select
+                      value={editFormData.destinationSilo2 || ''}
+                      onChange={(e) => setEditFormData({...editFormData, destinationSilo2: e.target.value})}
+                      className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    >
+                      <option value="">Select Silo 2</option>
+                      {(() => {
+                        // Get order type and line for edit modal
+                        let orderType = 'intake';
+                        let line = 1;
+                        
+                        if (activeTab === 'intake-line-1') {
+                          orderType = 'intake';
+                          line = 1;
+                        } else if (activeTab === 'intake-line-2') {
+                          orderType = 'intake';
+                          line = 2;
+                        } else if (activeTab === 'mineral-intake') {
+                          orderType = 'intake';
+                          line = 3; // ✅ CORRECT! Mineral intake uses line 3
+                        } else if (activeTab === 'outloading-1') {
+                          orderType = 'outloading';
+                          line = 1;
+                        } else if (activeTab === 'outloading-2') {
+                          orderType = 'outloading';
+                          line = 2;
+                        } else if (activeTab === 'outloading-3') {
+                          orderType = 'outloading';
+                          line = 3;
+                        } else if (activeTab === 'bulk-line') {
+                          orderType = 'bulk';
+                          line = 1;
+                        } else if (activeTab === 'pt-line') {
+                          orderType = 'pit';
+                          line = 1;
+                        }
+
+                        const isMineralOrder = activeTab === 'mineral-intake';
+                        const isDestinationField = true; // In edit modal, we're always dealing with destination fields
+                        return getSilosForOrderType(orderType, line, isMineralOrder, isDestinationField).filter(silo => {
+                          // FINAL: Filter by material code + exclude locked/high level silos + exclude already used silos + exclude already selected silos
+                          const isAvailable = !silo.lock_active && !silo.hl_active;
+                          
+                          // Must not be already used by another order
+                          const isNotUsed = !usedSilos.has(silo.bin_name);
+                          
+                          // Must match the material code if one is specified
+                          let materialCodeStr = '';
+                          if (activeTab === 'bulk-line') {
+                            // For bulk orders, get material from selected source silo
+                            const sourceSilos = getSilosForOrderType(orderType, line, isMineralOrder, false); // Get source silos (101-115)
+                            const selectedSourceSilo = sourceSilos.find(s => s.bin_name === editFormData.sourceSilo);
+                            if (selectedSourceSilo) {
+                              materialCodeStr = selectedSourceSilo.material_name || selectedSourceSilo.material_code || '';
+                            }
+                          } else {
+                            materialCodeStr = String(editFormData.sourceMaterialCode || '');
+                          }
+                          
+                          let materialMatches = false;
+                          if (activeTab === 'bulk-line') {
+                            // For bulk orders, be strict - only show silos with matching material
+                            if (materialCodeStr && materialCodeStr !== '' && materialCodeStr !== 'None' && materialCodeStr !== 'None - None') {
+                              materialMatches = Boolean(silo.material_code === materialCodeStr ||
+                                              silo.material_name === materialCodeStr ||
+                                              // Extract just the code part from "210 - Soya Oil" format
+                                              (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                               silo.material_code === materialCodeStr.split(' - ')[0]) ||
+                                              // Also check if silo material matches the full display text
+                                              (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                               silo.material_name === materialCodeStr.split(' - ')[1]));
+                            }
+                            // If no source silo selected or no material found, don't show any destination silos
+                          } else {
+                            // For other order types, use the original logic
+                            materialMatches = Boolean(!materialCodeStr ||
+                                                materialCodeStr === '' ||
+                                                materialCodeStr === 'None' ||
+                                                materialCodeStr === 'None - None' ||
+                                          silo.material_code === materialCodeStr ||
+                                          silo.material_name === materialCodeStr ||
+                                                // Extract just the code part from "210 - Soya Oil" format
+                                                (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                 silo.material_code === materialCodeStr.split(' - ')[0]) ||
+                                                // Also check if silo material matches the full display text
+                                                (materialCodeStr && materialCodeStr.includes(' - ') && 
+                                                 silo.material_name === materialCodeStr.split(' - ')[1]));
+                          }
+                          
+                          // For destinationSilo2, exclude the silo already selected in destinationSilo1
+                          // Also exclude the pit number silo from destination dropdowns
+                          const siloNumber = silo.bin_name.split(' ')[1] || 'unknown';
+                          const isNotAlreadySelected = (!editFormData.destinationSilo1 || 
+                                                     editFormData.destinationSilo1 !== siloNumber) &&
+                                                     // Exclude pit number silo from destination dropdowns
+                                                     (!editFormData.pitNo || editFormData.pitNo !== siloNumber);
+                          
+                          return isAvailable && isNotUsed && materialMatches && isNotAlreadySelected;
+                        }).map((silo) => {
+                        const materialInfo = silo.material_name ? ` - ${silo.material_name}` : '';
+                        const statusText = silo.lock_active ? ' (Locked)' : silo.hl_active ? ' (High Level)' : ' (Available)';
+                        return (
+                          <option key={silo.bin_name} value={silo.silo_no || 0}>
+                            {silo.bin_name}{materialInfo}{statusText}
+                          </option>
+                        );
+                      });
+                    })()}
+                    </select>
+                  </div>
+
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    className="!text-slate-400 hover:!bg-slate-700/50 light:!text-white light:hover:!bg-gray-600 px-3 py-1 text-sm border border-slate-600 light:border-gray-300" 
+                    onClick={() => setEditModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit"
+                    className="bg-orange-600 hover:bg-orange-700 text-white light:bg-orange-600 light:hover:bg-orange-700 light:text-white px-4 py-1 text-sm"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Updating...' : 'Update Order'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        <Tabs defaultValue="intake-line-1" className="w-full" onValueChange={(value) => {
+          setActiveTab(value)
+        }}>
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 bg-slate-800/50 light:bg-gray-100">
+            <TabsTrigger value="intake-line-1" className="text-xs data-[state=active]:bg-cyan-600 data-[state=active]:text-white light:data-[state=active]:bg-cyan-600 light:data-[state=active]:text-white">INTAKE LINE 1</TabsTrigger>
+            <TabsTrigger value="intake-line-2" className="text-xs data-[state=active]:bg-cyan-600 data-[state=active]:text-white light:data-[state=active]:bg-cyan-600 light:data-[state=active]:text-white">INTAKE LINE 2</TabsTrigger>
+            <TabsTrigger value="mineral-intake" className="text-xs data-[state=active]:bg-cyan-600 data-[state=active]:text-white light:data-[state=active]:bg-cyan-600 light:data-[state=active]:text-white">Mineral Intake</TabsTrigger>
+            <TabsTrigger value="outloading-1" className="text-xs data-[state=active]:bg-cyan-600 data-[state=active]:text-white light:data-[state=active]:bg-cyan-600 light:data-[state=active]:text-white">Outloading 1</TabsTrigger>
+            <TabsTrigger value="outloading-2" className="text-xs data-[state=active]:bg-cyan-600 data-[state=active]:text-white light:data-[state=active]:bg-cyan-600 light:data-[state=active]:text-white">Outloading 2</TabsTrigger>
+            <TabsTrigger value="outloading-3" className="text-xs data-[state=active]:bg-cyan-600 data-[state=active]:text-white light:data-[state=active]:bg-cyan-600 light:data-[state=active]:text-white">Outloading 3</TabsTrigger>
+            <TabsTrigger value="bulk-line" className="text-xs data-[state=active]:bg-cyan-600 data-[state=active]:text-white light:data-[state=active]:bg-cyan-600 light:data-[state=active]:text-white">Bulk Line</TabsTrigger>
+            <TabsTrigger value="pt-line" className="text-xs data-[state=active]:bg-cyan-600 data-[state=active]:text-white light:data-[state=active]:bg-cyan-600 light:data-[state=active]:text-white">PIT Line</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="intake-line-1" className="space-y-4">
+            {renderIntakeTable(intakeLine1Data, "Intake Line 1 Orders", "intake-line-1")}
+          </TabsContent>
+
+          <TabsContent value="intake-line-2" className="space-y-4">
+            {renderIntakeTable(intakeLine2Data, "Intake Line 2 Orders", "intake-line-2")}
+          </TabsContent>
+
+          <TabsContent value="mineral-intake" className="space-y-4">
+            {renderIntakeTable(mineralIntakeData, "Mineral Intake Orders", "mineral-intake")}
+          </TabsContent>
+
+          <TabsContent value="outloading-1" className="space-y-4">
+            {renderOutloadingTable(outloading1Data, "Outloading 1 Orders", "outloading-1")}
+          </TabsContent>
+
+          <TabsContent value="outloading-2" className="space-y-4">
+            {renderOutloadingTable(outloading2Data, "Outloading 2 Orders", "outloading-2")}
+          </TabsContent>
+
+          <TabsContent value="outloading-3" className="space-y-4">
+            {renderOutloadingTable(outloading3Data, "Outloading 3 Orders", "outloading-3")}
+          </TabsContent>
+
+          <TabsContent value="bulk-line" className="space-y-4">
+            {renderBulkLineTable(bulkLineData, "Bulk Line Orders")}
+          </TabsContent>
+
+          <TabsContent value="pt-line" className="space-y-4">
+            {renderPTLineTable(ptLineData, "PIT Line Orders")}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </WaterSystemLayout>
+  )
+}

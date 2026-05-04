@@ -1,0 +1,13 @@
+modules = ["nodejs-20", "python-3.10"]
+
+# Use a short shell script to run everything together
+run = "sh start.sh"
+
+[deployment]
+run = ["sh", "start.sh"]
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[nix]

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Hercules - Water Monitoring System</title>
+    <script>
+      // Prevent theme flash by applying theme immediately
+      (function() {
+        const savedTheme = localStorage.getItem('fakieh-theme') || 'dark';
+        document.documentElement.classList.add(savedTheme);
+        document.documentElement.style.transition = 'none';
+        
+        // Re-enable transitions after a short delay
+        setTimeout(() => {
+          document.documentElement.style.transition = '';
+        }, 100);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
+    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+  </body>
+</html>

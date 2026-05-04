@@ -1,0 +1,8 @@
+Flask
+Flask-Cors
+Flask-SQLAlchemy
+psycopg2-binary
+python-snap7
+Flask-SocketIO
+eventlet
+pyodbc

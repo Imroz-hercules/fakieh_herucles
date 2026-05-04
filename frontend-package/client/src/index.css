@@ -1,0 +1,3724 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Smooth theme transitions */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Prevent flash of unstyled content */
+html {
+  transition: none !important;
+}
+
+html.loaded {
+  transition: background-color 0.3s ease, color 0.3s ease !important;
+}
+
+/* Specific transitions for common elements that might flicker */
+body, #root {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Ensure smooth transitions for layout components */
+.bg-slate-950, .bg-slate-900, .bg-white, .bg-gray-50, .bg-gray-100 {
+  transition: background-color 0.3s ease;
+}
+
+/* Smooth text color transitions */
+.text-white, .text-gray-900, .text-slate-300, .text-slate-400 {
+  transition: color 0.3s ease;
+}
+
+/* Smooth border transitions */
+.border-slate-700, .border-gray-200, .border-slate-600, .border-gray-300 {
+  transition: border-color 0.3s ease;
+}
+
+/* Professional Light Theme with High Contrast */
+:root.light .light\:bg-white { background-color: #ffffff; }
+:root.light .light\:bg-gray-50 { background-color: #f8fafc; }
+:root.light .light\:bg-gray-100 { background-color: #f1f5f9; }
+:root.light .light\:bg-gray-200 { background-color: #e2e8f0; }
+:root.light .light\:bg-gray-800 { background-color: #1e293b; }
+:root.light .light\:bg-gray-900 { background-color: #0f172a; }
+
+/* Light theme transparencies */
+:root.light .light\:bg-white\/80 { background-color: rgba(255, 255, 255, 0.8); }
+:root.light .light\:bg-white\/90 { background-color: rgba(255, 255, 255, 0.9); }
+:root.light .light\:bg-white\/95 { background-color: rgba(255, 255, 255, 0.95); }
+:root.light .light\:bg-gray-100\/50 { background-color: rgba(241, 245, 249, 0.5); }
+:root.light .light\:bg-gray-200\/50 { background-color: rgba(226, 232, 240, 0.5); }
+
+/* Light theme text colors */
+:root.light .light\:text-gray-900 { color: #0f172a; }
+:root.light .light\:text-gray-800 { color: #1e293b; }
+:root.light .light\:text-gray-700 { color: #334155; }
+:root.light .light\:text-gray-600 { color: #475569; }
+:root.light .light\:text-gray-500 { color: #64748b; }
+:root.light .light\:text-white { color: #ffffff; }
+
+/* Light theme borders */
+:root.light .light\:border-gray-200 { border-color: #e2e8f0; }
+:root.light .light\:border-gray-300 { border-color: #cbd5e1; }
+:root.light .light\:border-gray-200\/50 { border-color: rgba(226, 232, 240, 0.5); }
+
+/* Light theme hover states */
+:root.light .light\:hover\:bg-gray-50:hover { background-color: #f8fafc; }
+:root.light .light\:hover\:bg-gray-100:hover { background-color: #f1f5f9; }
+:root.light .light\:hover\:bg-gray-200:hover { background-color: #e2e8f0; }
+:root.light .light\:hover\:bg-gray-300\/50:hover { background-color: rgba(203, 213, 225, 0.5); }
+
+/* Light theme hover text colors */
+:root.light .light\:hover\:text-gray-900:hover { color: #0f172a; }
+:root.light .light\:hover\:text-blue-600:hover { color: #2563eb; }
+
+/* Light theme accent colors */
+:root.light .light\:text-blue-600 { color: #2563eb; }
+:root.light .light\:text-blue-700 { color: #1d4ed8; }
+:root.light .light\:text-green-600 { color: #16a34a; }
+:root.light .light\:text-green-700 { color: #15803d; }
+:root.light .light\:text-orange-600 { color: #ea580c; }
+:root.light .light\:text-red-600 { color: #dc2626; }
+:root.light .light\:text-purple-600 { color: #9333ea; }
+
+/* Light theme cyan colors for buttons and accents */
+:root.light .light\:bg-cyan-600 { background-color: #0891b2 !important; }
+:root.light .light\:bg-cyan-700 { background-color: #0e7490 !important; }
+:root.light .light\:hover\:bg-cyan-700:hover { background-color: #0e7490 !important; }
+:root.light .light\:text-cyan-600 { color: #0891b2 !important; }
+:root.light .light\:text-cyan-700 { color: #0e7490 !important; }
+:root.light .light\:border-cyan-600 { border-color: #0891b2 !important; }
+:root.light .light\:border-cyan-700 { border-color: #0e7490 !important; }
+
+/* Additional cyan color utilities for light theme */
+:root.light .light\:bg-cyan-500 { background-color: #06b6d4 !important; }
+:root.light .light\:bg-cyan-400 { background-color: #22d3ee !important; }
+:root.light .light\:text-cyan-400 { color: #22d3ee !important; }
+:root.light .light\:text-cyan-500 { color: #06b6d4 !important; }
+:root.light .light\:border-cyan-400 { border-color: #22d3ee !important; }
+:root.light .light\:border-cyan-500 { border-color: #06b6d4 !important; }
+
+/* Force cyan button styling in light mode - highest priority */
+:root.light button.light\:bg-cyan-600 { 
+  background-color: #0891b2 !important; 
+  border-color: #0891b2 !important;
+}
+:root.light button.light\:hover\:bg-cyan-700:hover { 
+  background-color: #0e7490 !important; 
+  border-color: #0e7490 !important;
+}
+
+/* Force cyan styling for all cyan buttons in light mode */
+:root.light .bg-cyan-600 { 
+  background-color: #0891b2 !important; 
+  border-color: #0891b2 !important;
+}
+:root.light .hover\:bg-cyan-700:hover { 
+  background-color: #0e7490 !important; 
+  border-color: #0e7490 !important;
+}
+
+/* Force Add Order button styling in light mode */
+:root.light button.bg-cyan-600 {
+  background-color: #0891b2 !important;
+  border-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+:root.light button.bg-cyan-600:hover {
+  background-color: #0e7490 !important;
+  border-color: #0e7490 !important;
+}
+:root.light button.hover\:bg-cyan-700:hover {
+  background-color: #0e7490 !important;
+  border-color: #0e7490 !important;
+}
+
+/* Ultra-specific Add Order button overrides */
+:root.light button[class*="bg-cyan-600"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+:root.light button[class*="bg-cyan-600"]:hover {
+  background-color: #0e7490 !important;
+  border-color: #0e7490 !important;
+}
+:root.light button[class*="hover:bg-cyan-700"]:hover {
+  background-color: #0e7490 !important;
+  border-color: #0e7490 !important;
+}
+
+/* Force active tab styling in light mode - ONLY for active tabs */
+:root.light [data-state="active"].light\:bg-cyan-600 { 
+  background-color: #0891b2 !important; 
+  color: #ffffff !important;
+}
+:root.light [data-state="active"].light\:text-white { 
+  color: #ffffff !important;
+}
+
+/* Force ONLY active tab styling in light mode */
+:root.light [data-state="active"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+:root.light [data-state="active"].bg-cyan-600 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+:root.light [data-state="active"].text-white {
+  color: #ffffff !important;
+}
+
+/* Ultra-specific active tab overrides - ONLY for active tabs */
+:root.light [role="tab"][data-state="active"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+:root.light [role="tab"][aria-selected="true"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+:root.light button[data-state="active"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+:root.light .tabs-trigger[data-state="active"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+
+/* Ensure inactive tabs have proper styling in light mode */
+:root.light [data-state="inactive"] {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+}
+:root.light [role="tab"][data-state="inactive"] {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+}
+:root.light button[data-state="inactive"] {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+}
+:root.light .tabs-trigger[data-state="inactive"] {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+}
+
+/* Force button styling to match dark mode in light mode */
+:root.light button.light\:border-slate-600 { 
+  border-color: #475569 !important; 
+}
+:root.light button.light\:text-slate-300 { 
+  color: #cbd5e1 !important; 
+}
+:root.light button.light\:hover\:bg-slate-700:hover { 
+  background-color: #334155 !important; 
+}
+:root.light button.light\:bg-slate-700 { 
+  background-color: #334155 !important; 
+}
+:root.light button.light\:text-white { 
+  color: #ffffff !important; 
+}
+:root.light button.light\:hover\:bg-slate-600:hover { 
+  background-color: #475569 !important; 
+}
+
+/* Force button styling to match dark mode in light mode - EXCLUDE tabs */
+:root.light button[class*="border-slate-600"]:not([role="tab"]):not([data-state]):not(.tabs-trigger) { 
+  border-color: #475569 !important; 
+}
+:root.light button[class*="text-slate-300"]:not([role="tab"]):not([data-state]):not(.tabs-trigger) { 
+  color: #cbd5e1 !important; 
+}
+:root.light button[class*="bg-slate-700"]:not([role="tab"]):not([data-state]):not(.tabs-trigger) { 
+  background-color: #334155 !important; 
+}
+:root.light button[class*="text-white"]:not([role="tab"]):not([data-state]):not(.tabs-trigger) { 
+  color: #ffffff !important; 
+}
+:root.light button[class*="bg-red-600"]:not([role="tab"]):not([data-state]):not(.tabs-trigger) { 
+  background-color: #dc2626 !important; 
+}
+:root.light button[class*="hover:bg-red-700"]:hover:not([role="tab"]):not([data-state]):not(.tabs-trigger) { 
+  background-color: #b91c1c !important; 
+}
+:root.light button[class*="hover:bg-slate-700"]:hover:not([role="tab"]):not([data-state]):not(.tabs-trigger) { 
+  background-color: #334155 !important; 
+}
+:root.light button[class*="hover:bg-slate-600"]:hover:not([role="tab"]):not([data-state]):not(.tabs-trigger) { 
+  background-color: #475569 !important; 
+}
+
+/* Override any conflicting button styles in light mode - EXCLUDE tabs */
+:root.light button:not([role="tab"]):not([data-state]):not(.tabs-trigger) {
+  border-color: inherit !important;
+  color: inherit !important;
+  background-color: inherit !important;
+}
+
+/* Specific overrides for button variants */
+:root.light button[data-variant="outline"] {
+  border-color: #475569 !important;
+  color: #cbd5e1 !important;
+  background-color: transparent !important;
+}
+:root.light button[data-variant="outline"]:hover {
+  background-color: #334155 !important;
+}
+
+:root.light button[data-variant="secondary"] {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+:root.light button[data-variant="secondary"]:hover {
+  background-color: #475569 !important;
+}
+
+:root.light button[data-variant="destructive"] {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+:root.light button[data-variant="destructive"]:hover {
+  background-color: #b91c1c !important;
+}
+
+/* Ultra-specific overrides for Orders page buttons */
+:root.light .text-xs.px-2.py-1.border-slate-600 {
+  border-color: #475569 !important;
+  color: #cbd5e1 !important;
+  background-color: transparent !important;
+}
+:root.light .text-xs.px-2.py-1.border-slate-600:hover {
+  background-color: #334155 !important;
+}
+
+:root.light .text-xs.px-2.py-1.bg-slate-700 {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+:root.light .text-xs.px-2.py-1.bg-slate-700:hover {
+  background-color: #475569 !important;
+}
+
+:root.light .text-xs.px-2.py-1.bg-red-600 {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+:root.light .text-xs.px-2.py-1.bg-red-600:hover {
+  background-color: #b91c1c !important;
+}
+
+/* Force button text colors in light mode */
+:root.light button[class*="text-slate-300"] {
+  color: #cbd5e1 !important;
+}
+:root.light button[class*="text-white"] {
+  color: #ffffff !important;
+}
+
+/* Override any light mode button background overrides */
+:root.light button[class*="light:bg-"] {
+  background-color: inherit !important;
+}
+:root.light button[class*="light:text-"] {
+  color: inherit !important;
+}
+:root.light button[class*="light:border-"] {
+  border-color: inherit !important;
+}
+
+/* Nuclear option - force all button styling in light mode */
+:root.light button[class*="border-slate-600"] {
+  border: 1px solid #475569 !important;
+  color: #cbd5e1 !important;
+  background-color: transparent !important;
+}
+:root.light button[class*="border-slate-600"]:hover {
+  background-color: #334155 !important;
+}
+
+:root.light button[class*="bg-slate-700"] {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border: 1px solid #334155 !important;
+}
+:root.light button[class*="bg-slate-700"]:hover {
+  background-color: #475569 !important;
+}
+
+:root.light button[class*="bg-red-600"] {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border: 1px solid #dc2626 !important;
+}
+:root.light button[class*="bg-red-600"]:hover {
+  background-color: #b91c1c !important;
+}
+
+/* Force button text visibility */
+:root.light button[class*="text-slate-300"] {
+  color: #cbd5e1 !important;
+}
+:root.light button[class*="text-white"] {
+  color: #ffffff !important;
+}
+
+/* Fix View button text visibility in light mode */
+:root.light button.border-slate-600 {
+  border: 1px solid #475569 !important;
+  color: #cbd5e1 !important;
+  background-color: transparent !important;
+}
+:root.light button.border-slate-600:hover {
+  background-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+/* Override any conflicting text colors for outline buttons */
+:root.light button[data-variant="outline"] {
+  color: #cbd5e1 !important;
+}
+:root.light button[data-variant="outline"]:hover {
+  color: #cbd5e1 !important;
+}
+
+/* Nuclear option - override button styling in light mode - EXCLUDE tabs */
+:root.light button:not([role="tab"]):not([data-state]):not(.tabs-trigger) {
+  color: inherit !important;
+  background-color: inherit !important;
+  border-color: inherit !important;
+}
+
+/* Specific overrides for common button classes */
+:root.light .bg-cyan-600 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+:root.light .bg-cyan-600:hover {
+  background-color: #0e7490 !important;
+  border-color: #0e7490 !important;
+}
+
+:root.light .border-slate-600 {
+  border-color: #475569 !important;
+  color: #cbd5e1 !important;
+  background-color: transparent !important;
+}
+:root.light .border-slate-600:hover {
+  background-color: #334155 !important;
+}
+
+:root.light .bg-slate-700 {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+:root.light .bg-slate-700:hover {
+  background-color: #475569 !important;
+}
+
+:root.light .bg-red-600 {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+:root.light .bg-red-600:hover {
+  background-color: #b91c1c !important;
+}
+
+/* Additional ultra-specific overrides for cyan elements */
+:root.light *[class*="bg-cyan-600"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+:root.light *[class*="bg-cyan-600"]:hover {
+  background-color: #0e7490 !important;
+}
+
+/* Force cyan color for any element with cyan classes */
+:root.light .bg-cyan-600,
+:root.light button.bg-cyan-600,
+:root.light [data-state="active"].bg-cyan-600,
+:root.light [role="tab"].bg-cyan-600 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+/* Override any conflicting light mode styles */
+:root.light .light\:bg-cyan-600 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+:root.light .light\:text-white {
+  color: #ffffff !important;
+}
+
+/* Force Add Order button to maintain cyan color constantly */
+:root.light button.bg-cyan-600,
+:root.light button[class*="bg-cyan-600"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+:root.light button.bg-cyan-600:hover,
+:root.light button[class*="bg-cyan-600"]:hover {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+/* Style Refresh and Stop Broadcast buttons in light mode */
+:root.light button[variant="outline"] {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+:root.light button[variant="outline"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+  border-color: #94a3b8 !important;
+}
+
+:root.light button[variant="default"] {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+:root.light button[variant="default"]:hover {
+  background-color: #475569 !important;
+  color: #ffffff !important;
+  border-color: #475569 !important;
+}
+
+:root.light button[variant="destructive"] {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+:root.light button[variant="destructive"]:hover {
+  background-color: #b91c1c !important;
+  color: #ffffff !important;
+  border-color: #b91c1c !important;
+}
+
+/* Additional targeting for button variants */
+:root.light button[data-variant="outline"] {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+:root.light button[data-variant="outline"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+  border-color: #94a3b8 !important;
+}
+
+:root.light button[data-variant="default"] {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+:root.light button[data-variant="default"]:hover {
+  background-color: #475569 !important;
+  color: #ffffff !important;
+  border-color: #475569 !important;
+}
+
+:root.light button[data-variant="destructive"] {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+:root.light button[data-variant="destructive"]:hover {
+  background-color: #b91c1c !important;
+  color: #ffffff !important;
+  border-color: #b91c1c !important;
+}
+
+/* Target buttons by class patterns */
+:root.light button[class*="outline"] {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+:root.light button[class*="outline"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+  border-color: #94a3b8 !important;
+}
+
+:root.light button[class*="default"] {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+:root.light button[class*="default"]:hover {
+  background-color: #475569 !important;
+  color: #ffffff !important;
+  border-color: #475569 !important;
+}
+
+:root.light button[class*="destructive"] {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+:root.light button[class*="destructive"]:hover {
+  background-color: #b91c1c !important;
+  color: #ffffff !important;
+  border-color: #b91c1c !important;
+}
+
+/* Additional specificity for Apply Filters button */
+:root.light button[onclick*="handleApplyFilters"].light\:bg-cyan-600 {
+  background-color: #0891b2 !important;
+  border-color: #0891b2 !important;
+}
+:root.light button[onclick*="handleApplyFilters"].light\:hover\:bg-cyan-700:hover {
+  background-color: #0e7490 !important;
+  border-color: #0e7490 !important;
+}
+
+/* Light theme gradients */
+:root.light .light\:from-blue-500\/20 { --tw-gradient-from: rgba(59, 130, 246, 0.2); --tw-gradient-to: rgba(59, 130, 246, 0); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+:root.light .light\:to-cyan-500\/20 { --tw-gradient-to: rgba(6, 182, 212, 0.2); }
+:root.light .light\:from-gray-100\/50 { --tw-gradient-from: rgba(241, 245, 249, 0.5); --tw-gradient-to: rgba(241, 245, 249, 0); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+:root.light .light\:to-transparent { --tw-gradient-to: transparent; }
+
+/* Light theme shadows */
+:root.light .light\:shadow-sm { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+:root.light .light\:shadow-md { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+:root.light .light\:shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+:root.light .light\:shadow-xl { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+
+/* Force light theme overrides for complex components */
+:root.light * { 
+  --tw-bg-opacity: 1; 
+}
+
+/* Comprehensive light theme overrides for all dark components */
+:root.light .bg-slate-950 { background-color: #ffffff !important; }
+:root.light .bg-slate-900 { background-color: #f8fafc !important; }
+:root.light .bg-slate-800 { background-color: #f1f5f9 !important; }
+:root.light .bg-slate-700 { background-color: #e2e8f0 !important; }
+:root.light .bg-slate-600 { background-color: #cbd5e1 !important; }
+
+/* Background with opacity overrides */
+:root.light .bg-slate-950\/95 { background-color: rgba(255, 255, 255, 0.95) !important; }
+:root.light .bg-slate-950\/50 { background-color: rgba(248, 250, 252, 0.8) !important; }
+:root.light .bg-slate-900\/90 { background-color: rgba(248, 250, 252, 0.9) !important; }
+:root.light .bg-slate-900\/80 { background-color: rgba(255, 255, 255, 0.9) !important; }
+:root.light .bg-slate-800\/40 { background-color: rgba(255, 255, 255, 0.9) !important; }
+:root.light .bg-slate-800\/30 { background-color: rgba(241, 245, 249, 0.9) !important; }
+
+/* Text color overrides */
+:root.light .text-slate-400 { color: #64748b !important; }
+:root.light .text-slate-300 { color: #475569 !important; }
+:root.light .text-white { color: #0f172a !important; }
+
+/* Border color overrides */
+:root.light .border-slate-700 { border-color: #e2e8f0 !important; }
+:root.light .border-slate-700\/50 { border-color: rgba(226, 232, 240, 0.8) !important; }
+:root.light .border-slate-700\/30 { border-color: rgba(226, 232, 240, 0.6) !important; }
+:root.light .border-slate-600 { border-color: #cbd5e1 !important; }
+
+/* Hover state overrides */
+:root.light .hover\:bg-slate-700\/50:hover { background-color: rgba(226, 232, 240, 0.5) !important; }
+:root.light .hover\:bg-slate-800\/50:hover { background-color: rgba(241, 245, 249, 0.8) !important; }
+
+/* Light theme hidden utility */
+:root.light .light\:hidden { display: none !important; }
+
+/* Modern Light Theme Components */
+
+/* Buttons Light Theme */
+:root.light .bg-cyan-500 { background-color: #0891b2 !important; }
+:root.light .bg-cyan-600 { background-color: #0e7490 !important; }
+:root.light .hover\:bg-cyan-600:hover { background-color: #0e7490 !important; }
+:root.light .bg-blue-500 { background-color: #3b82f6 !important; }
+:root.light .bg-blue-600 { background-color: #2563eb !important; }
+:root.light .hover\:bg-blue-600:hover { background-color: #2563eb !important; }
+
+/* Orange button styling for light mode - using darker orange as default */
+:root.light .bg-orange-600 { background-color: #c2410c !important; }
+:root.light .bg-orange-700 { background-color: #9a3412 !important; }
+:root.light .hover\:bg-orange-700:hover { background-color: #9a3412 !important; }
+:root.light .text-orange-600 { color: #c2410c !important; }
+:root.light .text-orange-700 { color: #9a3412 !important; }
+:root.light .border-orange-600 { border-color: #c2410c !important; }
+:root.light .border-orange-700 { border-color: #9a3412 !important; }
+
+/* Force all orange buttons to show orange by default in light mode */
+:root.light button[class*="orange"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="orange"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Edit button styling for light mode - darker orange as default */
+:root.light button.bg-orange-600 {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button.bg-orange-600:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+:root.light button.hover\:bg-orange-700:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+:root.light button.light\:bg-orange-600 {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button.light\:hover\:bg-orange-700:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+:root.light button.light\:text-white {
+  color: #ffffff !important;
+}
+
+/* Form button styling for light mode - darker orange as default */
+:root.light button[type="submit"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[type="submit"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+:root.light button[type="submit"]:disabled {
+  background-color: #9ca3af !important;
+  color: #ffffff !important;
+  border-color: #9ca3af !important;
+}
+
+/* Specific edit button overrides - darker orange as default */
+:root.light button[class*="bg-orange-600"][class*="text-white"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="bg-orange-600"][class*="text-white"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+:root.light button[class*="hover:bg-orange-700"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Update Order button specific styling - darker orange as default */
+:root.light button[class*="Update Order"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="Update Order"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Additional comprehensive orange button overrides - darker orange as default */
+:root.light button[class*="orange-600"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="orange-600"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+:root.light button[class*="orange-700"] {
+  background-color: #9a3412 !important;
+  color: #ffffff !important;
+  border-color: #9a3412 !important;
+}
+
+:root.light button[class*="orange-700"]:hover {
+  background-color: #7c2d12 !important;
+  border-color: #7c2d12 !important;
+}
+
+/* Force orange styling for any button with orange classes - darker orange as default */
+:root.light button.bg-orange-600,
+:root.light button[class*="bg-orange-600"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button.bg-orange-600:hover,
+:root.light button[class*="bg-orange-600"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Specific styling for edit buttons with pencil icon - darker orange as default */
+:root.light button[class*="✏️"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="✏️"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Override any conflicting styles that might hide orange buttons */
+:root.light button[class*="bg-orange"]:not(:hover) {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="hover:bg-orange"]:not(:hover) {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+/* Force orange buttons to be visible by default */
+:root.light button[class*="orange-600"]:not(:hover) {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="orange-700"]:not(:hover) {
+  background-color: #9a3412 !important;
+  color: #ffffff !important;
+  border-color: #9a3412 !important;
+}
+
+/* Additional override for any button with orange in class name */
+:root.light button[class*="orange"]:not(:hover) {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+/* Ultimate override for orange buttons - highest priority */
+:root.light button {
+  /* Check if button has orange classes and force orange styling */
+}
+
+:root.light button[class*="bg-orange-600"],
+:root.light button[class*="bg-orange-700"],
+:root.light button[class*="hover:bg-orange-700"],
+:root.light button[class*="orange-600"],
+:root.light button[class*="orange-700"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="bg-orange-600"]:hover,
+:root.light button[class*="bg-orange-700"]:hover,
+:root.light button[class*="hover:bg-orange-700"]:hover,
+:root.light button[class*="orange-600"]:hover,
+:root.light button[class*="orange-700"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Specific overrides for variant="outline" buttons with orange classes */
+:root.light button[variant="outline"][class*="bg-orange-600"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[variant="outline"][class*="bg-orange-600"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Override for buttons with specific class combinations */
+:root.light button.text-xs.px-2.py-1.bg-orange-600 {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button.text-xs.px-2.py-1.bg-orange-600:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Override for Update Order button */
+:root.light button.bg-orange-600.hover\:bg-orange-700.text-white {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button.bg-orange-600.hover\:bg-orange-700.text-white:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Force override for any button containing orange classes */
+:root.light button[class*="orange-600"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="orange-600"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Override for buttons with light: classes */
+:root.light button[class*="light:bg-orange-600"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+}
+
+:root.light button[class*="light:bg-orange-600"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+}
+
+/* Nuclear option - override ALL possible button styles for orange buttons */
+:root.light button[class*="orange"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+  background: #c2410c !important;
+}
+
+:root.light button[class*="orange"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+  background: #9a3412 !important;
+}
+
+/* Override any potential global button styles */
+:root.light button[class*="bg-orange-600"],
+:root.light button[class*="bg-orange-700"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+  background: #c2410c !important;
+}
+
+:root.light button[class*="bg-orange-600"]:hover,
+:root.light button[class*="bg-orange-700"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+  background: #9a3412 !important;
+}
+
+/* Force override for any element with orange classes */
+:root.light *[class*="bg-orange-600"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+  background: #c2410c !important;
+}
+
+:root.light *[class*="bg-orange-600"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+  background: #9a3412 !important;
+}
+
+/* CRITICAL: Override outline variant for orange buttons */
+:root.light button[data-variant="outline"][class*="orange"],
+:root.light button[data-variant="outline"][class*="bg-orange-600"],
+:root.light button[data-variant="outline"][class*="bg-orange-700"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+  background: #c2410c !important;
+}
+
+:root.light button[data-variant="outline"][class*="orange"]:hover,
+:root.light button[data-variant="outline"][class*="bg-orange-600"]:hover,
+:root.light button[data-variant="outline"][class*="bg-orange-700"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+  background: #9a3412 !important;
+}
+
+/* Override any outline button styles for orange buttons */
+:root.light button[class*="outline"][class*="orange"],
+:root.light button[class*="outline"][class*="bg-orange-600"],
+:root.light button[class*="outline"][class*="bg-orange-700"] {
+  background-color: #c2410c !important;
+  color: #ffffff !important;
+  border-color: #c2410c !important;
+  background: #c2410c !important;
+}
+
+:root.light button[class*="outline"][class*="orange"]:hover,
+:root.light button[class*="outline"][class*="bg-orange-600"]:hover,
+:root.light button[class*="outline"][class*="bg-orange-700"]:hover {
+  background-color: #9a3412 !important;
+  border-color: #9a3412 !important;
+  background: #9a3412 !important;
+}
+
+/* Tabs Light Theme */
+:root.light .bg-cyan-500\/20 { background-color: rgba(8, 145, 178, 0.1) !important; }
+:root.light .text-cyan-400 { color: #0891b2 !important; }
+
+/* Cards and Sections */
+:root.light .card-light-theme {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+}
+
+/* Tables */
+:root.light .table-light-theme {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+:root.light .table-header-light-theme {
+  background-color: #f8fafc !important;
+  color: #374151 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+:root.light .table-row-light-theme {
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+
+:root.light .table-row-light-theme:hover {
+  background-color: #f9fafb !important;
+}
+
+/* Input Fields Light Theme */
+:root.light input[type="text"],
+:root.light input[type="date"],
+:root.light select,
+:root.light .bg-slate-800 input {
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #374151 !important;
+}
+
+:root.light input[type="text"]:focus,
+:root.light input[type="date"]:focus,
+:root.light select:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* KPI Cards and Status Badges */
+:root.light .text-green-400 { color: #22c55e !important; }
+:root.light .text-orange-400 { color: #f97316 !important; }
+:root.light .text-red-400 { color: #ef4444 !important; }
+:root.light .text-blue-400 { color: #3b82f6 !important; }
+:root.light .text-purple-400 { color: #a855f7 !important; }
+
+/* Status indicators */
+:root.light .bg-green-500\/20 { background-color: rgba(34, 197, 94, 0.1) !important; }
+:root.light .bg-orange-500\/20 { background-color: rgba(249, 115, 22, 0.1) !important; }
+:root.light .bg-red-500\/20 { background-color: rgba(239, 68, 68, 0.1) !important; }
+
+/* Professional shadows for light mode */
+:root.light .shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important; }
+:root.light .shadow-xl { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important; }
+
+/* Button text visibility fixes for light mode */
+:root.light button[class*="outline"] {
+  background-color: #ffffff !important;
+  color: inherit !important;
+}
+
+:root.light button[class*="border-green"] {
+  color: #059669 !important;
+}
+
+:root.light button[class*="border-blue"] {
+  color: #2563eb !important;
+}
+
+:root.light button[class*="border-slate"] {
+  color: #374151 !important;
+}
+
+:root.light button[class*="border-gray"] {
+  color: #374151 !important;
+}
+
+/* Fix scrolling and layout issues */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+/* Enhanced smooth scrolling for all elements */
+* {
+  scroll-behavior: smooth;
+}
+
+body {
+  height: 100vh;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Custom Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(8, 145, 178, 0.6), rgba(34, 197, 94, 0.6));
+  border-radius: 4px;
+  border: 1px solid rgba(8, 145, 178, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(8, 145, 178, 0.8), rgba(34, 197, 94, 0.8));
+}
+
+::-webkit-scrollbar-corner {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(8, 145, 178, 0.6) rgba(15, 23, 42, 0.5);
+}
+
+/* Smooth scroll animation class */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced smooth scrolling for main content areas */
+main {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+/* Smooth transitions for page navigation */
+.page-transition {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Enhanced Dashboard Editor Animations */
+@keyframes scanning {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes matrix-rain {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+@keyframes cyber-grid {
+  0% { opacity: 0.1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.1; }
+}
+
+@keyframes chart-hover-glow {
+  0% { filter: drop-shadow(0 0 0 rgba(0, 188, 212, 0)); }
+  100% { filter: drop-shadow(0 0 10px rgba(0, 188, 212, 0.5)); }
+}
+
+@keyframes data-point-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+@keyframes chart-scale-in {
+  0% { transform: scale(0.95) rotateX(5deg); }
+  100% { transform: scale(1) rotateX(0deg); }
+}
+
+@keyframes chart-hover-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(0, 188, 212, 0.3); }
+  50% { transform: scale(1.03); box-shadow: 0 0 30px rgba(0, 188, 212, 0.5); }
+}
+
+@keyframes floating-particles {
+  0% { transform: translateY(0) translateX(0) scale(1); opacity: 0.6; }
+  33% { transform: translateY(-10px) translateX(5px) scale(1.2); opacity: 1; }
+  66% { transform: translateY(5px) translateX(-3px) scale(0.8); opacity: 0.8; }
+  100% { transform: translateY(0) translateX(0) scale(1); opacity: 0.6; }
+}
+
+@keyframes perspective-float {
+  0% { transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0px); }
+  25% { transform: perspective(1000px) rotateX(1deg) rotateY(1deg) translateZ(5px); }
+  50% { transform: perspective(1000px) rotateX(0deg) rotateY(2deg) translateZ(8px); }
+  75% { transform: perspective(1000px) rotateX(-1deg) rotateY(1deg) translateZ(5px); }
+  100% { transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0px); }
+}
+
+/* Fix hover edge cutting and ensure proper boundaries */
+.react-grid-layout {
+  position: relative !important;
+}
+
+.react-grid-item {
+  transition: all 300ms ease;
+  will-change: transform;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: rgba(0, 188, 212, 0.1) !important;
+  border: 2px dashed rgba(0, 188, 212, 0.5) !important;
+  border-radius: 8px !important;
+}
+
+/* Ensure chart widgets don't get clipped during hover animations */
+.layout {
+  padding: 8px;
+  margin: 8px;
+}
+
+.layout .react-grid-item {
+  overflow: visible !important;
+}
+
+/* Additional animations for water system */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+/* Enhanced KPI card animations */
+@keyframes cardGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(8, 145, 178, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(8, 145, 178, 0.6);
+  }
+}
+
+/* Scanning line effect */
+@keyframes scanLine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100vw);
+  }
+}
+
+/* Data stream effect */
+@keyframes dataStream {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* Enhanced button animations */
+@keyframes buttonPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(8, 145, 178, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(8, 145, 178, 0);
+  }
+}
+
+/* Matrix background enhancement */
+@keyframes matrixRain {
+  0% {
+    opacity: 0;
+    transform: translateY(-100vh);
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh);
+  }
+}
+
+/* Drag and drop animations */
+@keyframes dragHover {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: 0 4px 20px rgba(8, 145, 178, 0.3);
+  }
+  50% {
+    transform: scale(1.02) rotate(0.5deg);
+    box-shadow: 0 8px 40px rgba(8, 145, 178, 0.5);
+  }
+}
+
+@keyframes dragActive {
+  0%, 100% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Grab cursor enhancement */
+.drag-handle {
+  background: linear-gradient(45deg, rgba(8, 145, 178, 0.2), rgba(34, 197, 94, 0.2));
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(8, 145, 178, 0.3);
+  transition: all 0.3s ease;
+}
+
+.drag-handle:hover {
+  background: linear-gradient(45deg, rgba(8, 145, 178, 0.3), rgba(34, 197, 94, 0.3));
+  border-color: rgba(8, 145, 178, 0.5);
+  transform: scale(1.1);
+}
+
+/* Chart container enhancements */
+.chart-container {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.chart-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(8, 145, 178, 0.1), transparent);
+  transition: left 0.6s ease;
+}
+
+.chart-container:hover::before {
+  left: 100%;
+}
+
+/* Text Shadow Utilities */
+.text-shadow-sm {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.text-shadow {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.text-shadow-lg {
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.8);
+}
+
+/* 3D Perspective Utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-gpu {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Grid Layout Enhancements */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(135deg, #00bcd4, #0097a7);
+  border-radius: 4px 0;
+  cursor: se-resize;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.react-grid-item:hover > .react-resizable-handle {
+  opacity: 0.8;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: rgba(0, 188, 212, 0.2);
+  border: 2px dashed rgba(0, 188, 212, 0.6);
+  border-radius: 8px;
+  opacity: 0.8;
+  transition-duration: 100ms;
+  z-index: 2;
+  user-select: none;
+}
+
+:root {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(195, 100%, 50%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+  
+  /* Custom cyberpunk colors */
+  --cyber-blue: hsl(180, 100%, 50%);
+  --electric-blue: hsl(212, 100%, 50%);
+  --neon-orange: hsl(20, 100%, 50%);
+  --neon-amber: hsl(45, 100%, 50%);
+  --space-dark: hsl(240, 25%, 6%);
+  --dark-navy: hsl(240, 36%, 12%);
+  --neon-green: hsl(158, 100%, 50%);
+  --cyber-purple: hsl(270, 100%, 50%);
+  --cyber-red: hsl(0, 100%, 60%);
+  --cyber-pink: hsl(320, 100%, 60%);
+  --hologram-blue: hsl(195, 100%, 80%);
+  --matrix-green: hsl(120, 100%, 70%);
+}
+
+/* 3D Futuristic Hover Effects */
+/* Removed excessive glow-pulse animation */
+
+@keyframes holographic-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes float-3d {
+  0%, 100% { 
+    transform: translateY(0) rotateX(0deg) rotateY(0deg);
+  }
+  50% { 
+    transform: translateY(-10px) rotateX(5deg) rotateY(2deg);
+  }
+}
+
+@keyframes energy-ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* Clean Professional Chart Hover */
+.chart-3d-hover {
+  transition: all 0.3s ease-out;
+  position: relative;
+}
+
+/* React Grid Layout Styles */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top;
+  border-radius: 8px;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform;
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNiIgaGVpZ2h0PSI2IiB2aWV3Qm94PSIwIDAgNiA2IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8ZG90cyBmaWxsPSIjODg4IiBkPSJtIDUuNSwxLjUgLTQsNCBMIDIuNSw0LjUgbCA0LC00IHoiLz4KPC9zdmc+Cg==');
+  background-position: bottom right;
+  padding: 0 3px 3px 0;
+  background-repeat: no-repeat;
+  background-origin: content-box;
+  box-sizing: border-box;
+  cursor: se-resize;
+  opacity: 0.3;
+  transition: opacity 0.2s ease;
+}
+
+.react-grid-item:hover > .react-resizable-handle {
+  opacity: 0.6;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: rgba(0, 188, 212, 0.2);
+  opacity: 0.2;
+  transition-duration: 100ms;
+  z-index: 2;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  border: 2px dashed #00bcd4;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 5px;
+  height: 5px;
+  border-right: 2px solid rgba(0, 188, 212, 0.4);
+  border-bottom: 2px solid rgba(0, 188, 212, 0.4);
+}
+
+.chart-3d-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px rgba(0, 255, 255, 0.15),
+    0 4px 12px rgba(0, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.5);
+}
+
+/* Matrix Rain Animation */
+@keyframes matrix-rain {
+  0% {
+    transform: translateY(-100vh);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+/* Enhanced Data Flow Animation */
+@keyframes data-flow {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-20px) scale(1.1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-40px) scale(1.2);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-20px) scale(1.1);
+    opacity: 0.7;
+  }
+}
+
+/* 3D Widget Grid Animation */
+@keyframes widget-appear {
+  0% {
+    transform: scale(0.8) translateZ(-20px) rotateX(20deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateZ(0) rotateX(0deg);
+    opacity: 1;
+  }
+}
+
+/* Holographic UI Elements */
+.holographic {
+  background: linear-gradient(135deg, 
+    rgba(0, 255, 255, 0.1) 0%, 
+    rgba(138, 43, 226, 0.1) 50%, 
+    rgba(0, 255, 255, 0.1) 100%);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.holographic::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(0, 255, 255, 0.2), 
+    transparent);
+  animation: holographic-shimmer 3s infinite;
+  pointer-events: none;
+}
+
+/* Cyber Grid Background */
+.cyber-grid {
+  background-image: 
+    linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: grid-float 10s ease-in-out infinite;
+}
+
+@keyframes grid-float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(5px, 5px); }
+}
+
+.chart-3d-hover:hover::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(0, 255, 255, 0.2) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  z-index: -2;
+  animation: energy-ripple 1.5s infinite;
+}
+
+/* Enhanced KPI Card Hover */
+.kpi-card-3d {
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-style: preserve-3d;
+  perspective: 800px;
+}
+
+.kpi-card-3d:hover {
+  transform: 
+    scale(1.05) 
+    translateZ(15px) 
+    rotateX(3deg) 
+    rotateY(1deg);
+  box-shadow: 
+    0 15px 30px rgba(0, 255, 255, 0.25),
+    0 30px 60px rgba(0, 255, 255, 0.15),
+    0 0 40px rgba(0, 255, 255, 0.3),
+    inset 0 0 20px rgba(0, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.6);
+  z-index: 40;
+}
+
+/* Network Monitoring Animations */
+@keyframes matrix-rain {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+@keyframes water-ripple {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1) rotate(180deg);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(2) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes water-wave {
+  0% {
+    transform: translateY(0px) scaleY(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(-10px) scaleY(1.1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(0px) scaleY(1);
+    opacity: 0.2;
+  }
+}
+
+@keyframes liquid-flow {
+  0% {
+    background-position: 0% 0%;
+  }
+  25% {
+    background-position: 100% 25%;
+  }
+  50% {
+    background-position: 50% 100%;
+  }
+  75% {
+    background-position: 25% 50%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+@keyframes water-current {
+  0% {
+    transform: translateX(-100%) scaleY(1);
+    opacity: 0.1;
+  }
+  25% {
+    transform: translateX(-25%) scaleY(1.2);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateX(25%) scaleY(0.8);
+    opacity: 0.6;
+  }
+  75% {
+    transform: translateX(75%) scaleY(1.1);
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateX(150%) scaleY(1);
+    opacity: 0.1;
+  }
+}
+
+@keyframes wave-motion {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+    border-radius: 50% 40% 60% 30%;
+  }
+  25% {
+    transform: translateY(-15px) rotate(90deg);
+    border-radius: 40% 60% 30% 50%;
+  }
+  50% {
+    transform: translateY(-5px) rotate(180deg);
+    border-radius: 60% 30% 50% 40%;
+  }
+  75% {
+    transform: translateY(-20px) rotate(270deg);
+    border-radius: 30% 50% 40% 60%;
+  }
+  100% {
+    transform: translateY(0px) rotate(360deg);
+    border-radius: 50% 40% 60% 30%;
+  }
+}
+
+@keyframes float-3d {
+  0% {
+    transform: perspective(1000px) rotateX(2deg) rotateY(-1deg) translateY(0px);
+  }
+  25% {
+    transform: perspective(1000px) rotateX(3deg) rotateY(0deg) translateY(-3px);
+  }
+  50% {
+    transform: perspective(1000px) rotateX(1deg) rotateY(1deg) translateY(-6px);
+  }
+  75% {
+    transform: perspective(1000px) rotateX(4deg) rotateY(-0.5deg) translateY(-3px);
+  }
+  100% {
+    transform: perspective(1000px) rotateX(2deg) rotateY(-1deg) translateY(0px);
+  }
+}
+
+@keyframes hologram-scan {
+  0% {
+    left: -100%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes geometric-float {
+  0% {
+    transform: perspective(800px) rotateX(1deg) rotateY(1deg) translateY(0px);
+  }
+  33% {
+    transform: perspective(800px) rotateX(2deg) rotateY(-1deg) translateY(-4px);
+  }
+  66% {
+    transform: perspective(800px) rotateX(-1deg) rotateY(2deg) translateY(-2px);
+  }
+  100% {
+    transform: perspective(800px) rotateX(1deg) rotateY(1deg) translateY(0px);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background: radial-gradient(circle at 20% 80%, hsla(180, 100%, 50%, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, hsla(20, 100%, 50%, 0.1) 0%, transparent 50%);
+    background-color: hsl(240, 25%, 6%);
+    overflow: hidden;
+    font-family: 'Orbitron', monospace;
+  }
+}
+
+
+
+@layer components {
+  .glass-morphism {
+    background: rgba(0, 20, 40, 0.3);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1);
+  }
+  
+  .holographic {
+    background: linear-gradient(135deg, 
+      rgba(0, 255, 255, 0.15) 0%, 
+      rgba(170, 0, 255, 0.15) 25%, 
+      rgba(0, 255, 136, 0.15) 50%, 
+      rgba(255, 170, 0, 0.15) 75%, 
+      rgba(255, 0, 170, 0.15) 100%);
+    backdrop-filter: blur(25px);
+    border: 1px solid rgba(0, 255, 255, 0.4);
+    box-shadow: 
+      0 0 20px rgba(0, 255, 255, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  .cyberpunk-card {
+    background: linear-gradient(145deg, 
+      rgba(0, 10, 30, 0.95) 0%, 
+      rgba(10, 0, 30, 0.95) 50%, 
+      rgba(0, 20, 20, 0.95) 100%);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    box-shadow: 
+      0 4px 15px rgba(0, 255, 255, 0.08),
+      0 0 0 1px rgba(0, 255, 255, 0.03);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .cyberpunk-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+      transparent, 
+      rgba(0, 255, 255, 0.05), 
+      transparent);
+    animation: scan-line 4s infinite;
+  }
+  
+  .cyberpunk-card {
+    background: linear-gradient(145deg, 
+      rgba(0, 10, 30, 0.95) 0%, 
+      rgba(10, 0, 30, 0.95) 50%, 
+      rgba(0, 20, 20, 0.95) 100%);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    box-shadow: 
+      0 4px 15px rgba(0, 255, 255, 0.08),
+      0 0 0 1px rgba(0, 255, 255, 0.03);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .cyberpunk-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+      transparent, 
+      rgba(0, 255, 255, 0.1), 
+      transparent);
+    animation: scan-line 3s infinite;
+  }
+  
+  .neo-border {
+    border: 2px solid transparent;
+    background: linear-gradient(145deg, rgba(0, 255, 255, 0.1), rgba(255, 0, 170, 0.1)) padding-box,
+                linear-gradient(145deg, rgba(0, 255, 255, 0.5), rgba(255, 0, 170, 0.5)) border-box;
+  }
+  
+  .text-glow {
+    text-shadow: 
+      0 0 5px currentColor, 
+      0 0 10px currentColor, 
+      0 0 15px currentColor,
+      0 0 20px currentColor;
+  }
+  
+  .text-matrix {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    text-shadow: 
+      0 0 3px hsl(120, 100%, 70%),
+      0 0 6px hsl(120, 100%, 70%),
+      0 0 9px hsl(120, 100%, 70%);
+  }
+  
+  .progress-ring {
+    transform: rotate(-90deg);
+  }
+  
+  .facility-marker {
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .facility-marker:hover {
+    transform: scale(1.5);
+    z-index: 10;
+  }
+  
+  .status-indicator {
+    border-radius: 50%;
+    animation: glow-pulse 2s ease-in-out infinite alternate;
+  }
+  
+  .data-particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: hsl(180, 100%, 50%);
+    border-radius: 50%;
+    animation: data-flow 3s linear infinite;
+  }
+  
+  .metric-gauge {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .hologram-text {
+    background: linear-gradient(90deg, 
+      hsl(180, 100%, 50%), 
+      hsl(195, 100%, 80%), 
+      hsl(212, 100%, 50%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: hologram-shift 2s ease-in-out infinite alternate;
+  }
+  
+  .cyber-grid {
+    background-image: 
+      linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  
+  .energy-bar {
+    background: linear-gradient(90deg, 
+      hsl(0, 100%, 60%) 0%, 
+      hsl(45, 100%, 50%) 50%, 
+      hsl(120, 100%, 50%) 100%);
+    box-shadow: 0 0 10px currentColor;
+  }
+}
+
+@layer utilities {
+  .animate-glow-pulse {
+    animation: glow-pulse 2s ease-in-out infinite alternate;
+  }
+  
+  .animate-data-flow {
+    animation: data-flow 3s linear infinite;
+  }
+  
+  .animate-rotate-3d {
+    animation: rotate-3d 10s linear infinite;
+  }
+  
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  .hover\:scale-102:hover {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes glow-pulse {
+  0% { 
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+  }
+  100% { 
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.8), 0 0 60px rgba(0, 255, 255, 0.3);
+  }
+}
+
+@keyframes data-flow {
+  0% { 
+    transform: translateX(-100%); 
+    opacity: 0; 
+  }
+  50% { 
+    opacity: 1; 
+  }
+  100% { 
+    transform: translateX(100%); 
+    opacity: 0; 
+  }
+}
+
+@keyframes rotate-3d {
+  0% { 
+    transform: perspective(1000px) rotateY(0deg); 
+  }
+  100% { 
+    transform: perspective(1000px) rotateY(360deg); 
+  }
+}
+
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0px); 
+  }
+  50% { 
+    transform: translateY(-10px); 
+  }
+}
+
+@keyframes scan-line {
+  0% { 
+    left: -100%; 
+  }
+  100% { 
+    left: 100%; 
+  }
+}
+
+@keyframes hologram-shift {
+  0% { 
+    filter: hue-rotate(0deg);
+  }
+  100% { 
+    filter: hue-rotate(90deg);
+  }
+}
+
+@keyframes cyber-breathe {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.8);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes matrix-rain {
+  0% { 
+    transform: translateY(-100px);
+    opacity: 0;
+  }
+  50% { 
+    opacity: 1;
+  }
+  100% { 
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+@keyframes energy-flow {
+  0% { 
+    background-position: 0% 50%;
+  }
+  50% { 
+    background-position: 100% 50%;
+  }
+  100% { 
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes circuit-pulse {
+  0% { 
+    stroke-dashoffset: 100;
+    opacity: 0.3;
+  }
+  50% { 
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% { 
+    stroke-dashoffset: -100;
+    opacity: 0.3;
+  }
+}
+
+/* Chart styling */
+.chart-container {
+  position: relative;
+  height: 100%;
+  min-height: 200px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(240, 3.7%, 15.9%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(180, 100%, 50%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(212, 100%, 50%);
+}
+
+/* Enhanced 3D Animation System for Innovative Futuristic Design */
+@keyframes process-flow {
+  0% {
+    transform: translateY(100vh) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(50vh) rotate(180deg);
+    opacity: 1;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-10vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes alert-pulse {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-20vh) scale(1.2);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-50vh) scale(0.8);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-80vh) scale(1.1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-100vh) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes chemical-flow {
+  0% {
+    transform: translateX(0) translateY(100vh) rotate(0deg) scale(0.8);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.7;
+    transform: translateX(20vw) translateY(75vh) rotate(90deg) scale(1);
+  }
+  35% {
+    transform: translateX(-10vw) translateY(50vh) rotate(180deg) scale(1.1);
+    opacity: 1;
+  }
+  65% {
+    transform: translateX(30vw) translateY(25vh) rotate(270deg) scale(0.9);
+    opacity: 0.8;
+  }
+  85% {
+    opacity: 0.5;
+    transform: translateX(10vw) translateY(5vh) rotate(315deg) scale(1.2);
+  }
+  100% {
+    transform: translateX(50vw) translateY(-20vh) rotate(360deg) scale(0.4);
+    opacity: 0;
+  }
+}
+
+@keyframes grid-flow {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 60px 60px;
+  }
+}
+
+@keyframes power-pulse {
+  0% {
+    opacity: 0.6;
+    transform: scaleX(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1.05);
+  }
+  100% {
+    opacity: 0.6;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes warning-blink {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px #ffaa0060);
+  }
+  50% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 15px #ffaa0080);
+  }
+}
+
+@keyframes liquid-wave {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes holographic-scan {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes equipment-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px currentColor);
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 16px currentColor);
+    transform: scale(1.05);
+  }
+}
+
+/* Enhanced 3D Component Styles */
+.holographic-enhanced {
+  background: linear-gradient(135deg, 
+    rgba(0, 255, 255, 0.2) 0%, 
+    rgba(170, 0, 255, 0.2) 25%, 
+    rgba(0, 255, 136, 0.2) 50%, 
+    rgba(255, 170, 0, 0.2) 75%, 
+    rgba(255, 0, 170, 0.2) 100%);
+  backdrop-filter: blur(30px);
+  border: 2px solid rgba(0, 255, 255, 0.5);
+  box-shadow: 
+    0 0 30px rgba(0, 255, 255, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.holographic-enhanced::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(0, 255, 255, 0.2), 
+    transparent);
+  animation: holographic-scan 4s infinite;
+}
+
+.cyberpunk-enhanced {
+  background: linear-gradient(145deg, 
+    rgba(0, 20, 40, 0.95) 0%, 
+    rgba(20, 0, 40, 0.95) 30%, 
+    rgba(0, 40, 30, 0.95) 70%, 
+    rgba(10, 10, 50, 0.95) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 255, 255, 0.4);
+  box-shadow: 
+    0 8px 32px rgba(0, 255, 255, 0.15),
+    0 0 0 1px rgba(0, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+}
+
+.scanning-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(0, 255, 255, 0.8), 
+    transparent);
+  animation: holographic-scan 2s infinite;
+}
+
+/* 3D Gauge Effects */
+.gauge-3d {
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.gauge-3d::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, 
+    rgba(255, 255, 255, 0.2), 
+    transparent 50%);
+  z-index: -1;
+}
+
+/* Interactive Hover Effects */
+.interactive-3d {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.interactive-3d:hover {
+  transform: translateY(-2px) rotateX(5deg);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    0 0 30px rgba(0, 255, 255, 0.2);
+}
+
+/* Enhanced Glass Morphism */
+.glass-morphism-enhanced {
+  background: rgba(0, 20, 40, 0.4);
+  backdrop-filter: blur(25px) saturate(180%);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  box-shadow: 
+    0 12px 40px rgba(0, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Network Topology Enhancements */
+.network-node {
+  animation: pulse 2s infinite;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+.network-connection {
+  animation: power-pulse 3s infinite;
+}
+
+/* Energy Visualization */
+.energy-hub {
+  animation: pulse 4s infinite;
+  filter: drop-shadow(0 0 20px #ffaa0060);
+}
+
+/* Maintenance Alert Styling */
+.alert-card-critical {
+  animation: warning-blink 2s infinite;
+  border-left: 4px solid #ff4444;
+}
+
+.alert-card-high {
+  border-left: 4px solid #ff8800;
+}
+
+.alert-card-medium {
+  border-left: 4px solid #ffaa00;
+}
+
+.alert-card-low {
+  border-left: 4px solid #ffff00;
+}
+
+/* Chemical Tank Animations */
+.tank-level {
+  animation: liquid-wave 3s ease-in-out infinite;
+}
+
+/* Energy Particle Animations for 3D Gauges */
+@keyframes energy-particle-0 {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(40px, -40px) rotate(180deg); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(80px, -80px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes energy-particle-1 {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(0, -60px) rotate(180deg); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(0, -120px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes energy-particle-2 {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(-40px, -40px) rotate(180deg); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(-80px, -80px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes energy-particle-3 {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(-60px, 0) rotate(180deg); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(-120px, 0) rotate(360deg); opacity: 0; }
+}
+
+@keyframes energy-particle-4 {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(-40px, 40px) rotate(180deg); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(-80px, 80px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes energy-particle-5 {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(0, 60px) rotate(180deg); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(0, 120px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes energy-particle-6 {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(40px, 40px) rotate(180deg); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(80px, 80px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes energy-particle-7 {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(60px, 0) rotate(180deg); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(120px, 0) rotate(360deg); opacity: 0; }
+}
+
+/* Enhanced Holographic Gauge Effects */
+.holographic-gauge {
+  position: relative;
+  background: linear-gradient(135deg, 
+    rgba(0, 255, 255, 0.1) 0%, 
+    rgba(170, 0, 255, 0.1) 25%, 
+    rgba(0, 255, 136, 0.1) 50%, 
+    rgba(255, 170, 0, 0.1) 75%, 
+    rgba(255, 0, 170, 0.1) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  box-shadow: 
+    0 0 20px rgba(0, 255, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.holographic-gauge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(0, 255, 255, 0.15), 
+    transparent);
+  animation: holographic-scan 3s infinite;
+}
+
+.gauge-glow {
+  filter: drop-shadow(0 0 10px currentColor);
+  animation: gauge-pulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes gauge-pulse {
+  0% {
+    filter: drop-shadow(0 0 8px currentColor);
+    transform: scale(1);
+  }
+  100% {
+    filter: drop-shadow(0 0 15px currentColor);
+    transform: scale(1.02);
+  }
+}
+
+/* 3D Power Hub Enhancements */
+.power-hub-3d {
+  transform-style: preserve-3d;
+  animation: hub-float 6s ease-in-out infinite;
+}
+
+@keyframes hub-float {
+  0%, 100% {
+    transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) translateY(0px);
+  }
+  50% {
+    transform: perspective(1000px) rotateX(-2deg) rotateY(2deg) translateY(-5px);
+  }
+}
+
+/* Enhanced Connection Lines */
+.connection-line-3d {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    currentColor 20%, 
+    currentColor 80%, 
+    transparent 100%);
+  animation: connection-pulse 3s ease-in-out infinite;
+}
+
+@keyframes connection-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.1);
+  }
+}
+
+/* Status Indicator Enhancements */
+.status-indicator-3d {
+  background: radial-gradient(circle at 30% 30%, 
+    rgba(255, 255, 255, 0.8), 
+    currentColor 40%, 
+    transparent 70%);
+  animation: status-blink 2s ease-in-out infinite;
+}
+
+@keyframes status-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+/* Responsive 3D Effects */
+@media (max-width: 768px) {
+  .holographic-enhanced,
+  .cyberpunk-enhanced {
+    backdrop-filter: blur(15px);
+  }
+  
+  .interactive-3d:hover {
+    transform: translateY(-1px);
+  }
+  
+  .power-hub-3d {
+    animation-duration: 8s;
+  }
+}
+
+/* Enhanced Scrollbar styling */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: rgb(30 41 59 / 0.3);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(71 85 105 / 0.8);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgb(100 116 139 / 0.9);
+}
+
+.scrollbar-track-slate-800::-webkit-scrollbar-track {
+  background: rgb(30 41 59 / 0.5);
+}
+
+.scrollbar-thumb-slate-600::-webkit-scrollbar-thumb {
+  background: rgb(71 85 105 / 0.7);
+}
+
+.scrollbar-thumb-slate-600::-webkit-scrollbar-thumb:hover {
+  background: rgb(71 85 105 / 0.9);
+}
+
+/* Text truncation helper */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Force View button visibility in light mode - highest priority */
+:root.light button.bg-cyan-600,
+:root.light button[class*="bg-cyan-600"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button.bg-cyan-600:hover,
+:root.light button[class*="bg-cyan-600"]:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Ultra-specific View button override for light mode */
+:root.light button.text-xs.px-2.py-1.bg-cyan-600 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button.text-xs.px-2.py-1.bg-cyan-600:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Force Add Order button visibility in light mode - highest priority */
+:root.light button.bg-cyan-600.mb-4,
+:root.light button[class*="bg-cyan-600"][class*="mb-4"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button.bg-cyan-600.mb-4:hover,
+:root.light button[class*="bg-cyan-600"][class*="mb-4"]:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Ultra-specific Add Order button override */
+:root.light button.bg-cyan-600.hover\:bg-cyan-700.text-white.light\:bg-cyan-600.light\:hover\:bg-cyan-700.light\:text-white.mb-4 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button.bg-cyan-600.hover\:bg-cyan-700.text-white.light\:bg-cyan-600.light\:hover\:bg-cyan-700.light\:text-white.mb-4:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Force Close button visibility in light mode - highest priority */
+:root.light button.bg-cyan-600.hover\:bg-cyan-700.text-white.light\:bg-cyan-600.light\:hover\:bg-cyan-700.light\:text-white {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button.bg-cyan-600.hover\:bg-cyan-700.text-white.light\:bg-cyan-600.light\:hover\:bg-cyan-700.light\:text-white:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Ultra-specific Close button override for modal */
+:root.light button[onclick*="setViewModal(false)"].bg-cyan-600 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button[onclick*="setViewModal(false)"].bg-cyan-600:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Force Apply Filters button visibility in light mode - highest priority */
+:root.light button.bg-cyan-600.hover\:bg-cyan-700.text-white.light\:bg-cyan-600.light\:hover\:bg-cyan-700.light\:text-white.px-4.py-1\.5 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button.bg-cyan-600.hover\:bg-cyan-700.text-white.light\:bg-cyan-600.light\:hover\:bg-cyan-700.light\:text-white.px-4.py-1\.5:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Force Refresh and Clear Filters buttons visibility in light mode */
+:root.light button.border-slate-600.text-white.light\:border-gray-300.light\:text-gray-700 {
+  border-color: #d1d5db !important;
+  color: #374151 !important;
+  background-color: transparent !important;
+}
+
+:root.light button.border-slate-600.text-white.light\:border-gray-300.light\:text-gray-700:hover {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+
+/* Specific override for Clear Filters button */
+:root.light button.border-slate-600.text-slate-300.light\:border-gray-300.light\:text-gray-700 {
+  border-color: #d1d5db !important;
+  color: #374151 !important;
+  background-color: transparent !important;
+}
+
+:root.light button.border-slate-600.text-slate-300.light\:border-gray-300.light\:text-gray-700:hover {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+
+/* Force RFID buttons visibility in light mode */
+:root.light button.bg-blue-600.text-white.light\:bg-blue-600.light\:text-white {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+
+:root.light button.bg-blue-600.text-white.light\:bg-blue-600.light\:text-white:hover {
+  background-color: #1d4ed8 !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+}
+
+:root.light button.bg-green-600.text-white.light\:bg-green-600.light\:text-white {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #16a34a !important;
+}
+
+:root.light button.bg-green-600.text-white.light\:bg-green-600.light\:text-white:hover {
+  background-color: #15803d !important;
+  color: #ffffff !important;
+  border-color: #15803d !important;
+}
+
+:root.light button.bg-yellow-500.text-white.light\:bg-yellow-500.light\:text-white {
+  background-color: #eab308 !important;
+  color: #ffffff !important;
+  border-color: #eab308 !important;
+}
+
+:root.light button.bg-yellow-500.text-white.light\:bg-yellow-500.light\:text-white:hover {
+  background-color: #ca8a04 !important;
+  color: #ffffff !important;
+  border-color: #ca8a04 !important;
+}
+
+/* Force Save IN and Save OUT buttons visibility in light mode */
+:root.light button.bg-cyan-600.text-white.light\:bg-cyan-600.light\:text-white {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button.bg-cyan-600.text-white.light\:bg-cyan-600.light\:text-white:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Force Truck Management tabs visibility in light mode */
+:root.light button.bg-cyan-600.text-white.light\:bg-cyan-600.light\:text-white.border-cyan-600.light\:border-cyan-600 {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+  border-color: #0891b2 !important;
+}
+
+:root.light button.bg-cyan-600.text-white.light\:bg-cyan-600.light\:text-white.border-cyan-600.light\:border-cyan-600:hover {
+  background-color: #0e7490 !important;
+  color: #ffffff !important;
+  border-color: #0e7490 !important;
+}
+
+/* Force inactive tabs visibility in light mode */
+:root.light button.bg-slate-800.light\:bg-gray-100.text-slate-300.light\:text-gray-700 {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+}
+
+:root.light button.bg-slate-800.light\:bg-gray-100.text-slate-300.light\:text-gray-700:hover {
+  background-color: #e5e7eb !important;
+  color: #374151 !important;
+}
+
+/* Force action button icon colors in light mode */
+:root.light button .text-blue-500.light\:text-blue-600 {
+  color: #2563eb !important;
+}
+
+:root.light button .text-yellow-500.light\:text-yellow-600 {
+  color: #ca8a04 !important;
+}
+
+:root.light button .text-red-500.light\:text-red-600 {
+  color: #dc2626 !important;
+}
+
+/* Force action button backgrounds in light mode */
+:root.light button.hover\:bg-slate-700.light\:hover\:bg-gray-100 {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light button.hover\:bg-slate-700.light\:hover\:bg-gray-100:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* Force all ghost variant buttons to have transparent backgrounds in light mode */
+:root.light button[data-variant="ghost"] {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light button[data-variant="ghost"]:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* Additional specificity for action buttons */
+:root.light button.variant-ghost {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light button.variant-ghost:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* Force action buttons in tables to have transparent backgrounds */
+:root.light table button[data-variant="ghost"] {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light table button[data-variant="ghost"]:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* Target buttons with specific classes */
+:root.light button[class*="hover:bg-slate-700"][class*="light:hover:bg-gray-100"] {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light button[class*="hover:bg-slate-700"][class*="light:hover:bg-gray-100"]:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* General override for all ghost buttons in light mode */
+:root.light button[data-variant="ghost"],
+:root.light button.variant-ghost,
+:root.light button[class*="variant-ghost"] {
+  background-color: transparent !important;
+  border: none !important;
+  color: inherit !important;
+}
+
+:root.light button[data-variant="ghost"]:hover,
+:root.light button.variant-ghost:hover,
+:root.light button[class*="variant-ghost"]:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+  color: inherit !important;
+}
+
+/* Ultra-specific overrides to beat global CSS */
+:root.light .space-x-2 button,
+:root.light .text-right button,
+:root.light table button,
+:root.light [class*="Table"] button,
+:root.light [class*="table"] button {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light .space-x-2 button:hover,
+:root.light .text-right button:hover,
+:root.light table button:hover,
+:root.light [class*="Table"] button:hover,
+:root.light [class*="table"] button:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* Target buttons with size="icon" specifically */
+:root.light button[data-size="icon"],
+:root.light button[class*="size-icon"] {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light button[data-size="icon"]:hover,
+:root.light button[class*="size-icon"]:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* Nuclear option - target all buttons in light mode that might be action buttons */
+:root.light button:has(svg),
+:root.light button svg {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light button:has(svg):hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* Maximum specificity overrides */
+:root.light div.space-x-2 button[data-variant="ghost"][data-size="icon"],
+:root.light td.text-right button[data-variant="ghost"][data-size="icon"],
+:root.light .TableRow button[data-variant="ghost"][data-size="icon"] {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+:root.light div.space-x-2 button[data-variant="ghost"][data-size="icon"]:hover,
+:root.light td.text-right button[data-variant="ghost"][data-size="icon"]:hover,
+:root.light .TableRow button[data-variant="ghost"][data-size="icon"]:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Override any potential dark mode styles */
+:root.light button[class*="bg-slate"],
+:root.light button[class*="bg-gray"],
+:root.light button[class*="bg-zinc"] {
+  background-color: transparent !important;
+}
+
+:root.light button[class*="bg-slate"]:hover,
+:root.light button[class*="bg-gray"]:hover,
+:root.light button[class*="bg-zinc"]:hover {
+  background-color: #f3f4f6 !important;
+}
+
+/* Final nuclear option - override everything for action buttons */
+:root.light button {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+:root.light button:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+}
+
+/* Ultra-specific override for Truck Management action buttons */
+:root.light .TruckManagement button[data-variant="ghost"][data-size="icon"],
+:root.light [class*="TruckManagement"] button[data-variant="ghost"][data-size="icon"],
+:root.light button[data-variant="ghost"][data-size="icon"] {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+:root.light .TruckManagement button[data-variant="ghost"][data-size="icon"]:hover,
+:root.light [class*="TruckManagement"] button[data-variant="ghost"][data-size="icon"]:hover,
+:root.light button[data-variant="ghost"][data-size="icon"]:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Maximum specificity for truck management action buttons */
+:root.light .truck-management-container button[data-variant="ghost"][data-size="icon"],
+:root.light .truck-management-container button[class*="variant-ghost"][class*="size-icon"],
+:root.light .truck-management-container button[class*="hover:bg-slate-700"] {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+:root.light .truck-management-container button[data-variant="ghost"][data-size="icon"]:hover,
+:root.light .truck-management-container button[class*="variant-ghost"][class*="size-icon"]:hover,
+:root.light .truck-management-container button[class*="hover:bg-slate-700"]:hover {
+  background-color: #f3f4f6 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* But preserve colored backgrounds for specific buttons */
+:root.light button.bg-cyan-600,
+:root.light button.bg-green-600,
+:root.light button.bg-blue-600,
+:root.light button.bg-yellow-500,
+:root.light button.bg-red-600 {
+  background-color: inherit !important;
+}
+
+:root.light button.bg-cyan-600:hover,
+:root.light button.bg-green-600:hover,
+:root.light button.bg-blue-600:hover,
+:root.light button.bg-yellow-500:hover,
+:root.light button.bg-red-600:hover {
+  background-color: inherit !important;
+}
+
+/* Fix table header text visibility in light mode */
+:root.light th,
+:root.light .TableHead,
+:root.light [role="columnheader"],
+:root.light thead th,
+:root.light thead .TableHead {
+  color: #000000 !important;
+  background-color: #f8fafc !important;
+}
+
+/* Fix table header text visibility in dark mode */
+:root:not(.light) th,
+:root:not(.light) .TableHead,
+:root:not(.light) [role="columnheader"],
+:root:not(.light) thead th,
+:root:not(.light) thead .TableHead {
+  color: #ffffff !important;
+  background-color: #1e293b !important;
+}
+
+/* Fix Select dropdown text visibility in light mode */
+:root.light [data-radix-select-content] {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #000000 !important;
+}
+
+:root.light [data-radix-select-item] {
+  color: #000000 !important;
+  background-color: transparent !important;
+}
+
+:root.light [data-radix-select-item]:hover {
+  background-color: #f8fafc !important;
+  color: #000000 !important;
+}
+
+:root.light [data-radix-select-item][data-highlighted] {
+  background-color: #f1f5f9 !important;
+  color: #000000 !important;
+}
+
+:root.light [data-radix-select-trigger] {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #000000 !important;
+}
+
+:root.light [data-radix-select-trigger]:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Fix SelectItem text visibility in light mode */
+:root.light .SelectItem,
+:root.light [data-radix-select-item],
+:root.light [role="option"] {
+  color: #000000 !important;
+  background-color: transparent !important;
+}
+
+:root.light .SelectItem:hover,
+:root.light [data-radix-select-item]:hover,
+:root.light [role="option"]:hover {
+  background-color: #f8fafc !important;
+  color: #000000 !important;
+}
+
+:root.light .SelectItem[data-highlighted],
+:root.light [data-radix-select-item][data-highlighted],
+:root.light [role="option"][data-highlighted] {
+  background-color: #f1f5f9 !important;
+  color: #000000 !important;
+}
+
+/* Fix SelectContent background in light mode */
+:root.light .SelectContent,
+:root.light [data-radix-select-content] {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+}
+
+/* Force light mode styling for all SelectContent elements */
+:root.light .SelectContent *,
+:root.light [data-radix-select-content] *,
+:root.light [data-radix-select-viewport] * {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Override any dark theme classes in light mode */
+:root.light .SelectContent.bg-slate-800,
+:root.light [data-radix-select-content].bg-slate-800,
+:root.light .SelectContent[class*="bg-slate-800"],
+:root.light [data-radix-select-content][class*="bg-slate-800"] {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+:root.light .SelectContent.bg-slate-900,
+:root.light [data-radix-select-content].bg-slate-900,
+:root.light .SelectContent[class*="bg-slate-900"],
+:root.light [data-radix-select-content][class*="bg-slate-900"] {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Fix SelectTrigger styling in light mode */
+:root.light .SelectTrigger,
+:root.light [data-radix-select-trigger] {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #000000 !important;
+}
+
+:root.light .SelectTrigger:focus,
+:root.light [data-radix-select-trigger]:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Fix SelectValue placeholder text in light mode */
+:root.light .SelectValue,
+:root.light [data-radix-select-value] {
+  color: #6b7280 !important;
+}
+
+:root.light .SelectValue[data-placeholder],
+:root.light [data-radix-select-value][data-placeholder] {
+  color: #9ca3af !important;
+}
+
+/* Additional specificity for SelectItem text in light mode */
+:root.light .SelectItem span,
+:root.light [data-radix-select-item] span,
+:root.light [role="option"] span {
+  color: #000000 !important;
+}
+
+:root.light .SelectItem .SelectItemText,
+:root.light [data-radix-select-item] .SelectItemText,
+:root.light [role="option"] .SelectItemText {
+  color: #000000 !important;
+}
+
+/* Fix any potential text color inheritance issues */
+:root.light .SelectContent *,
+:root.light [data-radix-select-content] * {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
+:root.light .SelectContent .SelectItem,
+:root.light [data-radix-select-content] .SelectItem {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
+/* Force all SelectItem elements to have light mode styling */
+:root.light .SelectItem,
+:root.light [data-radix-select-item],
+:root.light [role="option"] {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+:root.light .SelectItem:hover,
+:root.light [data-radix-select-item]:hover,
+:root.light [role="option"]:hover {
+  background-color: #f8fafc !important;
+  color: #000000 !important;
+}
+
+:root.light .SelectItem[data-highlighted],
+:root.light [data-radix-select-item][data-highlighted],
+:root.light [role="option"][data-highlighted] {
+  background-color: #f1f5f9 !important;
+  color: #000000 !important;
+}
+
+/* Ensure proper contrast for selected items */
+:root.light .SelectItem[data-state="checked"],
+:root.light [data-radix-select-item][data-state="checked"] {
+  background-color: #dbeafe !important;
+  color: #1e40af !important;
+}
+
+/* Fix input field styling in light mode */
+:root.light input[type="number"],
+:root.light input[type="text"],
+:root.light input[type="email"],
+:root.light input[type="password"],
+:root.light .Input {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #000000 !important;
+}
+
+:root.light input[type="number"]:hover,
+:root.light input[type="text"]:hover,
+:root.light input[type="email"]:hover,
+:root.light input[type="password"]:hover,
+:root.light .Input:hover {
+  background-color: #ffffff !important;
+  border-color: #9ca3af !important;
+  color: #000000 !important;
+}
+
+:root.light input[type="number"]:focus,
+:root.light input[type="text"]:focus,
+:root.light input[type="email"]:focus,
+:root.light input[type="password"]:focus,
+:root.light .Input:focus {
+  background-color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  color: #000000 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Fix input field styling in modal forms */
+:root.light .bg-slate-800\/70 input,
+:root.light .bg-slate-900 input,
+:root.light [class*="bg-slate-800"] input,
+:root.light [class*="bg-slate-900"] input {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #000000 !important;
+}
+
+:root.light .bg-slate-800\/70 input:hover,
+:root.light .bg-slate-900 input:hover,
+:root.light [class*="bg-slate-800"] input:hover,
+:root.light [class*="bg-slate-900"] input:hover {
+  background-color: #ffffff !important;
+  border-color: #9ca3af !important;
+  color: #000000 !important;
+}
+
+:root.light .bg-slate-800\/70 input:focus,
+:root.light .bg-slate-900 input:focus,
+:root.light [class*="bg-slate-800"] input:focus,
+:root.light [class*="bg-slate-900"] input:focus {
+  background-color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  color: #000000 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Fix number input spinner buttons in light mode */
+:root.light input[type="number"]::-webkit-outer-spin-button,
+:root.light input[type="number"]::-webkit-inner-spin-button {
+  background-color: #f3f4f6 !important;
+  color: #000000 !important;
+}
+
+:root.light input[type="number"]::-webkit-outer-spin-button:hover,
+:root.light input[type="number"]::-webkit-inner-spin-button:hover {
+  background-color: #e5e7eb !important;
+  color: #000000 !important;
+}
+
+/* Ultra-specific input field overrides for light mode */
+:root.light input.bg-slate-800\/70,
+:root.light input[class*="bg-slate-800"],
+:root.light input[class*="bg-slate-900"] {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #000000 !important;
+}
+
+:root.light input.bg-slate-800\/70:hover,
+:root.light input[class*="bg-slate-800"]:hover,
+:root.light input[class*="bg-slate-900"]:hover {
+  background-color: #ffffff !important;
+  border-color: #9ca3af !important;
+  color: #000000 !important;
+}
+
+:root.light input.bg-slate-800\/70:focus,
+:root.light input[class*="bg-slate-800"]:focus,
+:root.light input[class*="bg-slate-900"]:focus {
+  background-color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  color: #000000 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Fix input field text color inheritance */
+:root.light input.text-white,
+:root.light input[class*="text-white"] {
+  color: #000000 !important;
+}
+
+:root.light input.text-slate-300,
+:root.light input[class*="text-slate-300"] {
+  color: #000000 !important;
+}
+
+/* Fix input field border color inheritance */
+:root.light input.border-slate-600,
+:root.light input[class*="border-slate-600"] {
+  border-color: #d1d5db !important;
+}
+
+:root.light input.border-slate-700,
+:root.light input[class*="border-slate-700"] {
+  border-color: #d1d5db !important;
+}
+
+/* Nuclear option - force all dropdown elements to light mode */
+:root.light [data-radix-select-content],
+:root.light [data-radix-select-viewport],
+:root.light [data-radix-select-item],
+:root.light [data-radix-select-item] *,
+:root.light [data-radix-select-content] *,
+:root.light [data-radix-select-viewport] * {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+:root.light [data-radix-select-item]:hover,
+:root.light [data-radix-select-item]:hover * {
+  background-color: #f8fafc !important;
+  color: #000000 !important;
+}
+
+:root.light [data-radix-select-item][data-highlighted],
+:root.light [data-radix-select-item][data-highlighted] * {
+  background-color: #f1f5f9 !important;
+  color: #000000 !important;
+}
+
+/* Override any potential dark theme inheritance */
+:root.light .SelectContent,
+:root.light .SelectContent *,
+:root.light [data-radix-select-content],
+:root.light [data-radix-select-content] * {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Force light mode for all dropdown portal elements */
+:root.light [data-radix-portal] [data-radix-select-content],
+:root.light [data-radix-portal] [data-radix-select-content] *,
+:root.light [data-radix-portal] [data-radix-select-item],
+:root.light [data-radix-portal] [data-radix-select-item] * {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Fix Cancel button text visibility in light mode */
+:root.light button[type="button"][variant="outline"],
+:root.light button[type="button"].border-gray-300,
+:root.light button[type="button"][class*="border-gray-300"] {
+  color: #000000 !important;
+  border-color: #d1d5db !important;
+  background-color: transparent !important;
+}
+
+:root.light button[type="button"][variant="outline"]:hover,
+:root.light button[type="button"].border-gray-300:hover,
+:root.light button[type="button"][class*="border-gray-300"]:hover {
+  color: #000000 !important;
+  background-color: #f3f4f6 !important;
+  border-color: #9ca3af !important;
+}
+
+/* Fix outline button text visibility in light mode */
+:root.light button[variant="outline"],
+:root.light button[data-variant="outline"] {
+  color: #000000 !important;
+  border-color: #d1d5db !important;
+  background-color: transparent !important;
+}
+
+:root.light button[variant="outline"]:hover,
+:root.light button[data-variant="outline"]:hover {
+  color: #000000 !important;
+  background-color: #f3f4f6 !important;
+  border-color: #9ca3af !important;
+}
+
+/* Ultra-specific Cancel button overrides for light mode */
+:root.light button[type="button"]:contains("Cancel"),
+:root.light button:contains("Cancel"),
+:root.light button[onclick*="setShowAddModal(false)"],
+:root.light button[onclick*="setShowEditModal(false)"],
+:root.light button[onclick*="setShowAssignModal(false)"],
+:root.light button[onclick*="setViewModal(false)"] {
+  color: #000000 !important;
+  background-color: transparent !important;
+  border-color: #d1d5db !important;
+}
+
+:root.light button[type="button"]:contains("Cancel"):hover,
+:root.light button:contains("Cancel"):hover,
+:root.light button[onclick*="setShowAddModal(false)"]:hover,
+:root.light button[onclick*="setShowEditModal(false)"]:hover,
+:root.light button[onclick*="setShowAssignModal(false)"]:hover,
+:root.light button[onclick*="setViewModal(false)"]:hover {
+  color: #000000 !important;
+  background-color: #f3f4f6 !important;
+  border-color: #9ca3af !important;
+}
+
+/* Force all modal Cancel buttons to have black text in light mode */
+:root.light .fixed button[type="button"],
+:root.light [class*="modal"] button[type="button"],
+:root.light [class*="Modal"] button[type="button"] {
+  color: #000000 !important;
+}
+
+:root.light .fixed button[type="button"]:hover,
+:root.light [class*="modal"] button[type="button"]:hover,
+:root.light [class*="Modal"] button[type="button"]:hover {
+  color: #000000 !important;
+}
+
+/* Nuclear option - override ALL button text in light mode modals */
+:root.light .fixed button,
+:root.light [class*="modal"] button,
+:root.light [class*="Modal"] button {
+  color: #000000 !important;
+}
+
+:root.light .fixed button:hover,
+:root.light [class*="modal"] button:hover,
+:root.light [class*="Modal"] button:hover {
+  color: #000000 !important;
+}
+
+/* Specific override for buttons with gray border classes */
+:root.light button.border-gray-300,
+:root.light button[class*="border-gray-300"],
+:root.light button[class*="text-gray-700"],
+:root.light button[class*="text-gray-900"] {
+  color: #000000 !important;
+}
+
+:root.light button.border-gray-300:hover,
+:root.light button[class*="border-gray-300"]:hover,
+:root.light button[class*="text-gray-700"]:hover,
+:root.light button[class*="text-gray-900"]:hover {
+  color: #000000 !important;
+}
+
+/* Maximum specificity for RFID modal buttons */
+:root.light button.border-gray-300.light\:border-gray-300.dark\:border-slate-600.text-gray-900.light\:text-gray-900.dark\:text-slate-300 {
+  color: #000000 !important;
+  background-color: transparent !important;
+  border-color: #d1d5db !important;
+}
+
+:root.light button.border-gray-300.light\:border-gray-300.dark\:border-slate-600.text-gray-900.light\:text-gray-900.dark\:text-slate-300:hover {
+  color: #000000 !important;
+  background-color: #f3f4f6 !important;
+  border-color: #9ca3af !important;
+}
+
+/* Override any conflicting text color classes */
+:root.light button[class*="text-gray-700"],
+:root.light button[class*="text-gray-900"],
+:root.light button[class*="text-slate-300"] {
+  color: #000000 !important;
+}
+
+/* Force button text to be black in light mode regardless of other classes */
+:root.light button {
+  color: #000000 !important;
+}
+
+/* But preserve colored button backgrounds */
+:root.light button.bg-green-600,
+:root.light button.bg-blue-600,
+:root.light button.bg-yellow-500,
+:root.light button.bg-red-600,
+:root.light button.bg-cyan-600 {
+  color: #ffffff !important;
+}
+
+/* Force sidebar toggle button to have transparent background in light mode - MAXIMUM SPECIFICITY */
+:root.light .sidebar-toggle-button,
+:root.light button.sidebar-toggle-button,
+:root.light .sidebar-toggle-button[onclick*="onToggle"],
+:root.light button[onclick*="onToggle"].sidebar-toggle-button,
+:root.light div .sidebar-toggle-button,
+:root.light .bg-slate-900 .sidebar-toggle-button,
+:root.light .bg-slate-900\/95 .sidebar-toggle-button {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  --tw-bg-opacity: 0 !important;
+}
+
+:root.light .sidebar-toggle-button:hover,
+:root.light button.sidebar-toggle-button:hover,
+:root.light .sidebar-toggle-button[onclick*="onToggle"]:hover,
+:root.light button[onclick*="onToggle"].sidebar-toggle-button:hover,
+:root.light div .sidebar-toggle-button:hover,
+:root.light .bg-slate-900 .sidebar-toggle-button:hover,
+:root.light .bg-slate-900\/95 .sidebar-toggle-button:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  --tw-bg-opacity: 0 !important;
+}
+
+/* Nuclear option - override ALL button styles for sidebar toggle */
+:root.light .sidebar-toggle-button * {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* ULTIMATE NUCLEAR OPTION - Target by data attribute with maximum specificity */
+:root.light button[data-toggle-button="true"],
+:root.light button[data-toggle-button="true"].sidebar-toggle-button,
+:root.light .bg-slate-900 button[data-toggle-button="true"],
+:root.light .bg-slate-900\/95 button[data-toggle-button="true"],
+:root.light div button[data-toggle-button="true"],
+:root.light .p-4 button[data-toggle-button="true"],
+:root.light .border-b button[data-toggle-button="true"] {
+  background-color: transparent !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  --tw-bg-opacity: 0 !important;
+  --tw-gradient-from: transparent !important;
+  --tw-gradient-to: transparent !important;
+  --tw-gradient-stops: transparent !important;
+}
+
+:root.light button[data-toggle-button="true"]:hover,
+:root.light button[data-toggle-button="true"].sidebar-toggle-button:hover,
+:root.light .bg-slate-900 button[data-toggle-button="true"]:hover,
+:root.light .bg-slate-900\/95 button[data-toggle-button="true"]:hover,
+:root.light div button[data-toggle-button="true"]:hover,
+:root.light .p-4 button[data-toggle-button="true"]:hover,
+:root.light .border-b button[data-toggle-button="true"]:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  --tw-bg-opacity: 0 !important;
+  --tw-gradient-from: transparent !important;
+  --tw-gradient-to: transparent !important;
+  --tw-gradient-stops: transparent !important;
+}
+
+/* Specific overrides for table headers with specific classes */
+:root.light .bg-slate-800.light\:bg-gray-50.text-black.dark\:text-white th,
+:root.light .bg-slate-800.light\:bg-gray-50.text-black.dark\:text-white .TableHead {
+  color: #000000 !important;
+  background-color: #f8fafc !important;
+}
+
+:root:not(.light) .bg-slate-800.light\:bg-gray-50.text-black.dark\:text-white th,
+:root:not(.light) .bg-slate-800.light\:bg-gray-50.text-black.dark\:text-white .TableHead {
+  color: #ffffff !important;
+  background-color: #1e293b !important;
+}

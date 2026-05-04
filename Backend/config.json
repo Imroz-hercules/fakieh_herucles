@@ -1,0 +1,10 @@
+{
+  "plc": {
+    "ip": "192.168.0.100",
+    "rack": 0,
+    "slot": 3
+  },
+  "default_db": 1,
+  "read_len_cap": 0,
+  "demo_mode": false
+}
