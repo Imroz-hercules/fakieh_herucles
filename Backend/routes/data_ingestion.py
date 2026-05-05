@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from flask import Blueprint, jsonify, current_app
 from models import db
-from routes.plc_routes import plant_orders
+from routes.plc_routes import fetch_plant_orders_snapshot
 from routes.orders_sink import persist_orders
 from routes.silos_collect import collect_all_silos
 from routes.silos_sink import persist_silos
@@ -251,11 +251,7 @@ def ingestion_worker(app_instance):
         try:
             # Get data from PLC routes within application context
             with app_instance.app_context():
-                payload = plant_orders()
-                if isinstance(payload, tuple):  # Flask response tuple
-                    payload = payload[0].get_json()
-                else:
-                    payload = payload.get_json()
+                payload = fetch_plant_orders_snapshot()
                 
                 # Check for changes if enabled
                 if ONLY_ON_CHANGES and not changed("plant_orders", payload):
@@ -333,11 +329,7 @@ def ingest_now():
     """Manually trigger data ingestion once"""
     try:
         with current_app.app_context():
-            payload = plant_orders()
-            if isinstance(payload, tuple):
-                payload = payload[0].get_json()
-            else:
-                payload = payload.get_json()
+            payload = fetch_plant_orders_snapshot()
         
         try:
             persist_orders(payload)

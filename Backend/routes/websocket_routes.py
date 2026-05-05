@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Dict, Set, Any
 from flask import Blueprint, request, current_app
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from routes.plc_routes import plant_orders
+from routes.plc_routes import fetch_plant_orders_snapshot
 from routes.orders_sink import persist_orders
 from routes.silos_collect import collect_all_silos
 from routes.silos_sink import persist_silos
@@ -46,11 +46,7 @@ def register_socketio_events(socketio_instance):
         # Send initial data
         try:
             with current_app.app_context():
-                data = plant_orders()
-                if isinstance(data, tuple):
-                    data = data[0].get_json()
-                else:
-                    data = data.get_json()
+                data = fetch_plant_orders_snapshot()
             
             # Don't persist orders data to database - only store when status is 8 via handle_order_status
             # persist_orders(data)
@@ -121,11 +117,7 @@ def broadcast_worker(app_instance):
         try:
             # Get PLC data within application context (always, not just when clients are connected)
             with app_instance.app_context():
-                data = plant_orders()
-                if isinstance(data, tuple):
-                    data = data[0].get_json()
-                else:
-                    data = data.get_json()
+                data = fetch_plant_orders_snapshot()
                 
                 # Don't persist orders data to database - only store when status is 8 via handle_order_status
                 # persist_orders(data)
@@ -165,8 +157,10 @@ def start_broadcast():
         return {'status': 'already_running', 'message': 'Broadcast is already running'}
     
     _broadcast_running = True
+    app = current_app._get_current_object()
+    app.config["PLC_BROADCAST_ACTIVE"] = True
     # Pass the Flask app instance to the worker
-    _broadcast_thread = threading.Thread(target=broadcast_worker, args=(current_app._get_current_object(),), daemon=True)
+    _broadcast_thread = threading.Thread(target=broadcast_worker, args=(app,), daemon=True)
     _broadcast_thread.start()
     
     return {
@@ -184,6 +178,7 @@ def stop_broadcast():
         return {'status': 'not_running', 'message': 'Broadcast is not running'}
     
     _broadcast_running = False
+    current_app._get_current_object().config["PLC_BROADCAST_ACTIVE"] = False
     return {'status': 'stopped', 'message': 'PLC data broadcast stopped'}
 
 @websocket_bp.route("/status", methods=["GET"])

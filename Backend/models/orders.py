@@ -1,9 +1,16 @@
-from . import db
 from datetime import datetime
+
+from sqlalchemy import Index
+
+from . import db
 
 # ─────────────── Intake Orders ───────────────
 class IntakeOrder(db.Model):
     __tablename__ = 'intake_orders'
+    __table_args__ = (
+        Index("ix_intake_orders_complete_finished", "is_complete", "finished_at"),
+        Index("ix_intake_orders_created_at", "created_at"),
+    )
     id = db.Column(db.Integer, primary_key=True)
     badge_no = db.Column(db.String(20), nullable=False)
     source_material_code = db.Column(db.String(50), nullable=False)
@@ -55,6 +62,10 @@ class IntakeOrder(db.Model):
 # ─────────────── Outloading Orders ───────────────
 class OutloadingOrder(db.Model):
     __tablename__ = 'outloading_orders'
+    __table_args__ = (
+        Index("ix_outloading_orders_complete_finished", "is_complete", "finished_at"),
+        Index("ix_outloading_orders_created_at", "created_at"),
+    )
     id = db.Column(db.Integer, primary_key=True)
     badge_no = db.Column(db.String(20), nullable=False)
     source_material_code = db.Column(db.String(50), nullable=False)
@@ -110,6 +121,10 @@ class OutloadingOrder(db.Model):
 # ─────────────── Bulk Line Orders ───────────────
 class BulkLineOrder(db.Model):
     __tablename__ = 'bulk_line_orders'
+    __table_args__ = (
+        Index("ix_bulk_line_orders_complete_finished", "is_complete", "finished_at"),
+        Index("ix_bulk_line_orders_created_at", "created_at"),
+    )
     id = db.Column(db.Integer, primary_key=True)
     badge_no = db.Column(db.String(20))
     source_material_code = db.Column(db.String(50))
@@ -190,6 +205,10 @@ class BulkLineOrder(db.Model):
 # ─────────────── PIT Line Orders ───────────────
 class PTLineOrder(db.Model):
     __tablename__ = 'pt_line_orders'
+    __table_args__ = (
+        Index("ix_pt_line_orders_complete_finished", "is_complete", "finished_at"),
+        Index("ix_pt_line_orders_created_at", "created_at"),
+    )
     id = db.Column(db.Integer, primary_key=True)
     pit_no = db.Column(db.String(50))
     raw_code = db.Column(db.String(50))

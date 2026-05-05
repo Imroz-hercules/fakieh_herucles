@@ -1,5 +1,10 @@
 # config.py
+import os
 from urllib.parse import quote_plus
+
+# PLC broadcast / plant-orders HTTP cache (see routes.plc_routes, routes.websocket_routes)
+PLC_POLL_INTERVAL = float(os.getenv("PLC_POLL_INTERVAL", "0.5"))
+PLC_ORDERS_CACHE_TTL_SEC = float(os.getenv("PLC_ORDERS_CACHE_TTL_SEC", "1.25"))
 
 DB_USERNAME = "postgres"
 DB_PASSWORD = "Hercules"
@@ -33,3 +38,6 @@ SQLALCHEMY_BINDS = {
 }
 
 SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+# Set True at runtime when /api/websocket/start-broadcast runs (not a static deploy default).
+PLC_BROADCAST_ACTIVE = False

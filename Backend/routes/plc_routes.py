@@ -1,6 +1,6 @@
 
 
-import os, re, json, struct, time, threading
+import os, re, json, struct, time, threading, copy
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from flask import Blueprint, jsonify, request
@@ -680,6 +680,22 @@ def get_material_name_from_code(material_code):
     except Exception:
         return ""
 
+# ─────────── Plant orders snapshot (HTTP cache vs broadcast dedup) ───────────
+_ORDERS_SNAPSHOT_LOCK = threading.RLock()
+_LAST_ORDERS_PAYLOAD: Optional[Dict[str, Any]] = None
+_LAST_ORDERS_TS: float = 0.0
+
+
+def _verbose_plc() -> bool:
+    """Heavy order/PLC debug logs only when PLC_VERBOSE_LOGS=1/true."""
+    return os.getenv("PLC_VERBOSE_LOGS", "").lower() in ("1", "true", "yes")
+
+
+def _vlog(msg: str) -> None:
+    if _verbose_plc():
+        print(msg)
+
+
 # ─────────────────────────── Lifecycle Handler ─────────────────────────
 def handle_order_status(order_data, model_class, order_type="intake"):
     """
@@ -700,15 +716,14 @@ def handle_order_status(order_data, model_class, order_type="intake"):
     status = order_data.get("status_word", {}).get("code") if isinstance(order_data.get("status_word"), dict) else order_data.get("status_word")
     now = datetime.now()  # Use local time instead of UTC
 
-    # 🔍 DEBUG: Log the raw status data to understand the structure
-    print(f"[DEBUG] {order_type.upper()} Order {badge}: Raw status_word = {order_data.get('status_word')}")
-    print(f"[DEBUG] {order_type.upper()} Order {badge}: Parsed status = {status} (type: {type(status)})")
-    print(f"[DEBUG] {order_type.upper()} Order {badge}: Full order_data = {order_data}")
+    _vlog(f"[DEBUG] {order_type.upper()} Order {badge}: Raw status_word = {order_data.get('status_word')}")
+    _vlog(f"[DEBUG] {order_type.upper()} Order {badge}: Parsed status = {status} (type: {type(status)})")
+    _vlog(f"[DEBUG] {order_type.upper()} Order {badge}: Full order_data = {order_data}")
 
     if not badge or badge == "0" or badge == "":
-        print(f"[DEBUG] {order_type.upper()} Order: Badge is empty or invalid: '{badge}'")
-        print(f"[DEBUG] {order_type.upper()} Order: Raw badge_no from data: '{order_data.get('badge_no')}'")
-        print(f"[DEBUG] {order_type.upper()} Order: Raw badgeNo from data: '{order_data.get('badgeNo')}'")
+        _vlog(f"[DEBUG] {order_type.upper()} Order: Badge is empty or invalid: '{badge}'")
+        _vlog(f"[DEBUG] {order_type.upper()} Order: Raw badge_no from data: '{order_data.get('badge_no')}'")
+        _vlog(f"[DEBUG] {order_type.upper()} Order: Raw badgeNo from data: '{order_data.get('badgeNo')}'")
         return
 
     # Convert status to int for comparison (handle both string and int)
@@ -723,33 +738,33 @@ def handle_order_status(order_data, model_class, order_type="intake"):
     if status_int == 1:
         # Status 1 (Idle) → Record created_at timestamp only if not already recorded, then check for completed order
         if order_key not in _order_timestamps_buffer or "created_at" not in _order_timestamps_buffer[order_key]:
-            print(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status 1 (Idle) - Recording created_at timestamp")
+            _vlog(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status 1 (Idle) - Recording created_at timestamp")
             _update_timestamp_buffer(order_key, "created_at", now)
         else:
-            print(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status 1 (Idle) - Already recorded created_at, checking for completed order")
+            _vlog(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status 1 (Idle) - Already recorded created_at, checking for completed order")
         _store_completed_order_if_ready(order_data, model_class, order_type, badge, now)
         
     elif status_int in [2, 3, 4, 5, 6, 7]:
         # Status 2-7 (Running) → Record started_at timestamp (only once)
         if order_key not in _order_timestamps_buffer or "started_at" not in _order_timestamps_buffer[order_key]:
-            print(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status {status_int} (Running) - Recording started_at timestamp")
+            _vlog(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status {status_int} (Running) - Recording started_at timestamp")
             _update_timestamp_buffer(order_key, "started_at", now)
         else:
-            print(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status {status_int} (Running) - Already recorded started_at")
+            _vlog(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status {status_int} (Running) - Already recorded started_at")
             
     elif status_int in [8, 12]:
         # Status 8 (Stopping) or 12 (Completed) → Record finished_at timestamp and mark ready for storage
         status_name = "Stopping" if status_int == 8 else "Completed"
-        print(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status {status_int} ({status_name}) - Recording finished_at timestamp")
-        print(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Order key = {order_key}")
-        print(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Model class = {model_class}")
+        _vlog(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status {status_int} ({status_name}) - Recording finished_at timestamp")
+        _vlog(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Order key = {order_key}")
+        _vlog(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Model class = {model_class}")
         _update_timestamp_buffer(order_key, "finished_at", now)
         _mark_order_ready_for_storage(order_data, model_class, order_type, badge, now)
         
     else:
         # For other statuses, just log
         if status_int and status_int != 1:  # Don't log idle status (too frequent)
-            print(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status {status_int} (unknown - tracking progress)")
+            _vlog(f"[TIMESTAMP] {order_type.upper()} Order {badge}: Status {status_int} (unknown - tracking progress)")
         return
 
 # Global dictionary to track order lifecycle states
@@ -764,7 +779,7 @@ def _update_timestamp_buffer(order_key, timestamp_type, timestamp):
         _order_timestamps_buffer[order_key] = {}
     
     _order_timestamps_buffer[order_key][timestamp_type] = timestamp
-    print(f"[BUFFER] Updated {order_key}: {timestamp_type} = {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+    _vlog(f"[BUFFER] Updated {order_key}: {timestamp_type} = {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
 
 def _get_timestamp_buffer(order_key):
     """Get all timestamps from buffer for an order"""
@@ -774,7 +789,7 @@ def _clear_timestamp_buffer(order_key):
     """Clear timestamp buffer for an order after storage"""
     if order_key in _order_timestamps_buffer:
         del _order_timestamps_buffer[order_key]
-        print(f"[BUFFER] Cleared timestamp buffer for {order_key}")
+        _vlog(f"[BUFFER] Cleared timestamp buffer for {order_key}")
 
 def _mark_order_ready_for_storage(order_data, model_class, order_type, badge, now):
     """Mark order as ready for storage when status 8 (stopped) is reached"""
@@ -798,11 +813,11 @@ def _mark_order_ready_for_storage(order_data, model_class, order_type, badge, no
             "ready_for_storage": True
         }
         
-        print(f"[LIFECYCLE] 📝 Order {badge} with silos {dest1}/{dest2} marked as ready for storage")
+        _vlog(f"[LIFECYCLE] 📝 Order {badge} with silos {dest1}/{dest2} marked as ready for storage")
         if order_type == "outloading":
-            print(f"[LIFECYCLE] OUTLOADING DEBUG: Order key = {order_key}")
-            print(f"[LIFECYCLE] OUTLOADING DEBUG: Model class = {model_class}")
-            print(f"[LIFECYCLE] OUTLOADING DEBUG: Order data keys = {list(order_data.keys())}")
+            _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Order key = {order_key}")
+            _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Model class = {model_class}")
+            _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Order data keys = {list(order_data.keys())}")
         
     except Exception as e:
         print(f"[LIFECYCLE] ❌ ERROR! Failed to mark order {badge} as ready: {e}")
@@ -822,8 +837,8 @@ def _store_completed_order_if_ready(order_data, model_class, order_type, badge, 
             order_info = _order_lifecycle_tracker[order_key]
             
             if order_type == "outloading":
-                print(f"[LIFECYCLE] OUTLOADING DEBUG: Found ready order in tracker: {order_key}")
-                print(f"[LIFECYCLE] OUTLOADING DEBUG: Order info = {order_info}")
+                _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Found ready order in tracker: {order_key}")
+                _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Order info = {order_info}")
             
             # Store the completed order
             _store_complete_order_with_lifecycle(
@@ -837,12 +852,12 @@ def _store_completed_order_if_ready(order_data, model_class, order_type, badge, 
             
             # Remove from tracker
             del _order_lifecycle_tracker[order_key]
-            print(f"[LIFECYCLE] ✅ Order {badge} with silos {dest1}/{dest2} stored and removed from tracker")
+            _vlog(f"[LIFECYCLE] ✅ Order {badge} with silos {dest1}/{dest2} stored and removed from tracker")
         else:
-            print(f"[LIFECYCLE] ℹ️ Order {badge} with silos {dest1}/{dest2} not ready for storage (no previous stopped status)")
+            _vlog(f"[LIFECYCLE] ℹ️ Order {badge} with silos {dest1}/{dest2} not ready for storage (no previous stopped status)")
             if order_type == "outloading":
-                print(f"[LIFECYCLE] OUTLOADING DEBUG: Order key not in tracker: {order_key}")
-                print(f"[LIFECYCLE] OUTLOADING DEBUG: Available keys in tracker: {list(_order_lifecycle_tracker.keys())}")
+                _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Order key not in tracker: {order_key}")
+                _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Available keys in tracker: {list(_order_lifecycle_tracker.keys())}")
             
     except Exception as e:
         print(f"[LIFECYCLE] ❌ ERROR! Failed to store completed order {badge}: {e}")
@@ -861,27 +876,27 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
         started_at = timestamps.get("started_at", finished_at)  # Fallback to finished_at if not available
         finished_at_from_buffer = timestamps.get("finished_at", finished_at)  # Use buffer value or fallback
         
-        print(f"[LIFECYCLE] Using timestamps from buffer for {order_key}:")
-        print(f"[LIFECYCLE]   created_at: {created_at.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"[LIFECYCLE]   started_at: {started_at.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"[LIFECYCLE]   finished_at: {finished_at_from_buffer.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"[LIFECYCLE]   idle_at: {idle_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        _vlog(f"[LIFECYCLE] Using timestamps from buffer for {order_key}:")
+        _vlog(f"[LIFECYCLE]   created_at: {created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        _vlog(f"[LIFECYCLE]   started_at: {started_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        _vlog(f"[LIFECYCLE]   finished_at: {finished_at_from_buffer.strftime('%Y-%m-%d %H:%M:%S')}")
+        _vlog(f"[LIFECYCLE]   idle_at: {idle_at.strftime('%Y-%m-%d %H:%M:%S')}")
         
         # Verify chronological order
         if created_at <= started_at <= finished_at_from_buffer <= idle_at:
-            print(f"[LIFECYCLE] ✅ Timestamps are in correct chronological order")
+            _vlog(f"[LIFECYCLE] ✅ Timestamps are in correct chronological order")
         else:
-            print(f"[LIFECYCLE] ⚠️ WARNING: Timestamps are NOT in chronological order!")
-            print(f"[LIFECYCLE]   Created: {created_at.strftime('%H:%M:%S')}")
-            print(f"[LIFECYCLE]   Started: {started_at.strftime('%H:%M:%S')}")
-            print(f"[LIFECYCLE]   Finished: {finished_at_from_buffer.strftime('%H:%M:%S')}")
-            print(f"[LIFECYCLE]   Idle: {idle_at.strftime('%H:%M:%S')}")
+            _vlog(f"[LIFECYCLE] ⚠️ WARNING: Timestamps are NOT in chronological order!")
+            _vlog(f"[LIFECYCLE]   Created: {created_at.strftime('%H:%M:%S')}")
+            _vlog(f"[LIFECYCLE]   Started: {started_at.strftime('%H:%M:%S')}")
+            _vlog(f"[LIFECYCLE]   Finished: {finished_at_from_buffer.strftime('%H:%M:%S')}")
+            _vlog(f"[LIFECYCLE]   Idle: {idle_at.strftime('%H:%M:%S')}")
         
         # Create complete order with all timestamps
         if order_type == "outloading":
-            print(f"[LIFECYCLE] OUTLOADING DEBUG: Creating outloading order with data: {order_data}")
-            print(f"[LIFECYCLE] OUTLOADING DEBUG: Model class: {model_class}")
-            print(f"[LIFECYCLE] OUTLOADING DEBUG: Badge: {badge}, Dest1: {dest1}, Dest2: {dest2}")
+            _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Creating outloading order with data: {order_data}")
+            _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Model class: {model_class}")
+            _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Badge: {badge}, Dest1: {dest1}, Dest2: {dest2}")
         
         if order_type == "intake":
             # Get material names from silos and material codes
@@ -945,7 +960,7 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
                 updated_at=idle_at,
                 is_complete=True  # Mark as complete since order cycle is done
             )
-            print(f"[LIFECYCLE] OUTLOADING DEBUG: Created outloading order object: {order}")
+            _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Created outloading order object: {order}")
         elif order_type == "bulk":
             # Get material names from silos
             source_silo = badge
@@ -1000,11 +1015,11 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
             )
         
         db.session.add(order)
-        print(f"[LIFECYCLE] OUTLOADING DEBUG: Added {order_type} order to database session")
+        _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Added {order_type} order to database session")
         db.session.commit()
-        print(f"[LIFECYCLE] ✅ SUCCESS! {order_type.upper()} Order {badge} stored with ID: {order.id}")
+        _vlog(f"[LIFECYCLE] ✅ SUCCESS! {order_type.upper()} Order {badge} stored with ID: {order.id}")
         if order_type == "outloading":
-            print(f"[LIFECYCLE] OUTLOADING DEBUG: Successfully committed outloading order {badge} to database with ID: {order.id}")
+            _vlog(f"[LIFECYCLE] OUTLOADING DEBUG: Successfully committed outloading order {badge} to database with ID: {order.id}")
         
         # Get material info for logging based on order type
         if order_type == "pit":
@@ -1012,8 +1027,8 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
         else:
             material_info = order_data.get("material_code") or order_data.get("sourceMaterialCode") or "N/A"
         
-        print(f"[LIFECYCLE] 📊 Order details: Material={material_info}, Qty={order_data.get('declared_qty_kg', 'N/A')}kg, Dest1={dest1}, Dest2={dest2}")
-        print(f"[LIFECYCLE] ⏰ Lifecycle: Created at {created_at}, Started at {started_at}, Finished at {finished_at_from_buffer}, Idle at {idle_at}")
+        _vlog(f"[LIFECYCLE] 📊 Order details: Material={material_info}, Qty={order_data.get('declared_qty_kg', 'N/A')}kg, Dest1={dest1}, Dest2={dest2}")
+        _vlog(f"[LIFECYCLE] ⏰ Lifecycle: Created at {created_at}, Started at {started_at}, Finished at {finished_at_from_buffer}, Idle at {idle_at}")
         
         # Clear the timestamp buffer for this order after successful storage
         _clear_timestamp_buffer(order_key)
@@ -1165,11 +1180,11 @@ def db_orders(db_no: int):
         }
     return jsonify(resp)
 
-@plc_bp.route("/plant/orders")
-def plant_orders():
+def _execute_plant_orders() -> Dict[str, Any]:
     """
-    Reads live orders from PLC, updates DB with lifecycle timestamps,
-    and returns real-time orders to frontend.
+    Reads live orders from PLC, updates DB with lifecycle timestamps.
+    Returns the payload dict (caller serializes with jsonify / cache).
+    Must run under _ORDERS_SNAPSHOT_LOCK when coordinated with HTTP cache.
     """
     from models.orders import IntakeOrder, OutloadingOrder, BulkLineOrder, PTLineOrder
     
@@ -1183,7 +1198,7 @@ def plant_orders():
         l1 = render_lines(b1, m1["line_tags"])
         # Check all lines for intake orders
         all_intake = [r for r in (_intake_row(l1, k) for k in (1,2)) if r]
-        print(f"[DEBUG] All intake orders from DB1: {all_intake}")
+        _vlog(f"[DEBUG] All intake orders from DB1: {all_intake}")
         
         # Separate regular intake from mineral orders (by destination silos)
         regular_intake = []
@@ -1197,14 +1212,14 @@ def plant_orders():
             is_mineral = (401 <= dest1 <= 408) or (401 <= dest2 <= 408)
             
             if is_mineral:
-                print(f"[DEBUG] Found legacy mineral order in DB1: {order}")
+                _vlog(f"[DEBUG] Found legacy mineral order in DB1: {order}")
                 legacy_mineral_orders.append(order)
             else:
                 regular_intake.append(order)
         
         payload["intake"] = regular_intake
-        print(f"[DEBUG] Regular intake orders: {len(regular_intake)}")
-        print(f"[DEBUG] Legacy mineral orders from DB1: {len(legacy_mineral_orders)}")
+        _vlog(f"[DEBUG] Regular intake orders: {len(regular_intake)}")
+        _vlog(f"[DEBUG] Legacy mineral orders from DB1: {len(legacy_mineral_orders)}")
 
     # DB3 Mineral Intake
     db3_mineral_orders = []
@@ -1213,9 +1228,9 @@ def plant_orders():
         l3 = render_lines(b3, m3["line_tags"])
         # Check line 3 for mineral orders (mineral orders use line 3, not line 1)
         db3_mineral_orders = [r for r in (_intake_row(l3, k) for k in (3,)) if r]
-        print(f"[DEBUG] Mineral orders from DB3 (line 3): {db3_mineral_orders}")
+        _vlog(f"[DEBUG] Mineral orders from DB3 (line 3): {db3_mineral_orders}")
     else:
-        print(f"[DEBUG] DB3 not available or empty")
+        _vlog(f"[DEBUG] DB3 not available or empty")
 
     # Combine legacy mineral orders from DB1 with new mineral orders from DB3
     mineral_orders.extend(db3_mineral_orders)
@@ -1223,7 +1238,7 @@ def plant_orders():
     
     # Set the mineral orders
     payload["mineral"] = mineral_orders
-    print(f"[DEBUG] Final mineral orders count: {len(mineral_orders)} (DB3: {len(db3_mineral_orders)}, Legacy: {len(legacy_mineral_orders)})")
+    _vlog(f"[DEBUG] Final mineral orders count: {len(mineral_orders)} (DB3: {len(db3_mineral_orders)}, Legacy: {len(legacy_mineral_orders)})")
 
     # DB2 Outloading
     m2 = load_map_from_pg(2); b2 = read_db_bytes(2, _needed_bytes(m2))
@@ -1231,11 +1246,11 @@ def plant_orders():
         l2 = render_lines(b2, m2["line_tags"])
         outloading_raw = [r for r in (_intake_row(l2, k) for k in (1,2,3)) if r]
         payload["outloading"] = outloading_raw
-        print(f"[DEBUG] DB2 Outloading: Found {len(outloading_raw)} outloading orders")
+        _vlog(f"[DEBUG] DB2 Outloading: Found {len(outloading_raw)} outloading orders")
         for i, order in enumerate(outloading_raw):
-            print(f"[DEBUG] DB2 Outloading order {i+1}: badge_no={order.get('badge_no')}, status={order.get('status_word', {}).get('code')}")
+            _vlog(f"[DEBUG] DB2 Outloading order {i+1}: badge_no={order.get('badge_no')}, status={order.get('status_word', {}).get('code')}")
     else:
-        print(f"[DEBUG] DB2 not available or empty")
+        _vlog(f"[DEBUG] DB2 not available or empty")
 
     # DB4 Bulk/Pit
     m4 = load_map_from_pg(4); b4 = read_db_bytes(4, _needed_bytes(m4))
@@ -1294,9 +1309,9 @@ def plant_orders():
 
         # Outloading orders
         outloading_orders = payload.get("outloading", [])
-        print(f"[DEBUG] Processing {len(outloading_orders)} outloading orders")
+        _vlog(f"[DEBUG] Processing {len(outloading_orders)} outloading orders")
         for i, outloading in enumerate(outloading_orders):
-            print(f"[DEBUG] Outloading order {i+1}: {outloading}")
+            _vlog(f"[DEBUG] Outloading order {i+1}: {outloading}")
             handle_order_status(outloading, OutloadingOrder, "outloading")
 
         # Bulk order
@@ -1313,13 +1328,51 @@ def plant_orders():
         for mineral in payload.get("mineral", []):
             handle_order_status(mineral, IntakeOrder, "intake")
 
-        print(f"[DEBUG] Successfully updated database with lifecycle tracking")
+        _vlog(f"[DEBUG] Successfully updated database with lifecycle tracking")
     except Exception as e:
         print(f"[ERROR] Failed to update database with lifecycle tracking: {e}")
 
-    return jsonify(payload)
+    return payload
 
-     # ---- helper: resolve (db_no, line_no) from order_ref / truck_id ----
+
+def fetch_plant_orders_snapshot() -> Dict[str, Any]:
+    """
+    PLC read + lifecycle under lock; refreshes snapshot used by HTTP when broadcast is active.
+    """
+    global _LAST_ORDERS_PAYLOAD, _LAST_ORDERS_TS
+
+    with _ORDERS_SNAPSHOT_LOCK:
+        payload = _execute_plant_orders()
+        _LAST_ORDERS_PAYLOAD = copy.deepcopy(payload)
+        _LAST_ORDERS_TS = time.time()
+        return copy.deepcopy(payload)
+
+
+@plc_bp.route("/plant/orders")
+def plant_orders():
+    """HTTP: returns live plant orders; uses cache while PLC broadcast is active."""
+    from flask import current_app, request
+
+    global _LAST_ORDERS_PAYLOAD, _LAST_ORDERS_TS
+
+    force_refresh = str(request.args.get("nocache", "")).lower() in ("1", "true", "yes")
+    broadcast_active = bool(current_app.config.get("PLC_BROADCAST_ACTIVE", False))
+    ttl = float(current_app.config.get("PLC_ORDERS_CACHE_TTL_SEC", 1.25))
+
+    with _ORDERS_SNAPSHOT_LOCK:
+        if (
+            not force_refresh
+            and broadcast_active
+            and _LAST_ORDERS_PAYLOAD is not None
+            and (time.time() - _LAST_ORDERS_TS) <= ttl
+        ):
+            return jsonify(copy.deepcopy(_LAST_ORDERS_PAYLOAD))
+        payload = _execute_plant_orders()
+        _LAST_ORDERS_PAYLOAD = copy.deepcopy(payload)
+        _LAST_ORDERS_TS = time.time()
+        return jsonify(payload)
+
+
 def _resolve_target_for_order(order_ref: str, truck_id: int) -> Optional[Dict[str, int]]:
     """
     Return {"db": 1|2, "line": 1|2|3} for this order.
