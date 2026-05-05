@@ -39,17 +39,17 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
       <div className="flex-1 flex flex-col relative z-10">
         
         {/* Top Header */}
-        <header className="bg-slate-900/95 light:bg-white border-b border-slate-700/50 light:border-gray-200 backdrop-blur-sm 
-                          px-6 py-4 flex items-center justify-between shadow-lg light:shadow-xl">
+        <header className="bg-slate-900/95 border-b border-slate-700/50 backdrop-blur-sm 
+                          px-6 py-4 flex items-center justify-between shadow-lg">
           <div>
-            <h1 className="text-xl font-bold text-white light:text-gray-900">{title}</h1>
-            <p className="text-sm text-slate-400 light:text-gray-600">{subtitle}</p>
+            <h1 className="text-xl font-bold text-white">{title}</h1>
+            <p className="text-sm text-slate-400">{subtitle}</p>
           </div>
           
           <div className="flex items-center space-x-4">
             {/* User Info */}
             <div className="flex items-center space-x-3 text-sm">
-              <span className="text-slate-300 light:text-gray-700">Production Manager</span>
+              <span className="text-slate-300">Production Manager</span>
               <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 
                               rounded-full flex items-center justify-center">
                 <User className="h-4 w-4 text-white" />
@@ -60,15 +60,9 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
             <div className="flex items-center space-x-2">
               <button 
                 onClick={toggleTheme}
-                className={`relative p-2 rounded-lg transition-all duration-300 ${
-                  isDarkMode 
-                    ? 'bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600' 
-                    : 'bg-gray-100 hover:bg-gray-200 border border-gray-300'
-                }`}>
+                className="relative p-2 rounded-lg transition-all duration-300 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600">
                 <div className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
-                  isDarkMode 
-                    ? 'bg-slate-600' 
-                    : 'bg-blue-400'
+                  isDarkMode ? 'bg-slate-600' : 'bg-blue-400'
                 }`}>
                   {/* Sun Icon - Left side */}
                   <div className={`absolute left-1 top-1/2 transform -translate-y-1/2 transition-opacity duration-300 ${
@@ -102,27 +96,19 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
                 </div>
               </button>
               <Link href="/fakieh/admin">
-                <button className={`p-1 transition-colors ${
-                  isDarkMode 
-                    ? 'rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-cyan-400' 
-                    : 'bg-transparent hover:bg-transparent text-gray-600 hover:text-blue-600'
-                }`}>
+                <button className="p-1 transition-colors rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-cyan-400">
                   <Settings className="h-4 w-4" />
                 </button>
               </Link>
-              <button className={`p-1 transition-colors ${
-                isDarkMode 
-                  ? 'rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-red-400' 
-                  : 'bg-transparent hover:bg-transparent text-gray-600 hover:text-red-600'
-              }`}>
+              <button className="p-1 transition-colors rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-red-400">
                 <LogOut className="h-4 w-4" />
               </button>
             </div>
             
             {/* Timestamp */}
-            <div className="text-xs text-slate-500 light:text-gray-500 border-l border-slate-700 light:border-gray-300 pl-4">
+            <div className="text-xs text-slate-500 border-l border-slate-700 pl-4">
               <div>Thursday, July 24, 2025</div>
-              <div className="text-cyan-400 light:text-blue-600">11:42 AM +03</div>
+              <div className="text-cyan-400">11:42 AM +03</div>
             </div>
             
             {/* Company Logos - Hidden */}

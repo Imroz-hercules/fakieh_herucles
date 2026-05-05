@@ -15,7 +15,6 @@ import {
   History
 } from 'lucide-react'
 import herculesLogo from "../../assets/Herculeslight.png"
-import { useTheme } from '../../contexts/ThemeContext'
 
 interface SidebarProps {
   collapsed: boolean
@@ -119,22 +118,21 @@ const menuItems = [
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [location] = useLocation()
-  const { theme } = useTheme()
 
   return (
-    <div className={`bg-slate-900/95 light:bg-white border-r border-slate-700/50 light:border-gray-200 backdrop-blur-sm 
-                     transition-all duration-300 flex flex-col relative h-screen shadow-lg light:shadow-xl
+    <div className={`bg-slate-900/95 border-r border-slate-700/50 backdrop-blur-sm 
+                     transition-all duration-300 flex flex-col relative h-screen shadow-lg
                      ${collapsed ? 'w-16' : 'w-64'}`}>
       
       {/* Header */}
-      <div className="p-4 border-b border-slate-700/50 light:border-gray-200">
+      <div className="p-4 border-b border-slate-700/50">
         <div className="flex items-center justify-between">
           {!collapsed && (
             <div className="flex items-center space-x-3">
               <img
                 src={herculesLogo}
                 alt="Hercules v2.0"
-                className="h-12 w-auto object-contain dark:brightness-0 dark:invert"
+                className="h-12 w-auto object-contain brightness-0 invert"
                 style={{
                   opacity: 1,
                   imageRendering: 'auto'
@@ -146,7 +144,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <img
               src={herculesLogo}
               alt="Hercules v2.0"
-              className="h-10 w-auto object-contain mx-auto dark:brightness-0 dark:invert"
+              className="h-10 w-auto object-contain mx-auto brightness-0 invert"
               style={{
                 opacity: 1,
                 imageRendering: 'auto'
@@ -156,7 +154,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <button
             onClick={onToggle}
             data-toggle-button="true"
-            className="sidebar-toggle-button p-2 rounded-lg text-slate-400 light:text-gray-800 hover:text-cyan-400 light:hover:text-gray-900 transition-colors"
+            className="sidebar-toggle-button p-2 rounded-lg text-slate-400 hover:text-cyan-400 transition-colors"
             style={{
               backgroundColor: 'transparent !important',
               background: 'transparent !important',
