@@ -46,25 +46,25 @@ function Router() {
   return (
     <Switch>
       {/* Redirect root to Fakieh water system */}
-      <Route path="/" component={() => { window.location.href = '/water-system/fakieh-dashboard'; return null; }} />
+      <Route path="/" component={() => { window.location.href = '/fakieh/fakieh-dashboard'; return null; }} />
       
-      {/* Water System Routes - Full-screen layouts without AppLayout */}
-      <Route path="/water-system" component={WaterDashboard} />
-      <Route path="/water-system/dashboard" component={WaterDashboard} />
-      <Route path="/water-system/fakieh-dashboard" component={FakiehDashboard} />
-      <Route path="/water-system/material" component={Material} />
-      <Route path="/water-system/storage" component={Storage} />
-      <Route path="/water-system/production" component={Production} />
-      <Route path="/water-system/orders" component={Orders} />
-      <Route path="/water-system/order-history" component={OrderHistory} />
-      <Route path="/water-system/rfid" component={RFID} />
-      <Route path="/water-system/weighbridge" component={Weighbridge} />
-      <Route path="/water-system/truck-management" component={TruckManagement} />
-      <Route path="/water-system/truck-entry" component={TruckEntry} />
-      <Route path="/water-system/alarms" component={Alarms} />
-      <Route path="/water-system/admin" component={Admin} />
-      <Route path="/water-system/engineering" component={PLCConfiguration} />
-      <Route path="/water-system/plc-reports" component={PLCReports} />
+      {/* Fakieh routes - full-screen layouts without AppLayout */}
+      <Route path="/fakieh" component={WaterDashboard} />
+      <Route path="/fakieh/dashboard" component={WaterDashboard} />
+      <Route path="/fakieh/fakieh-dashboard" component={FakiehDashboard} />
+      <Route path="/fakieh/material" component={Material} />
+      <Route path="/fakieh/storage" component={Storage} />
+      <Route path="/fakieh/production" component={Production} />
+      <Route path="/fakieh/orders" component={Orders} />
+      <Route path="/fakieh/order-history" component={OrderHistory} />
+      <Route path="/fakieh/rfid" component={RFID} />
+      <Route path="/fakieh/weighbridge" component={Weighbridge} />
+      <Route path="/fakieh/truck-management" component={TruckManagement} />
+      <Route path="/fakieh/truck-entry" component={TruckEntry} />
+      <Route path="/fakieh/alarms" component={Alarms} />
+      <Route path="/fakieh/admin" component={Admin} />
+      <Route path="/fakieh/engineering" component={PLCConfiguration} />
+      <Route path="/fakieh/plc-reports" component={PLCReports} />
       
       {/* Legacy Hercules facility routes - kept for existing facility functionality */}
       <Route path="/facility/:id">
@@ -72,7 +72,7 @@ function Router() {
       </Route>
       
       {/* Catch all - redirect to Fakieh */}
-      <Route component={() => { window.location.href = '/water-system/fakieh-dashboard'; return null; }} />
+      <Route component={() => { window.location.href = '/fakieh/fakieh-dashboard'; return null; }} />
     </Switch>
   );
 }

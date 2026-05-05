@@ -24,93 +24,93 @@ interface SidebarProps {
 
 const menuItems = [
   { 
-    path: '/water-system/fakieh-dashboard', 
+    path: '/fakieh/fakieh-dashboard', 
     icon: LayoutDashboard, 
     label: 'Fakieh Dashboard',
     description: 'Main Production Dashboard'
   },
   // { 
-  //   path: '/water-system/dashboard', 
+  //   path: '/fakieh/dashboard', 
   //   icon: LayoutDashboard, 
   //   label: 'Dashboard',
   //   description: 'Production Intelligence Dashboard'
   // },
 
   // { 
-  //   path: '/water-system/material', 
+  //   path: '/fakieh/material', 
   //   icon: Package, 
   //   label: 'Material',
   //   description: 'Material Management'
   // },
   { 
-    path: '/water-system/storage', 
+    path: '/fakieh/storage', 
     icon: Database, 
     label: 'Storage',
     description: 'Storage Management'
   },
   // { 
-  //   path: '/water-system/production', 
+  //   path: '/fakieh/production', 
   //   icon: Factory, 
   //   label: 'Production',
   //   description: 'Production Management'
   // },
   { 
-    path: '/water-system/orders', 
+    path: '/fakieh/orders', 
     icon: Truck, 
     label: 'Live orders',
     description: 'Real-time Orders from SCADA'
   },
   { 
-    path: '/water-system/order-history', 
+    path: '/fakieh/order-history', 
     icon: History, 
     label: 'Order History',
     description: 'Complete Order History from Database'
   },
   { 
-    path: '/water-system/rfid', 
+    path: '/fakieh/rfid', 
     icon: Radio, 
     label: 'RFID',
     description: 'RFID Tracking System'
   },
   { 
-    path: '/water-system/weighbridge', 
+    path: '/fakieh/weighbridge', 
     icon: Scale, 
     label: 'Weighbridge Log',
     description: 'Weighbridge Management'
   },
   { 
-    path: '/water-system/truck-entry', 
+    path: '/fakieh/truck-entry', 
     icon: Truck, 
     label: 'Truck Weighbridge',
     description: 'Live Weighbridge & Entry Management'
   },
   { 
-    path: '/water-system/truck-management', 
+    path: '/fakieh/truck-management', 
     icon: Truck, 
     label: 'Truck Management',
     description: 'Manage Trucks & Fleet'
   },
   // { 
-  //   path: '/water-system/alarms', 
+  //   path: '/fakieh/alarms', 
   //   icon: Bell, 
   //   label: 'Alarms',
   //   description: 'Alarms & Notifications'
   // },
   
   // {
-  //   path: '/water-system/engineering',
+  //   path: '/fakieh/engineering',
   //   icon: Settings,
   //   label: 'PLC Configuration',
   //   description: 'PLC Configuration & Field Management'
   // },
   // { 
-  //   path: '/water-system/plc-reports', 
+  //   path: '/fakieh/plc-reports', 
   //   icon: Database, 
   //   label: 'PLC Reports',
   //   description: 'Production Line Reports & Analytics'
   // },
   { 
-    path: '/water-system/admin', 
+    path: '/fakieh/admin', 
     icon: Settings, 
     label: 'Admin',
     description: 'System Administration & Configuration'

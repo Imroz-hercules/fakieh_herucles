@@ -71,7 +71,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const isDarkMode = theme === 'dark';
 
   const navigationItems = [
-    { icon: <Droplets size={18} />, label: 'Fakieh', href: '/water-system/dashboard' },
+    { icon: <Droplets size={18} />, label: 'Fakieh', href: '/fakieh/fakieh-dashboard' },
   ];
 
   return (

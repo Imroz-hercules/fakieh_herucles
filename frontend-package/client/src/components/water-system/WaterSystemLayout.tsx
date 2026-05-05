@@ -101,7 +101,7 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
                   </div>
                 </div>
               </button>
-              <Link href="/water-system/admin">
+              <Link href="/fakieh/admin">
                 <button className={`p-1 transition-colors ${
                   isDarkMode 
                     ? 'rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-cyan-400' 
