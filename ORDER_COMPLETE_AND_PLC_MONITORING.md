@@ -1,6 +1,6 @@
 # Order completion and PLC monitoring
 
-This document describes how the Fakieh backend monitors PLC **status words**, treats an order as **complete**, which **Siemens S7 data blocks (DB)** and **byte offsets** are involved, and which **PostgreSQL** databases are used. It reflects the implementation in `Backend/routes/plc_routes.py`, `Backend/routes/data_ingestion.py`, `Backend/routes/websocket_routes.py`, `Backend/routes/orders_sink.py`, and `Backend/config.py` as of the current repository state.
+This document describes how the Fakieh backend monitors PLC **status words**, treats an order as **complete**, which **Siemens S7 data blocks (DB)** and **byte offsets** are involved, and which **PostgreSQL** databases are used. It reflects the implementation in `Backend/routes/plc_routes.py`, `Backend/routes/data_ingestion.py`, `Backend/routes/websocket_routes.py`, `Backend/routes/orders_history_routes.py`, `Backend/routes/orders_sink.py`, `Backend/models/orders.py`, and `Backend/config.py` as of the current repository state.
 
 ---
 
@@ -49,6 +49,24 @@ After building the payload, **`handle_order_status(...)`** is invoked for:
 - each **`mineral`** row → `IntakeOrder`, type `"intake"`
 
 So **every** snapshot refresh re-evaluates status words and lifecycle state for all those streams.
+
+---
+
+## 3.1 Performance & consistency fixes (what was fixed and where)
+
+These changes reduce duplicate PLC work, protect in-memory lifecycle state, cut log noise in production, and make order-history queries scalable.
+
+| What we fixed | Where (file) | What changed |
+|---------------|--------------|--------------|
+| **Duplicate PLC + lifecycle** when HTTP and WebSocket both polled | `Backend/routes/plc_routes.py` | **`_execute_plant_orders()`** holds all PLC read + **`handle_order_status`** logic. **`fetch_plant_orders_snapshot()`** runs it inside **`_ORDERS_SNAPSHOT_LOCK`** and updates **`_LAST_ORDERS_PAYLOAD`** / **`_LAST_ORDERS_TS`**. |
+| **HTTP serving cached snapshot** while broadcast is on | `Backend/routes/plc_routes.py` | `GET /api/plc/plant/orders` (`plant_orders`): if `app.config["PLC_BROADCAST_ACTIVE"]` is true and the snapshot is newer than `PLC_ORDERS_CACHE_TTL_SEC` (default **1.25** s), returns a deep copy of the cache (no extra PLC read). Query `?nocache=1` forces a fresh `_execute_plant_orders()` run. |
+| **Broadcast / connect / ingestion** all use the same snapshot path | `Backend/routes/websocket_routes.py`, `Backend/routes/data_ingestion.py` | **`fetch_plant_orders_snapshot()`** replaces calling **`plant_orders()`** + **`get_json()`** so the worker and ingestion always refresh the shared snapshot under the same lock as lifecycle state. |
+| **Runtime flag for “broadcast owns polling”** | `Backend/routes/websocket_routes.py`, `Backend/config.py` | **`POST .../start-broadcast`** sets **`app.config["PLC_BROADCAST_ACTIVE"] = True`**; **`stop-broadcast`** sets **`False`**. Defaults: **`PLC_POLL_INTERVAL`**, **`PLC_ORDERS_CACHE_TTL_SEC`**, **`PLC_BROADCAST_ACTIVE`** live on the Flask config object (see `config.py`). |
+| **Hot-path log spam** | `Backend/routes/plc_routes.py` | Verbose **`print`** in **`handle_order_status`**, lifecycle helpers, and **`_execute_plant_orders`** gated behind **`_vlog()`**; enabled only when **`PLC_VERBOSE_LOGS`** is **`1`**, **`true`**, or **`yes`**. **`[ERROR]`** lines for lifecycle/DB failures remain always printed. |
+| **Concurrency on lifecycle buffers** | `Backend/routes/plc_routes.py` | **`_ORDERS_SNAPSHOT_LOCK`** (re-entrant **`RLock`**) serializes **`_execute_plant_orders`** and cache updates so the broadcast thread and HTTP cannot corrupt **`_order_timestamps_buffer`** / **`_order_lifecycle_tracker`** in parallel. |
+| **Order history: full-table scans** | `Backend/routes/orders_history_routes.py` | **`/api/orders/active`**, **`/completed`**, **`/history`**: query params **`limit`** (default **100**, max **500**) and **`offset`** (default **0**) applied **per category** (intake, outloading, bulk, pit). Response includes **`pagination`** with **`has_more`** per type. |
+| **Order stats: many `.count()` calls** | `Backend/routes/orders_history_routes.py` | **`/api/orders/stats`**: one aggregated query per table (**`COUNT`** + conditional sums for active vs completed) via **`sqlalchemy.func`** / **`case`**. |
+| **DB indexes for history filters** | `Backend/models/orders.py` | **`Index`** on **`(is_complete, finished_at)`** and **`created_at`** for **`intake_orders`**, **`outloading_orders`**, **`bulk_line_orders`**, **`pt_line_orders`**. **Note:** existing PostgreSQL DBs do not auto-add indexes from **`db.create_all()`**; run equivalent **`CREATE INDEX`** (or a migration) on deployed databases. |
 
 ---
 
@@ -207,12 +225,22 @@ Postgres credentials for **`Faikeh`** / **`plc`** binds default in `Backend/conf
 
 | Concern | Primary file |
 |---------|----------------|
-| PLC connect, read/write, maps, `fetch_plant_orders_snapshot`, `handle_order_status` | `Backend/routes/plc_routes.py` |
-| WebSocket polling + broadcast | `Backend/routes/websocket_routes.py` |
-| Ingestion polling + `persist_orders` | `Backend/routes/data_ingestion.py` |
+| PLC connect, read/write, maps, **`_execute_plant_orders`**, **`fetch_plant_orders_snapshot`**, HTTP **`plant_orders`**, **`handle_order_status`**, snapshot lock | `Backend/routes/plc_routes.py` |
+| WebSocket polling + broadcast, **`PLC_BROADCAST_ACTIVE`** | `Backend/routes/websocket_routes.py` |
+| Ingestion polling + **`persist_orders`** | `Backend/routes/data_ingestion.py` |
+| Order history list/stats APIs, pagination | `Backend/routes/orders_history_routes.py` |
+| SQLAlchemy order models + history indexes | `Backend/models/orders.py` |
 | Alternate order row lifecycle (`persist_orders`) | `Backend/routes/orders_sink.py` |
-| DB URIs and `plc` bind | `Backend/config.py` |
+| DB URIs, `plc` bind, **`PLC_POLL_INTERVAL`**, **`PLC_ORDERS_CACHE_TTL_SEC`**, **`PLC_BROADCAST_ACTIVE`** default | `Backend/config.py` |
 | JSON defaults merged into PLC settings | `Backend/config.json` |
+
+---
+
+## 12. HTTP vs WebSocket for live orders (after the fixes)
+
+- **WebSocket / broadcast** always calls **`fetch_plant_orders_snapshot()`** → one PLC + lifecycle pass per **`PLC_POLL_INTERVAL`**, cache updated.
+- **HTTP `GET /api/plc/plant/orders`** while broadcast is **on** and cache is **fresh** → returns the last snapshot JSON only (no second PLC read).
+- **HTTP with `?nocache=1`** or **broadcast off** → always runs a full snapshot (still under the lock when updating cache).
 
 ---
 

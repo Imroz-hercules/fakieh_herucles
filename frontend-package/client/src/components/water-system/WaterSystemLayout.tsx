@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Sidebar } from './Sidebar'
-import { User, Settings, LogOut, LayoutDashboard, ToggleLeft, ToggleRight, Sun, Moon } from 'lucide-react'
+import { WaterTopNav } from './WaterTopNav'
+import { PartnerLogosStrip } from './PartnerLogosStrip'
+import { User, Settings, LogOut, Sun, Moon } from 'lucide-react'
 import { Link } from 'wouter'
-import AsmLogo from '@/assets/Asm_Logo.png'
-import FakiehLogo from '@/assets/fakiehlogo.webp'
 import { useTheme } from '@/contexts/ThemeContext'
-
+import { useNavLayout } from '@/contexts/NavLayoutContext'
+import { cn } from '@/lib/utils'
 
 interface WaterSystemLayoutProps {
   children: React.ReactNode
@@ -16,7 +17,9 @@ interface WaterSystemLayoutProps {
 export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { theme, toggleTheme } = useTheme()
-  
+  const { navLayout } = useNavLayout()
+  const isTopbar = navLayout === 'topbar'
+
   const isDarkMode = theme === 'dark'
 
   return (
@@ -29,118 +32,101 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
         <div className="absolute inset-0 bg-gradient-to-b from-cyan-950/20 via-slate-950/50 to-slate-950/80"></div>
       </div>
       
-      {/* Sidebar */}
-      <Sidebar 
-        collapsed={sidebarCollapsed} 
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
-      />
+      {!isTopbar && (
+        <Sidebar 
+          collapsed={sidebarCollapsed} 
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        />
+      )}
       
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col relative z-10">
-        
-        {/* Top Header */}
-        <header className="bg-slate-900/95 border-b border-slate-700/50 backdrop-blur-sm 
-                          px-6 py-4 flex items-center justify-between shadow-lg">
-          <div>
-            <h1 className="text-xl font-bold text-white">{title}</h1>
-            <p className="text-sm text-slate-400">{subtitle}</p>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            {/* User Info */}
-            <div className="flex items-center space-x-3 text-sm">
-              <span className="text-slate-300">Production Manager</span>
-              <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 
-                              rounded-full flex items-center justify-center">
-                <User className="h-4 w-4 text-white" />
-              </div>
+      {/* Main Content — shared inset matches topbar / header width in both nav modes */}
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col px-3 pt-3 sm:px-5 sm:pt-4">
+        {isTopbar ? (
+          <WaterTopNav />
+        ) : (
+          <header className="app-chrome-dark mb-2 flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-700/50 bg-slate-900/95 px-6 py-4 shadow-lg backdrop-blur-sm sm:mb-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-white">{title}</h1>
+              <p className="text-sm font-bold text-white">{subtitle}</p>
             </div>
             
-            {/* Action Buttons */}
-            <div className="flex items-center space-x-2">
-              <button 
-                onClick={toggleTheme}
-                className="relative p-2 rounded-lg transition-all duration-300 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600">
-                <div className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
-                  isDarkMode ? 'bg-slate-600' : 'bg-blue-400'
-                }`}>
-                  {/* Sun Icon - Left side */}
-                  <div className={`absolute left-1 top-1/2 transform -translate-y-1/2 transition-opacity duration-300 ${
-                    isDarkMode ? 'opacity-40' : 'opacity-100'
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-2">
+              <PartnerLogosStrip variant="sidebar" />
+              <div className="flex items-center text-sm font-bold">
+                <span className="text-white">Production Manager</span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button 
+                  type="button"
+                  onClick={toggleTheme}
+                  className="relative p-2 rounded-lg transition-all duration-300 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600">
+                  <div className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
+                    isDarkMode ? 'bg-slate-600' : 'bg-blue-400'
                   }`}>
-                    <Sun className={`h-3 w-3 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`} />
-                  </div>
-                  
-                  {/* Moon Icon - Right side */}
-                  <div className={`absolute right-1 top-1/2 transform -translate-y-1/2 transition-opacity duration-300 ${
-                    isDarkMode ? 'opacity-100' : 'opacity-40'
-                  }`}>
-                    <Moon className={`h-3 w-3 ${isDarkMode ? 'text-white' : 'text-slate-600'}`} />
-                  </div>
-                  
-                  {/* Toggle Circle */}
-                  <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-lg border border-gray-200 ${
-                    isDarkMode 
-                      ? 'translate-x-6' 
-                      : 'translate-x-0.5'
-                  }`}>
-                    {/* Icon inside the circle */}
-                    <div className="flex items-center justify-center h-full">
-                      {isDarkMode ? (
-                        <Moon className="h-3 w-3 text-slate-700" />
-                      ) : (
-                        <Sun className="h-3 w-3 text-yellow-600" />
-                      )}
+                    <div className={`absolute left-1 top-1/2 transform -translate-y-1/2 transition-opacity duration-300 ${
+                      isDarkMode ? 'opacity-40' : 'opacity-100'
+                    }`}>
+                      <Sun className={`h-3 w-3 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`} />
+                    </div>
+                    
+                    <div className={`absolute right-1 top-1/2 transform -translate-y-1/2 transition-opacity duration-300 ${
+                      isDarkMode ? 'opacity-100' : 'opacity-40'
+                    }`}>
+                      <Moon className={`h-3 w-3 ${isDarkMode ? 'text-white' : 'text-slate-600'}`} />
+                    </div>
+                    
+                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-lg border border-gray-200 ${
+                      isDarkMode 
+                        ? 'translate-x-6' 
+                        : 'translate-x-0.5'
+                    }`}>
+                      <div className="flex items-center justify-center h-full">
+                        {isDarkMode ? (
+                          <Moon className="h-3 w-3 text-slate-700" />
+                        ) : (
+                          <Sun className="h-3 w-3 text-yellow-600" />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
-              <Link href="/fakieh/admin">
-                <button className="p-1 transition-colors rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-cyan-400">
-                  <Settings className="h-4 w-4" />
                 </button>
-              </Link>
-              <button className="p-1 transition-colors rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-red-400">
-                <LogOut className="h-4 w-4" />
-              </button>
-            </div>
-            
-            {/* Timestamp */}
-            <div className="text-xs text-slate-500 border-l border-slate-700 pl-4">
-              <div>Thursday, July 24, 2025</div>
-              <div className="text-cyan-400">11:42 AM +03</div>
-            </div>
-            
-            {/* Company Logos - Hidden */}
-            {/* <div className="flex items-center space-x-4 border-l border-slate-700 light:border-gray-300 pl-4">
-              <div className="h-14 w-auto flex items-center p-2 rounded-lg bg-white/10 light:bg-gray-100/50 backdrop-blur-sm border border-white/20 light:border-gray-200">
-                <img 
-                  src={AsmLogo} 
-                  alt="ASM Process Automation" 
-                  className="h-12 w-auto object-contain hover:opacity-80 transition-all duration-200"
-                  style={{
-                    filter: isDarkMode ? 'brightness(1.2) contrast(1.1) drop-shadow(0 0 4px rgba(255,255,255,0.3))' : 'brightness(1) contrast(1.1) drop-shadow(0 0 2px rgba(0,0,0,0.2))',
-                  }}
-                />
+                <Link href="/fakieh/admin">
+                  <button type="button" className="p-1 transition-colors rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-cyan-400">
+                    <Settings className="h-4 w-4" />
+                  </button>
+                </Link>
+                <button type="button" className="p-1 transition-colors rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-red-400">
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
-              <div className="h-14 w-auto flex items-center p-2 rounded-lg bg-white/10 light:bg-gray-100/50 backdrop-blur-sm border border-white/20 light:border-gray-200">
-                <img 
-                  src={FakiehLogo} 
-                  alt="Fakieh Chicken" 
-                  className="h-12 w-auto object-contain hover:opacity-80 transition-all duration-200"
-                  style={{
-                    filter: isDarkMode ? 'brightness(1.2) contrast(1.1) drop-shadow(0 0 4px rgba(255,255,255,0.3))' : 'brightness(1) contrast(1.1) drop-shadow(0 0 2px rgba(0,0,0,0.2))',
-                  }}
-                />
+              
+              <div className="text-xs font-bold text-white border-l border-slate-700 pl-4">
+                <div>Thursday, July 24, 2025</div>
+                <div className="text-cyan-400">11:42 AM +03</div>
               </div>
-            </div> */}
-          </div>
-        </header>
-        
+
+              <div
+                className="flex shrink-0 items-center border-l border-slate-700 pl-3"
+                title="Production Manager"
+                aria-label="Production Manager profile"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600">
+                  <User className="h-4 w-4 text-white" />
+                </div>
+              </div>
+            </div>
+          </header>
+        )}
+
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 relative h-full smooth-scroll
-                         bg-transparent light:bg-gray-50" 
-              style={{ height: 'calc(100vh - 88px)' }}>
+        <main
+          className={cn(
+            'relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6 smooth-scroll bg-transparent light:bg-gray-50',
+            'rounded-b-2xl border border-t-0 dark:border-slate-600/70 light:border-gray-200'
+          )}
+        >
           
           {/* Background Grid Pattern - Hidden in light mode */}
           <div className="absolute inset-0 pointer-events-none opacity-5 light:opacity-0">
@@ -153,12 +139,10 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
             </div>
           </div>
           
-          {/* Content Container */}
           <div className="relative z-10 max-w-full page-transition page-transition-enter-active">
             {children}
           </div>
           
-          {/* Floating Particles - Hidden in light mode */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden light:hidden">
             {[...Array(20)].map((_, i) => (
               <div
@@ -174,6 +158,7 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
             ))}
           </div>
         </main>
+        </div>
       </div>
     </div>
   )

@@ -16,9 +16,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import herculesLogo from "../assets/hercules-logo-final.png";
-import herculesLogoWhite from "../assets/image.png";
-import { useTheme } from '@/contexts/ThemeContext';
+import herculesLogo from "../assets/Hercules_New.png";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -66,9 +64,6 @@ function SidebarItem({ icon, label, href, isCollapsed, isActive }: SidebarItemPr
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [location] = useLocation();
-  const { theme } = useTheme();
-  
-  const isDarkMode = theme === 'dark';
 
   const navigationItems = [
     { icon: <Droplets size={18} />, label: 'Fakieh', href: '/fakieh/fakieh-dashboard' },
@@ -124,22 +119,14 @@ export function AppLayout({ children }: AppLayoutProps) {
           {/* Sidebar Header */}
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700/50">
             <div className={`flex items-center gap-3 transition-opacity duration-200 ${sidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-              <img 
-                src={isDarkMode ? herculesLogoWhite : herculesLogo} 
-                alt="Hercules v2.0" 
-                className="h-8 w-auto object-contain"
-                style={{ 
-                  filter: isDarkMode 
-                    ? 'none'
-                    : 'brightness(0.9) contrast(1.3) drop-shadow(0 0 3px rgba(0,0,0,0.4))',
-                  opacity: 0.95,
-                  imageRendering: 'crisp-edges'
-                }}
-              />
-              <div>
-                <div className="text-cyan-400 font-bold text-sm tracking-wider">HERCULES</div>
-                <div className="text-slate-400 text-xs">v2.0</div>
-              </div>
+              <span className="inline-flex rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-600/30">
+                <img
+                  src={herculesLogo}
+                  alt="Hercules"
+                  className="h-7 w-auto max-w-[140px] rounded object-contain"
+                />
+              </span>
+              <div className="text-cyan-400 font-bold text-sm tracking-wider">HERCULES</div>
             </div>
             
             <Button

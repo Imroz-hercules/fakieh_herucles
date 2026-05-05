@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
+import { useNavLayout } from '@/contexts/NavLayoutContext'
 import { 
   Upload, 
   Settings, 
@@ -20,7 +22,8 @@ import {
   ListChecks,
   Trash2,
   Edit,
-  Save
+  Save,
+  LayoutPanelTop
 } from 'lucide-react'
 
 interface SMTPProfile {
@@ -61,6 +64,7 @@ const mockEmailSchedule: EmailSchedule = {
 }
 
 export function Admin() {
+  const { navLayout, setNavLayout } = useNavLayout()
   const [currentLogo, setCurrentLogo] = useState<string | null>(null)
   const [smtpProfiles, setSMTPProfiles] = useState<SMTPProfile[]>(mockSMTPProfiles)
   const [emailSchedule, setEmailSchedule] = useState<EmailSchedule>(mockEmailSchedule)
@@ -82,7 +86,7 @@ export function Admin() {
   const [plcType, setPlcType] = useState('S7-1500')
   const [rackNumber, setRackNumber] = useState('0')
   const [slotNumber, setSlotNumber] = useState('2')
-  const [timeout, setTimeout] = useState('5000')
+  const [plcTimeoutMs, setPlcTimeoutMs] = useState('5000')
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'not_connected'>('not_connected')
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,7 +136,7 @@ export function Admin() {
     if (plcIP && plcPort) {
       alert(`Trying to connect to PLC at ${plcIP}:${plcPort}`)
       setConnectionStatus('connected')
-      setTimeout(() => setConnectionStatus('not_connected'), 3000)
+      window.setTimeout(() => setConnectionStatus('not_connected'), 3000)
     }
   }
 
@@ -142,6 +146,34 @@ export function Admin() {
       subtitle="System administration and configuration"
     >
       <div className="p-6 space-y-6 max-w-7xl mx-auto">
+
+        <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200 light:shadow-md">
+          <CardHeader>
+            <CardTitle className="text-white light:text-gray-900 flex items-center gap-3">
+              <LayoutPanelTop className="h-6 w-6 text-cyan-400 light:text-blue-600" />
+              Navigation layout
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="nav-topbar-toggle" className="text-slate-200 light:text-gray-800 text-base">
+                  Use top navigation bar
+                </Label>
+                <p className="text-sm text-slate-400 light:text-gray-600 max-w-xl">
+                  When enabled, the sidebar is hidden and primary links appear in a top bar (settings stay on the gear icon).
+                  Your choice is saved in this browser.
+                </p>
+              </div>
+              <Switch
+                id="nav-topbar-toggle"
+                checked={navLayout === 'topbar'}
+                onCheckedChange={(checked) => setNavLayout(checked ? 'topbar' : 'sidebar')}
+                className="shrink-0 data-[state=checked]:bg-cyan-600"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Logo Upload Section */}
         <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200 light:shadow-md">
@@ -257,8 +289,8 @@ export function Admin() {
               <div>
                 <Label className="text-slate-300 light:text-gray-700 text-sm">Timeout (ms)</Label>
                 <Input
-                  value={timeout}
-                  onChange={(e) => setTimeout(e.target.value)}
+                  value={plcTimeoutMs}
+                  onChange={(e) => setPlcTimeoutMs(e.target.value)}
                   placeholder="5000"
                   className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-900 mt-1"
                 />

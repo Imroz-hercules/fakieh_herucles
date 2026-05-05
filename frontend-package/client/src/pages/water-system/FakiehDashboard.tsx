@@ -759,16 +759,16 @@ export default function FakiehDashboard() {
     >
       <div className="space-y-6">
         {/* Dashboard Filters Section */}
-        <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg p-6 shadow-lg light:shadow-xl">
-          <div className="flex items-center space-x-2 mb-4">
-            <Filter className="h-5 w-5 text-cyan-400" />
-            <h2 className="text-lg font-bold text-white light:text-gray-900">Dashboard Filters</h2>
+        <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg px-4 py-3 shadow-lg light:shadow-xl">
+          <div className="flex items-center gap-2 mb-2">
+            <Filter className="h-4 w-4 text-cyan-400 shrink-0" />
+            <h2 className="text-base font-bold text-white light:text-gray-900">Dashboard Filters</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
             {/* Start Date */}
-            <div className="space-y-2">
-              <Label className="text-xl font-bold text-slate-300 light:text-gray-700">Start Date</Label>
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold text-slate-300 light:text-gray-700">Start Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -811,8 +811,8 @@ export default function FakiehDashboard() {
             </div>
 
             {/* End Date */}
-            <div className="space-y-2">
-              <Label className="text-xl font-bold text-slate-300 light:text-gray-700">End Date</Label>
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold text-slate-300 light:text-gray-700">End Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -836,7 +836,7 @@ export default function FakiehDashboard() {
                       className="bg-slate-800 light:bg-white text-slate-300 light:text-gray-700"
                     />
                     <div className="mt-3 pt-3 border-t border-slate-600 light:border-gray-300">
-                      <Label className="text-xl font-medium text-slate-300 light:text-gray-700 mb-2 block">Time</Label>
+                      <Label className="text-sm font-medium text-slate-300 light:text-gray-700 mb-2 block">Time</Label>
                       <Input
                         type="time"
                         value={format(endDate, "HH:mm")}
@@ -855,8 +855,8 @@ export default function FakiehDashboard() {
             </div>
 
             {/* Product Filter */}
-            <div className="space-y-2">
-              <Label className="text-xl font-bold text-slate-300 light:text-gray-700">Product</Label>
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold text-slate-300 light:text-gray-700">Product</Label>
               <Select value={selectedProduct} onValueChange={setSelectedProduct}>
                 <SelectTrigger className="bg-slate-800 light:bg-white border-slate-700 light:border-gray-300 text-slate-300 light:text-gray-700">
                   <SelectValue placeholder="All Products" />
@@ -873,8 +873,8 @@ export default function FakiehDashboard() {
             </div>
 
             {/* Batch Filter */}
-            <div className="space-y-2">
-              <Label className="text-xl font-bold text-slate-300 light:text-gray-700">Batch</Label>
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold text-slate-300 light:text-gray-700">Batch</Label>
               <Select value={selectedBatch} onValueChange={setSelectedBatch}>
                 <SelectTrigger className="bg-slate-800 light:bg-white border-slate-700 light:border-gray-300 text-slate-300 light:text-gray-700">
                   <SelectValue placeholder="All Batches" />
@@ -890,20 +890,9 @@ export default function FakiehDashboard() {
               </Select>
             </div>
 
-            {/* Material Filter with Apply Button above */}
-            <div className="space-y-2">
-              {/* Apply Filters Button positioned above Material dropdown */}
-              <div className="flex justify-end mb-2">
-                <Button 
-                  onClick={handleApplyFilters}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white px-4 py-1.5 rounded-lg flex items-center space-x-2 transition-colors duration-200 text-sm shadow-lg"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  <span>Apply Filters</span>
-                </Button>
-              </div>
-              
-              <Label className="text-xl font-bold text-slate-300 light:text-gray-700">Material</Label>
+            {/* Material Filter */}
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold text-slate-300 light:text-gray-700">Material</Label>
               <Select value={selectedMaterial} onValueChange={setSelectedMaterial}>
                 <SelectTrigger className="bg-slate-800 light:bg-white border-slate-700 light:border-gray-300 text-slate-300 light:text-gray-700">
                   <SelectValue placeholder="All Materials" />
@@ -917,6 +906,20 @@ export default function FakiehDashboard() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1 flex flex-col items-stretch md:items-end">
+              <span className="text-sm font-semibold leading-none invisible select-none pointer-events-none" aria-hidden>
+                &nbsp;
+              </span>
+              <Button
+                type="button"
+                onClick={handleApplyFilters}
+                className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white px-3 py-2 h-9 md:h-10 rounded-md flex items-center justify-center gap-2 transition-colors duration-200 text-sm shadow-md w-full md:w-auto shrink-0"
+              >
+                <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                <span>Apply Filters</span>
+              </Button>
             </div>
           </div>
         </div>

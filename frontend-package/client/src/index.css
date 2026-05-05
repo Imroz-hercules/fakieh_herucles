@@ -637,6 +637,103 @@ body, #root {
 :root.light .hover\:bg-slate-700\/50:hover { background-color: rgba(226, 232, 240, 0.5) !important; }
 :root.light .hover\:bg-slate-800\/50:hover { background-color: rgba(241, 245, 249, 0.8) !important; }
 
+/*
+ * Fixed dark sidebar / topbar (WaterSystemLayout): global light-theme rules above remap
+ * .text-white and .bg-slate-* for light pages. Re-assert dark-surface colors inside this shell only.
+ */
+:root.light .app-chrome-dark.bg-slate-900\/95 {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+}
+:root.light .app-chrome-dark .bg-slate-800\/50 {
+  background-color: rgba(30, 41, 59, 0.5) !important;
+}
+:root.light .app-chrome-dark .hover\:bg-slate-700\/50:hover {
+  background-color: rgba(51, 65, 85, 0.5) !important;
+}
+:root.light .app-chrome-dark .bg-slate-600 {
+  background-color: #475569 !important;
+}
+:root.light .app-chrome-dark .border-slate-600 {
+  border-color: #475569 !important;
+}
+:root.light .app-chrome-dark.border-slate-700\/50,
+:root.light .app-chrome-dark .border-slate-700\/50 {
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+:root.light .app-chrome-dark.border-slate-700,
+:root.light .app-chrome-dark .border-slate-700 {
+  border-color: #334155 !important;
+}
+:root.light .app-chrome-dark .text-white {
+  color: #ffffff !important;
+}
+:root.light .app-chrome-dark .text-slate-300 {
+  color: #e2e8f0 !important;
+}
+:root.light .app-chrome-dark .text-slate-400 {
+  color: #f1f5f9 !important;
+}
+:root.light .app-chrome-dark .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+:root.light .app-chrome-dark .text-cyan-400 {
+  color: #22d3ee !important;
+}
+:root.light .app-chrome-dark .hover\:bg-slate-800\/50:hover {
+  background-color: rgba(30, 41, 59, 0.5) !important;
+}
+
+/*
+ * WaterTopNav: global :root.light .bg-slate-950/95 { → white } made the bar light while
+ * nav labels stayed text-slate-200 (unreadable). Force real dark chrome on the header.
+ */
+:root.light header.water-top-nav.app-chrome-dark {
+  background-color: rgba(2, 6, 23, 0.95) !important;
+  color: #f8fafc !important;
+  border-color: rgba(71, 85, 105, 0.7) !important;
+}
+:root.light header.water-top-nav.app-chrome-dark .border-slate-600\/70,
+:root.light header.water-top-nav.app-chrome-dark .border-slate-600\/80 {
+  border-color: rgba(71, 85, 105, 0.75) !important;
+}
+:root.light header.water-top-nav.app-chrome-dark .bg-slate-900\/35 {
+  background-color: rgba(15, 23, 42, 0.35) !important;
+}
+:root.light header.water-top-nav.app-chrome-dark .bg-slate-900\/95 {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+}
+:root.light header.water-top-nav.app-chrome-dark .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+:root.light header.water-top-nav.app-chrome-dark .text-slate-100 {
+  color: #f1f5f9 !important;
+}
+:root.light header.water-top-nav.app-chrome-dark .hover\:bg-slate-800\/80:hover {
+  background-color: rgba(30, 41, 59, 0.8) !important;
+}
+
+/* TopNav dropdown is portaled to body; :root.light .bg-slate-900 → near-white breaks contrast. */
+:root.light [data-topnav-dropdown-portal] .topnav-menu-panel {
+  background-color: #0f172a !important;
+  border-color: rgba(71, 85, 105, 0.9) !important;
+  color: #f1f5f9 !important;
+}
+:root.light [data-topnav-dropdown-portal] .topnav-menu-panel .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+:root.light [data-topnav-dropdown-portal] .topnav-menu-panel .text-cyan-300 {
+  color: #67e8f9 !important;
+}
+:root.light [data-topnav-dropdown-portal] .topnav-menu-panel .hover\:bg-slate-800:hover {
+  background-color: #1e293b !important;
+}
+:root.light [data-topnav-dropdown-portal] .topnav-menu-panel .hover\:text-white:hover {
+  color: #ffffff !important;
+}
+:root.light [data-topnav-dropdown-portal] .topnav-menu-panel .bg-cyan-600\/20 {
+  background-color: rgba(8, 145, 178, 0.2) !important;
+}
+
 /* Light theme hidden utility */
 :root.light .light\:hidden { display: none !important; }
 
@@ -3722,3 +3819,54 @@ main {
   color: #ffffff !important;
   background-color: #1e293b !important;
 }
+
+/*
+ * WaterTopNav stays dark in app light mode; global :root.light button { … !important }
+ * still applies. Scoped rules restore nav tab + tool buttons inside the header only.
+ */
+:root.light header.water-top-nav button[data-topnav-item] {
+  background-color: transparent !important;
+  color: #e2e8f0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+:root.light header.water-top-nav button[data-topnav-item]:hover {
+  background-color: rgba(30, 41, 59, 0.8) !important;
+  color: #67e8f9 !important;
+}
+:root.light header.water-top-nav button[data-topnav-item][data-active] {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4) !important;
+}
+:root.light header.water-top-nav button[data-topnav-item][data-active]:hover {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+  color: #ffffff !important;
+}
+
+:root.light header.water-top-nav button[data-topnav-tool="theme"] {
+  border: 1px solid #475569 !important;
+  background-color: rgba(30, 41, 59, 0.5) !important;
+}
+:root.light header.water-top-nav button[data-topnav-tool="theme"]:hover {
+  background-color: rgba(51, 65, 85, 0.55) !important;
+}
+
+:root.light header.water-top-nav button[data-topnav-tool="settings"] {
+  border: none !important;
+  background-color: rgba(30, 41, 59, 0.5) !important;
+  color: #cbd5e1 !important;
+}
+:root.light header.water-top-nav button[data-topnav-tool="settings"]:hover {
+  background-color: rgba(51, 65, 85, 0.55) !important;
+  color: #22d3ee !important;
+}
+
+:root.light header.water-top-nav button[data-topnav-tool="profile"] {
+  background-color: transparent !important;
+  border: none !important;
+}
+:root.light header.water-top-nav button[data-topnav-tool="profile"]:hover {
+  background-color: transparent !important;
+}
+
