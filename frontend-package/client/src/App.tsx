@@ -55,7 +55,8 @@ function Router() {
       <Route path="/fakieh/material" component={Material} />
       <Route path="/fakieh/storage" component={Storage} />
       <Route path="/fakieh/production" component={Production} />
-      <Route path="/fakieh/orders" component={Orders} />
+      <Route path="/fakieh/orders" component={() => { window.location.replace('/fakieh/live_orders'); return null; }} />
+      <Route path="/fakieh/live_orders" component={Orders} />
       <Route path="/fakieh/order-history" component={OrderHistory} />
       <Route path="/fakieh/rfid" component={RFID} />
       <Route path="/fakieh/weighbridge" component={Weighbridge} />

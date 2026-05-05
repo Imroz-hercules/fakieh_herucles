@@ -55,7 +55,7 @@ const menuItems = [
   //   description: 'Production Management'
   // },
   { 
-    path: '/fakieh/orders', 
+    path: '/fakieh/live_orders', 
     icon: Truck, 
     label: 'Live orders',
     description: 'Real-time Orders from SCADA'
