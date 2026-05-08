@@ -24,6 +24,8 @@ from routes.orders_history_routes import orders_history_bp
 from routes.data_ingestion import ingestion_bp
 from routes.websocket_routes import websocket_bp, init_socketio
 from routes.sqlserver_routes import sqlserver_bp
+from routes.kpi_material_routes import kpi_material_bp
+from routes.kpi_calendar_routes import kpi_calendar_bp
 from background_sync import start_silo_sync
 
 app = Flask(__name__)
@@ -113,13 +115,15 @@ app.register_blueprint(ingestion_bp)
 app.register_blueprint(websocket_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(sqlserver_bp)
+app.register_blueprint(kpi_material_bp, url_prefix='/api')
+app.register_blueprint(kpi_calendar_bp, url_prefix='/api')
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Creates tables if they don't exist
         
-        # Start background silo sync task
-        start_silo_sync()
+        # Start background silo sync task (in-process; avoids HTTP self-call)
+        start_silo_sync(app)
         
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, debug=False, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)

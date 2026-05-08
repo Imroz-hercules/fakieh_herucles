@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, jsonify, request
 from models import db
 from models.production import ProductionBatch
@@ -9,18 +10,41 @@ from utils.error_handler import (
 
 production_bp = Blueprint('production', __name__)
 
+_PROD_LIST_MAX = int(os.getenv("PRODUCTION_LIST_MAX", "2000"))
+_PROD_LIST_DEFAULT = int(os.getenv("PRODUCTION_LIST_DEFAULT", "500"))
+
+
 @production_bp.route('/api/production', methods=['GET'])
 def get_all_batches():
     try:
         log_request_info()
         log_operation("get_all_batches")
-        
-        batches = ProductionBatch.query.order_by(ProductionBatch.created_at.desc()).all()
+
+        try:
+            limit = int(request.args.get("limit", _PROD_LIST_DEFAULT))
+        except ValueError:
+            limit = _PROD_LIST_DEFAULT
+        limit = max(1, min(limit, _PROD_LIST_MAX))
+        try:
+            offset = int(request.args.get("offset", 0))
+        except ValueError:
+            offset = 0
+        offset = max(0, offset)
+
+        base = ProductionBatch.query.order_by(ProductionBatch.created_at.desc())
+        total = base.count()
+        batches = base.limit(limit).offset(offset).all()
         batch_data = [batch.to_dict() for batch in batches]
-        
+
         return create_success_response(
-            data=batch_data,
-            message=f"Retrieved {len(batch_data)} production batches"
+            data={
+                "items": batch_data,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "has_more": offset + len(batch_data) < total,
+            },
+            message=f"Retrieved {len(batch_data)} production batches",
         )
     except Exception as e:
         return handle_database_error(e)

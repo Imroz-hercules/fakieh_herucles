@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, jsonify, request
 from models import db
 from models.material import Material
@@ -10,6 +11,10 @@ from utils.error_handler import (
 
 material_bp = Blueprint('material', __name__)
 
+_MAT_LIST_MAX = int(os.getenv("MATERIAL_LIST_MAX", "2000"))
+_MAT_LIST_DEFAULT = int(os.getenv("MATERIAL_LIST_DEFAULT", "500"))
+
+
 # Get all materials
 @material_bp.route('/api/materials', methods=['GET'])
 def get_materials():
@@ -17,12 +22,31 @@ def get_materials():
         log_request_info()
         log_operation("get_materials")
 
-        materials = Material.query.order_by(Material.last_updated.desc()).all()
+        try:
+            limit = int(request.args.get("limit", _MAT_LIST_DEFAULT))
+        except ValueError:
+            limit = _MAT_LIST_DEFAULT
+        limit = max(1, min(limit, _MAT_LIST_MAX))
+        try:
+            offset = int(request.args.get("offset", 0))
+        except ValueError:
+            offset = 0
+        offset = max(0, offset)
+
+        base = Material.query.order_by(Material.last_updated.desc())
+        total = base.count()
+        materials = base.limit(limit).offset(offset).all()
         material_data = [m.to_dict() for m in materials]
 
         return create_success_response(
-            data=material_data,
-            message=f"Retrieved {len(material_data)} materials"
+            data={
+                "items": material_data,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "has_more": offset + len(material_data) < total,
+            },
+            message=f"Retrieved {len(material_data)} materials",
         )
     except Exception as e:
         return handle_database_error(e)

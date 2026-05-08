@@ -1,4 +1,5 @@
 import json
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -18,6 +19,10 @@ _connected_clients: Set[str] = set()
 _broadcast_running = False
 _broadcast_thread = None
 _socketio = None
+_ws_silo_lock = threading.Lock()
+_ws_last_silo_persist = 0.0
+WS_CONNECT_SILO_PERSIST_MIN_SEC = float(os.getenv("WS_CONNECT_SILO_PERSIST_MIN_SEC", "20"))
+
 
 def init_socketio(app):
     """Initialize SocketIO with the Flask app"""
@@ -39,6 +44,7 @@ def register_socketio_events(socketio_instance):
     @socketio_instance.on('connect')
     def handle_connect():
         """Handle client connection"""
+        global _ws_last_silo_persist
         client_id = request.sid
         _connected_clients.add(client_id)
         print(f"[websocket] Client connected: {client_id}")
@@ -51,10 +57,14 @@ def register_socketio_events(socketio_instance):
             # Don't persist orders data to database - only store when status is 8 via handle_order_status
             # persist_orders(data)
             
-            # Also collect and persist silo data
+            # Throttle silo persist on connect (many tabs otherwise hammer PLC/DB)
             try:
-                silo_rows = collect_all_silos()
-                persist_silos(silo_rows)
+                now = time.time()
+                with _ws_silo_lock:
+                    if now - _ws_last_silo_persist >= WS_CONNECT_SILO_PERSIST_MIN_SEC:
+                        silo_rows = collect_all_silos()
+                        persist_silos(silo_rows)
+                        _ws_last_silo_persist = now
             except Exception as e:
                 print(f"[websocket] Failed to persist silo data: {e}")
             

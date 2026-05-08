@@ -137,7 +137,8 @@ export default function TruckManagement(): JSX.Element {
   const fetchTrucks = async () => {
     try {
       const res = await axios.get(`${API_BASE}/trucks/`)
-      setTruckData(res.data)
+      const body = res.data
+      setTruckData(Array.isArray(body) ? body : body?.items ?? [])
     } catch (err) {
       
     }
@@ -146,7 +147,8 @@ export default function TruckManagement(): JSX.Element {
   const fetchDrivers = async () => {
     try {
       const res = await axios.get(`${API_BASE}/trucks/drivers`)
-      setDriverData(res.data)
+      const body = res.data
+      setDriverData(Array.isArray(body) ? body : body?.items ?? [])
     } catch (err) {
       
     }
@@ -164,7 +166,8 @@ export default function TruckManagement(): JSX.Element {
   const fetchRFIDTags = async () => {
     try {
       const res = await axios.get(`${API_BASE}/rfid/config`)
-      setRfidTags(res.data)
+      const body = res.data
+      setRfidTags(Array.isArray(body) ? body : body?.items ?? [])
     } catch (err) {
       
     }

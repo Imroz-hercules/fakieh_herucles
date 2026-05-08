@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, request, jsonify
 from models import db
 from models.reports import (
@@ -5,10 +6,46 @@ from models.reports import (
     MaterialConsumptionReport, ReportConfiguration, ColumnConfiguration, ColumnValue
 )
 from datetime import datetime, timedelta
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, text
 import json
 
 reports_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
+
+REPORT_LIST_MAX = int(os.getenv("REPORTS_LIST_MAX", "10000"))
+REPORT_LIST_DEFAULT = int(os.getenv("REPORTS_LIST_DEFAULT", "5000"))
+REPORT_EXPORT_MAX = int(os.getenv("REPORTS_EXPORT_MAX", "25000"))
+
+
+def _list_limit_offset():
+    try:
+        limit = int(request.args.get("limit", REPORT_LIST_DEFAULT))
+    except ValueError:
+        limit = REPORT_LIST_DEFAULT
+    limit = max(1, min(limit, REPORT_LIST_MAX))
+    try:
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        offset = 0
+    offset = max(0, offset)
+    return limit, offset
+
+
+def _json_list_page(query, order_clause, item_to_dict):
+    limit, offset = _list_limit_offset()
+    total = query.count()
+    if isinstance(order_clause, tuple):
+        rows = query.order_by(*order_clause).limit(limit).offset(offset).all()
+    else:
+        rows = query.order_by(order_clause).limit(limit).offset(offset).all()
+    return jsonify(
+        {
+            "items": [item_to_dict(r) for r in rows],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(rows) < total,
+        }
+    )
 
 # === Daily Reports ===
 @reports_bp.route('/daily', methods=['GET'])
@@ -35,9 +72,8 @@ def get_daily_reports():
             query = query.filter(DailyReport.facility_id == facility_id)
         if shift:
             query = query.filter(DailyReport.shift == shift)
-            
-        reports = query.order_by(DailyReport.report_date.desc()).all()
-        return jsonify([report.to_dict() for report in reports])
+
+        return _json_list_page(query, DailyReport.report_date.desc(), lambda r: r.to_dict())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -138,9 +174,8 @@ def get_weekly_reports():
             query = query.filter(WeeklyReport.product_name.ilike(f'%{product}%'))
         if facility_id:
             query = query.filter(WeeklyReport.facility_id == facility_id)
-            
-        reports = query.order_by(WeeklyReport.week_start_date.desc()).all()
-        return jsonify([report.to_dict() for report in reports])
+
+        return _json_list_page(query, WeeklyReport.week_start_date.desc(), lambda r: r.to_dict())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -196,9 +231,12 @@ def get_monthly_reports():
             query = query.filter(MonthlyReport.product_name.ilike(f'%{product}%'))
         if facility_id:
             query = query.filter(MonthlyReport.facility_id == facility_id)
-            
-        reports = query.order_by(MonthlyReport.year.desc(), MonthlyReport.month.desc()).all()
-        return jsonify([report.to_dict() for report in reports])
+
+        return _json_list_page(
+            query,
+            (MonthlyReport.year.desc(), MonthlyReport.month.desc()),
+            lambda r: r.to_dict(),
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -260,9 +298,8 @@ def get_detailed_reports():
             query = query.filter(DetailedReport.facility_id == facility_id)
         if operator:
             query = query.filter(DetailedReport.operator.ilike(f'%{operator}%'))
-            
-        reports = query.order_by(DetailedReport.report_date.desc()).all()
-        return jsonify([report.to_dict() for report in reports])
+
+        return _json_list_page(query, DetailedReport.report_date.desc(), lambda r: r.to_dict())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -326,9 +363,10 @@ def get_material_reports():
             query = query.filter(MaterialConsumptionReport.supplier.ilike(f'%{supplier}%'))
         if batch_id:
             query = query.filter(MaterialConsumptionReport.batch_id == batch_id)
-            
-        reports = query.order_by(MaterialConsumptionReport.report_date.desc()).all()
-        return jsonify([report.to_dict() for report in reports])
+
+        return _json_list_page(
+            query, MaterialConsumptionReport.report_date.desc(), lambda r: r.to_dict()
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -590,13 +628,26 @@ def create_bulk_daily_reports():
 def get_report_summary():
     """Get summary statistics for all report types"""
     try:
-        # Get counts for each report type
-        daily_count = DailyReport.query.count()
-        weekly_count = WeeklyReport.query.count()
-        monthly_count = MonthlyReport.query.count()
-        detailed_count = DetailedReport.query.count()
-        material_count = MaterialConsumptionReport.query.count()
-        
+        counts_row = db.session.execute(
+            text(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM daily_reports) AS d,
+                    (SELECT COUNT(*) FROM weekly_reports) AS w,
+                    (SELECT COUNT(*) FROM monthly_reports) AS m,
+                    (SELECT COUNT(*) FROM detailed_reports) AS det,
+                    (SELECT COUNT(*) FROM material_consumption_reports) AS mat
+                """
+            )
+        ).one()
+        daily_count, weekly_count, monthly_count, detailed_count, material_count = (
+            int(counts_row[0] or 0),
+            int(counts_row[1] or 0),
+            int(counts_row[2] or 0),
+            int(counts_row[3] or 0),
+            int(counts_row[4] or 0),
+        )
+
         # Get recent activity
         recent_daily = DailyReport.query.order_by(DailyReport.created_at.desc()).limit(5).all()
         recent_detailed = DetailedReport.query.order_by(DetailedReport.created_at.desc()).limit(5).all()
@@ -620,23 +671,68 @@ def get_report_summary():
 # === Export Endpoints ===
 @reports_bp.route('/export/<report_type>', methods=['GET'])
 def export_reports(report_type):
-    """Export reports as CSV"""
+    """Export reports as JSON (bounded). Pass start_date/end_date where applicable + limit (max REPORT_EXPORT_MAX)."""
     try:
-        # This would typically generate a CSV file
-        # For now, return the data in a format suitable for CSV generation
-        if report_type == 'daily':
-            reports = DailyReport.query.all()
-        elif report_type == 'weekly':
-            reports = WeeklyReport.query.all()
-        elif report_type == 'monthly':
-            reports = MonthlyReport.query.all()
-        elif report_type == 'detailed':
-            reports = DetailedReport.query.all()
-        elif report_type == 'material':
-            reports = MaterialConsumptionReport.query.all()
+        try:
+            lim = int(request.args.get("limit", min(5000, REPORT_EXPORT_MAX)))
+        except ValueError:
+            lim = min(5000, REPORT_EXPORT_MAX)
+        lim = max(1, min(lim, REPORT_EXPORT_MAX))
+        try:
+            off = int(request.args.get("offset", 0))
+        except ValueError:
+            off = 0
+        off = max(0, off)
+
+        if report_type == "daily":
+            q = DailyReport.query
+            start_date = request.args.get("start_date")
+            end_date = request.args.get("end_date")
+            if start_date:
+                q = q.filter(DailyReport.report_date >= start_date)
+            if end_date:
+                q = q.filter(DailyReport.report_date <= end_date)
+            reports = q.order_by(DailyReport.report_date.desc()).limit(lim).offset(off).all()
+        elif report_type == "weekly":
+            q = WeeklyReport.query
+            start_date = request.args.get("start_date")
+            end_date = request.args.get("end_date")
+            if start_date:
+                q = q.filter(WeeklyReport.week_start_date >= start_date)
+            if end_date:
+                q = q.filter(WeeklyReport.week_end_date <= end_date)
+            reports = q.order_by(WeeklyReport.week_start_date.desc()).limit(lim).offset(off).all()
+        elif report_type == "monthly":
+            q = MonthlyReport.query
+            reports = q.order_by(MonthlyReport.year.desc(), MonthlyReport.month.desc()).limit(lim).offset(off).all()
+        elif report_type == "detailed":
+            q = DetailedReport.query
+            start_date = request.args.get("start_date")
+            end_date = request.args.get("end_date")
+            if start_date:
+                q = q.filter(DetailedReport.report_date >= start_date)
+            if end_date:
+                q = q.filter(DetailedReport.report_date <= end_date)
+            reports = q.order_by(DetailedReport.report_date.desc()).limit(lim).offset(off).all()
+        elif report_type == "material":
+            q = MaterialConsumptionReport.query
+            start_date = request.args.get("start_date")
+            end_date = request.args.get("end_date")
+            if start_date:
+                q = q.filter(MaterialConsumptionReport.report_date >= start_date)
+            if end_date:
+                q = q.filter(MaterialConsumptionReport.report_date <= end_date)
+            reports = q.order_by(MaterialConsumptionReport.report_date.desc()).limit(lim).offset(off).all()
         else:
-            return jsonify({'error': 'Invalid report type'}), 400
-            
-        return jsonify([report.to_dict() for report in reports])
+            return jsonify({"error": "Invalid report type"}), 400
+
+        return jsonify(
+            {
+                "items": [report.to_dict() for report in reports],
+                "limit": lim,
+                "offset": off,
+                "has_more": len(reports) >= lim,
+            }
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500 

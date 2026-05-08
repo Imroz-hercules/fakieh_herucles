@@ -121,8 +121,10 @@ export function RFID() {
       try {
         const configRes = await axios.get('/api/rfid/config')
         const trucksRes = await axios.get('/api/trucks/')
-        setRfidTableData(configRes.data)
-        setTruckData(trucksRes.data)
+        const cfg = configRes.data
+        const tr = trucksRes.data
+        setRfidTableData(Array.isArray(cfg) ? cfg : cfg?.items ?? [])
+        setTruckData(Array.isArray(tr) ? tr : tr?.items ?? [])
       } catch (err) {
         
         // Use mock data if API fails
@@ -205,7 +207,8 @@ export function RFID() {
       // Refresh RFID data to show updated status
       try {
         const configRes = await axios.get('/api/rfid/config')
-        setRfidTableData(configRes.data)
+        const cfg = configRes.data
+        setRfidTableData(Array.isArray(cfg) ? cfg : cfg?.items ?? [])
       } catch (err) {
         
       }

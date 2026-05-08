@@ -54,8 +54,15 @@ export const API_ENDPOINTS = {
   // Weighbridge
   WEIGHBRIDGE: '/api/weighbridge',
   
-  // Reports
+  // Reports (Postgres-backed app reports: /daily, /weekly, …)
   REPORTS: '/api/reports',
+
+  /** SQL Server BatchMaterials (NFM-style batch reporting) */
+  BATCH_KPI: `${API_BASE_URL}/kpi`,
+  BATCH_REPORTS_QUERY: `${API_BASE_URL}/reports`,
+  BATCH_FILTER_OPTIONS: `${API_BASE_URL}/filter-options`,
+  BATCH_KPI_CALENDAR: `${API_BASE_URL}/kpi_calendar`,
+  BATCH_KPI_CALENDAR_DETAILS: `${API_BASE_URL}/kpi_calendar/details`,
   
   // Production
   PRODUCTION: '/api/production',

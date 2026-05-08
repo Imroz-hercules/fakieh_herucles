@@ -1,14 +1,43 @@
+import os
 from flask import Blueprint, request, jsonify
 from models import db
 from models.truck import Truck, Driver
 
 truck_bp = Blueprint('truck', __name__, url_prefix='/api/trucks')
 
+_LIST_MAX = int(os.getenv("TRUCK_LIST_MAX", "2000"))
+_LIST_DEFAULT = int(os.getenv("TRUCK_LIST_DEFAULT", "500"))
+
+
+def _limit_offset():
+    try:
+        limit = int(request.args.get("limit", _LIST_DEFAULT))
+    except ValueError:
+        limit = _LIST_DEFAULT
+    limit = max(1, min(limit, _LIST_MAX))
+    try:
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        offset = 0
+    return limit, max(0, offset)
+
+
 # Get all trucks
 @truck_bp.route('/', methods=['GET'])
 def get_trucks():
-    trucks = Truck.query.all()
-    return jsonify([t.to_dict() for t in trucks])
+    limit, offset = _limit_offset()
+    q = Truck.query.order_by(Truck.id.desc())
+    total = q.count()
+    trucks = q.limit(limit).offset(offset).all()
+    return jsonify(
+        {
+            "items": [t.to_dict() for t in trucks],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(trucks) < total,
+        }
+    )
 
 # Get single truck
 @truck_bp.route('/<int:truck_id>', methods=['GET'])
@@ -68,8 +97,19 @@ def delete_truck(truck_id):
 @truck_bp.route('/drivers', methods=['GET'])
 def get_drivers():
     try:
-        drivers = Driver.query.all()
-        return jsonify([driver.to_dict() for driver in drivers])
+        limit, offset = _limit_offset()
+        q = Driver.query.order_by(Driver.id.desc())
+        total = q.count()
+        drivers = q.limit(limit).offset(offset).all()
+        return jsonify(
+            {
+                "items": [driver.to_dict() for driver in drivers],
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "has_more": offset + len(drivers) < total,
+            }
+        )
     except Exception as e:
         return jsonify({'error': f'Failed to fetch drivers: {str(e)}'}), 500
 
@@ -180,8 +220,19 @@ def delete_driver(driver_id):
 @truck_bp.route('/drivers/status/<status>', methods=['GET'])
 def get_drivers_by_status(status):
     try:
-        drivers = Driver.query.filter_by(status=status).all()
-        return jsonify([driver.to_dict() for driver in drivers])
+        limit, offset = _limit_offset()
+        q = Driver.query.filter_by(status=status).order_by(Driver.id.desc())
+        total = q.count()
+        drivers = q.limit(limit).offset(offset).all()
+        return jsonify(
+            {
+                "items": [driver.to_dict() for driver in drivers],
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "has_more": offset + len(drivers) < total,
+            }
+        )
     except Exception as e:
         return jsonify({'error': f'Failed to fetch drivers: {str(e)}'}), 500
 
@@ -189,7 +240,18 @@ def get_drivers_by_status(status):
 @truck_bp.route('/drivers/truck/<truck_id>', methods=['GET'])
 def get_drivers_by_truck(truck_id):
     try:
-        drivers = Driver.query.filter_by(assigned_truck=truck_id).all()
-        return jsonify([driver.to_dict() for driver in drivers])
+        limit, offset = _limit_offset()
+        q = Driver.query.filter_by(assigned_truck=truck_id).order_by(Driver.id.desc())
+        total = q.count()
+        drivers = q.limit(limit).offset(offset).all()
+        return jsonify(
+            {
+                "items": [driver.to_dict() for driver in drivers],
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "has_more": offset + len(drivers) < total,
+            }
+        )
     except Exception as e:
         return jsonify({'error': f'Failed to fetch drivers: {str(e)}'}), 500

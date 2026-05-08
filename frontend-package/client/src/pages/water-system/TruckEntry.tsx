@@ -134,7 +134,7 @@ export default function TruckEntry() {
     try {
       const res = await fetch(`${API_BASE}/api/trucks/`);
       const data = await res.json();
-      setTruckData(data);
+      setTruckData(Array.isArray(data) ? data : data?.items ?? []);
     } catch (err) {
       
       setTruckData([]);

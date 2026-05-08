@@ -54,7 +54,11 @@ export function Material() {
   useEffect(() => {
     fetch('/api/materials')
       .then(res => res.json())
-      .then(data => setMaterials(data))
+      .then((payload: any) => {
+        const inner = payload?.data
+        const list = Array.isArray(inner) ? inner : inner?.items ?? []
+        setMaterials(list)
+      })
       .catch(err => console.error('Error fetching materials:', err))
   }, [])
 

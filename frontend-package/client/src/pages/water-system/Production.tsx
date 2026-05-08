@@ -54,8 +54,9 @@ export function Production() {
     async function fetchBatches() {
       try {
         const res = await fetch('http://localhost:5000/api/production');
-        const data = await res.json();
-        setBatches(data);
+        const payload = await res.json();
+        const inner = payload?.data;
+        setBatches(Array.isArray(inner) ? inner : inner?.items ?? []);
       } catch (err) {
         
       }

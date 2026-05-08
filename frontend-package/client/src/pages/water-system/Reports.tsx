@@ -1037,6 +1037,14 @@ function DarkModeToggle() {
 // API base URL
 const API_BASE_URL = 'http://localhost:5000/api'
 
+function normalizeReportListBody(body: unknown): unknown[] {
+  if (Array.isArray(body)) return body
+  if (body && typeof body === 'object' && Array.isArray((body as { items?: unknown[] }).items)) {
+    return (body as { items: unknown[] }).items
+  }
+  return []
+}
+
 // API service functions
 const apiService = {
   // Fetch daily reports
@@ -1050,7 +1058,8 @@ const apiService = {
     
     const response = await fetch(`${API_BASE_URL}/reports/daily?${params}`)
     if (!response.ok) throw new Error('Failed to fetch daily reports')
-    return response.json()
+    const body = await response.json()
+    return normalizeReportListBody(body)
   },
 
   // Fetch weekly reports
@@ -1064,7 +1073,8 @@ const apiService = {
     
     const response = await fetch(`${API_BASE_URL}/reports/weekly?${params}`)
     if (!response.ok) throw new Error('Failed to fetch weekly reports')
-    return response.json()
+    const body = await response.json()
+    return normalizeReportListBody(body)
   },
 
   // Fetch monthly reports
@@ -1078,7 +1088,8 @@ const apiService = {
     
     const response = await fetch(`${API_BASE_URL}/reports/monthly?${params}`)
     if (!response.ok) throw new Error('Failed to fetch monthly reports')
-    return response.json()
+    const body = await response.json()
+    return normalizeReportListBody(body)
   },
 
   // Fetch detailed reports
@@ -1092,7 +1103,8 @@ const apiService = {
     
     const response = await fetch(`${API_BASE_URL}/reports/detailed?${params}`)
     if (!response.ok) throw new Error('Failed to fetch detailed reports')
-    return response.json()
+    const body = await response.json()
+    return normalizeReportListBody(body)
   },
 
   // Fetch material reports
@@ -1106,7 +1118,8 @@ const apiService = {
     
     const response = await fetch(`${API_BASE_URL}/reports/material?${params}`)
     if (!response.ok) throw new Error('Failed to fetch material reports')
-    return response.json()
+    const body = await response.json()
+    return normalizeReportListBody(body)
   },
 
   // Export reports

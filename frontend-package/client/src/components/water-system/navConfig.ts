@@ -8,6 +8,10 @@ import {
   Scale,
   Settings,
   ShoppingCart,
+  Calendar,
+  FileBarChart,
+  Table2,
+  BarChart3,
 } from 'lucide-react'
 
 export interface SidebarNavItem {
@@ -17,20 +21,21 @@ export interface SidebarNavItem {
   description: string
 }
 
-/** Sidebar + Admin: single list used by `Sidebar`. */
-export const sidebarNavItems: SidebarNavItem[] = [
-  {
-    path: '/fakieh/fakieh-dashboard',
-    icon: LayoutDashboard,
-    label: 'Fakieh Dashboard',
-    description: 'Main Production Dashboard',
-  },
-  {
-    path: '/fakieh/storage',
-    icon: Database,
-    label: 'Storage',
-    description: 'Storage Management',
-  },
+export interface SidebarNavGroup {
+  id: string
+  label: string
+  description: string
+  icon: LucideIcon
+  items: SidebarNavItem[]
+}
+
+export type SidebarNavEntry = SidebarNavItem | SidebarNavGroup
+
+export function isSidebarNavGroup(entry: SidebarNavEntry): entry is SidebarNavGroup {
+  return 'items' in entry && Array.isArray((entry as SidebarNavGroup).items)
+}
+
+const ordersItems: SidebarNavItem[] = [
   {
     path: '/fakieh/live_orders',
     icon: Truck,
@@ -42,6 +47,72 @@ export const sidebarNavItems: SidebarNavItem[] = [
     icon: History,
     label: 'Order History',
     description: 'Complete Order History from Database',
+  },
+]
+
+const trucksItems: SidebarNavItem[] = [
+  {
+    path: '/fakieh/truck-management',
+    icon: Truck,
+    label: 'Truck Management',
+    description: 'Manage Trucks & Fleet',
+  },
+  {
+    path: '/fakieh/truck-entry',
+    icon: Scale,
+    label: 'Truck Weighbridge',
+    description: 'Live Weighbridge & Entry Management',
+  },
+]
+
+const fakiehReportingItems: SidebarNavItem[] = [
+  {
+    path: '/fakieh/fakieh-dashboard',
+    icon: LayoutDashboard,
+    label: 'Fakieh Dashboard',
+    description: 'Main production dashboard',
+  },
+  {
+    path: '/fakieh/batch-calendar',
+    icon: Calendar,
+    label: 'Batch calendar',
+    description: 'Daily production from batch materials',
+  },
+  {
+    path: '/fakieh/batch-raw-data',
+    icon: Table2,
+    label: 'Raw data',
+    description: 'Filtered batch material rows and CSV export',
+  },
+  {
+    path: '/fakieh/batch-historical-reports',
+    icon: FileBarChart,
+    label: 'Historical reports',
+    description: 'Summaries, weekly, monthly, daily, material usage',
+  },
+]
+
+/** Sidebar + Admin */
+export const sidebarNavEntries: SidebarNavEntry[] = [
+  {
+    id: 'fakieh-reporting',
+    label: 'Fakieh Reporting',
+    description: 'Dashboard and batch reporting',
+    icon: BarChart3,
+    items: fakiehReportingItems,
+  },
+  {
+    path: '/fakieh/storage',
+    icon: Database,
+    label: 'Storage',
+    description: 'Storage Management',
+  },
+  {
+    id: 'orders',
+    label: 'Orders',
+    description: 'Live orders and order history',
+    icon: ShoppingCart,
+    items: ordersItems,
   },
   {
     path: '/fakieh/rfid',
@@ -56,16 +127,11 @@ export const sidebarNavItems: SidebarNavItem[] = [
     description: 'Weighbridge Management',
   },
   {
-    path: '/fakieh/truck-entry',
+    id: 'trucks',
+    label: 'Trucks',
+    description: 'Fleet and weighbridge entry',
     icon: Truck,
-    label: 'Truck Weighbridge',
-    description: 'Live Weighbridge & Entry Management',
-  },
-  {
-    path: '/fakieh/truck-management',
-    icon: Truck,
-    label: 'Truck Management',
-    description: 'Manage Trucks & Fleet',
+    items: trucksItems,
   },
   {
     path: '/fakieh/admin',
@@ -91,13 +157,18 @@ export type TopNavGroupItem = {
 
 export type TopNavItem = TopNavLinkItem | TopNavGroupItem
 
-/** Top bar: Admin omitted (gear in chrome). Orders / Truck are hover groups. */
+/** Top bar: Admin omitted (gear in chrome). */
 export const topNavItems: TopNavItem[] = [
   {
-    kind: 'link',
-    path: '/fakieh/fakieh-dashboard',
-    label: 'Fakieh Dashboard',
-    icon: LayoutDashboard,
+    kind: 'group',
+    label: 'Fakieh Reporting',
+    icon: BarChart3,
+    items: [
+      { path: '/fakieh/fakieh-dashboard', label: 'Fakieh Dashboard' },
+      { path: '/fakieh/batch-calendar', label: 'Batch calendar' },
+      { path: '/fakieh/batch-raw-data', label: 'Raw data' },
+      { path: '/fakieh/batch-historical-reports', label: 'Historical reports' },
+    ],
   },
   {
     kind: 'link',
@@ -128,7 +199,7 @@ export const topNavItems: TopNavItem[] = [
   },
   {
     kind: 'group',
-    label: 'Truck',
+    label: 'Trucks',
     icon: Truck,
     items: [
       { path: '/fakieh/truck-management', label: 'Truck management' },

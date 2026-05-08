@@ -731,14 +731,19 @@ export default function FakiehDashboard() {
     try {
       const response = await fetch('/api/trucks')
       const data = await response.json()
-      
-      if (data.success) {
-        setTotalTrucks(data.data ? data.data.length : 0)
+      if (Array.isArray(data)) {
+        setTotalTrucks(data.length)
+      } else if (data && typeof data.total === 'number') {
+        setTotalTrucks(data.total)
       } else {
-        // Try alternative endpoint
-        const altResponse = await fetch('/api/trucks/entries')
-        const altData = await altResponse.json()
-        setTotalTrucks(altData.success ? (altData.data ? altData.data.length : 0) : 0)
+        const list = data?.items ?? []
+        if (list.length > 0) {
+          setTotalTrucks(list.length)
+        } else {
+          const altResponse = await fetch('/api/trucks/entries')
+          const altData = await altResponse.json()
+          setTotalTrucks(altData.success ? (altData.data ? altData.data.length : 0) : 0)
+        }
       }
     } catch (err) {
       
@@ -761,7 +766,7 @@ export default function FakiehDashboard() {
         {/* Dashboard Filters Section */}
         <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg px-4 py-3 shadow-lg light:shadow-xl">
           <div className="flex items-center gap-2 mb-2">
-            <Filter className="h-4 w-4 text-cyan-400 shrink-0" />
+            <Filter className="h-4 w-4 shrink-0 text-slate-900 dark:text-cyan-400" />
             <h2 className="text-base font-bold text-white light:text-gray-900">Dashboard Filters</h2>
           </div>
           

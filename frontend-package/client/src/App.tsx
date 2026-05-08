@@ -31,6 +31,9 @@ import { Alarms } from "./pages/water-system/Alarms";
 import { Admin } from "./pages/water-system/Admin";
 import { PLCConfiguration } from "./pages/water-system/PlcConfiguration";
 import { PLCReports } from "./pages/water-system/PLCReports";
+import { BatchCalendarPage } from "./pages/water-system/BatchCalendarPage";
+import { BatchHistoricalReports } from "./pages/water-system/BatchHistoricalReports";
+import { BatchRawDataPage } from "./pages/water-system/BatchRawDataPage";
 
 function Router() {
   const { isInitialized } = useTheme();
@@ -67,6 +70,9 @@ function Router() {
       <Route path="/fakieh/admin" component={Admin} />
       <Route path="/fakieh/engineering" component={PLCConfiguration} />
       <Route path="/fakieh/plc-reports" component={PLCReports} />
+      <Route path="/fakieh/batch-calendar" component={BatchCalendarPage} />
+      <Route path="/fakieh/batch-historical-reports" component={BatchHistoricalReports} />
+      <Route path="/fakieh/batch-raw-data" component={BatchRawDataPage} />
       
       {/* Legacy Hercules facility routes - kept for existing facility functionality */}
       <Route path="/facility/:id">

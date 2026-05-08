@@ -254,8 +254,8 @@ body, #root {
   background-color: #475569 !important; 
 }
 
-/* Override any conflicting button styles in light mode - EXCLUDE tabs */
-:root.light button:not([role="tab"]):not([data-state]):not(.tabs-trigger) {
+/* Override any conflicting button styles in light mode - EXCLUDE tabs and explicitly colored buttons */
+:root.light button:not([role="tab"]):not([data-state]):not(.tabs-trigger):not([class*="bg-cyan"]):not([class*="bg-orange"]):not([class*="bg-red"]):not([class*="bg-green"]):not([class*="bg-blue"]):not([class*="bg-yellow"]):not([class*="bg-slate-2"]):not([class*="bg-slate-3"]):not([class*="bg-slate-7"]):not([class*="bg-slate-8"]) {
   border-color: inherit !important;
   color: inherit !important;
   background-color: inherit !important;
@@ -389,13 +389,6 @@ body, #root {
 }
 :root.light button[data-variant="outline"]:hover {
   color: #cbd5e1 !important;
-}
-
-/* Nuclear option - override button styling in light mode - EXCLUDE tabs */
-:root.light button:not([role="tab"]):not([data-state]):not(.tabs-trigger) {
-  color: inherit !important;
-  background-color: inherit !important;
-  border-color: inherit !important;
 }
 
 /* Specific overrides for common button classes */
@@ -681,6 +674,21 @@ body, #root {
 }
 :root.light .app-chrome-dark .hover\:bg-slate-800\/50:hover {
   background-color: rgba(30, 41, 59, 0.5) !important;
+}
+
+/* Sidebar collapsible groups: label + chevron must not inherit layout light:text-gray-900 */
+:root.light .app-chrome-dark button[data-sidebar-group-trigger] {
+  color: #f1f5f9 !important;
+}
+:root.light .app-chrome-dark button[data-sidebar-group-trigger] svg {
+  color: inherit !important;
+  opacity: 0.95;
+}
+:root.light .app-chrome-dark button[data-sidebar-group-trigger][data-active='true'] {
+  color: #67e8f9 !important;
+}
+:root.light .app-chrome-dark button[data-sidebar-group-trigger]:hover {
+  color: #ffffff !important;
 }
 
 /*
@@ -3237,41 +3245,44 @@ main {
   box-shadow: none !important;
 }
 
-/* But preserve colored backgrounds for specific buttons */
-:root.light button.bg-cyan-600,
-:root.light button.bg-green-600,
-:root.light button.bg-blue-600,
-:root.light button.bg-yellow-500,
-:root.light button.bg-red-600 {
-  background-color: inherit !important;
-}
-
-:root.light button.bg-cyan-600:hover,
-:root.light button.bg-green-600:hover,
-:root.light button.bg-blue-600:hover,
-:root.light button.bg-yellow-500:hover,
-:root.light button.bg-red-600:hover {
-  background-color: inherit !important;
-}
-
-/* Fix table header text visibility in light mode */
+/* Fix table header text visibility in light mode (skip Fakieh reporting tables) */
 :root.light th,
 :root.light .TableHead,
 :root.light [role="columnheader"],
-:root.light thead th,
-:root.light thead .TableHead {
+:root.light thead:not(.reporting-table-head) th,
+:root.light thead:not(.reporting-table-head) .TableHead {
   color: #000000 !important;
   background-color: #f8fafc !important;
 }
 
-/* Fix table header text visibility in dark mode */
+/* Fix table header text visibility in dark mode (skip Fakieh reporting tables) */
 :root:not(.light) th,
 :root:not(.light) .TableHead,
 :root:not(.light) [role="columnheader"],
-:root:not(.light) thead th,
-:root:not(.light) thead .TableHead {
+:root:not(.light) thead:not(.reporting-table-head) th,
+:root:not(.light) thead:not(.reporting-table-head) .TableHead {
   color: #ffffff !important;
   background-color: #1e293b !important;
+}
+
+/* Fakieh batch reporting: header bar matches topbar chrome in light mode */
+:root.light thead.reporting-table-head th {
+  color: #ffffff !important;
+  background-color: transparent !important;
+  border-color: rgba(51, 65, 85, 0.75) !important;
+}
+:root.light thead.reporting-table-head {
+  background: linear-gradient(to right, #020617, #0f172a) !important;
+  color: #ffffff !important;
+}
+:root:not(.light) thead.reporting-table-head th {
+  color: #ffffff !important;
+  background-color: transparent !important;
+  border-color: rgba(14, 116, 144, 0.55) !important;
+}
+:root:not(.light) thead.reporting-table-head {
+  background: linear-gradient(to right, #0891b2, #0e7490) !important;
+  color: #ffffff !important;
 }
 
 /* Fix Select dropdown text visibility in light mode */
@@ -3868,5 +3879,52 @@ main {
 }
 :root.light header.water-top-nav button[data-topnav-tool="profile"]:hover {
   background-color: transparent !important;
+}
+
+/*
+ * Light mode — page content (main + modals): primary buttons and active tab pills use the same
+ * slate-950 / slate-900 chrome as WaterTopNav / sidebar, instead of cyan fills.
+ * Placed last so these win over earlier :root.light cyan button utilities.
+ */
+:root.light main button[class*="bg-cyan-600"],
+:root.light main a[class*="bg-cyan-600"],
+:root.light main [type="submit"][class*="bg-cyan-600"],
+:root.light [role="dialog"] button[class*="bg-cyan-600"],
+:root.light [role="alertdialog"] button[class*="bg-cyan-600"] {
+  background-color: #020617 !important;
+  background-image: none !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+:root.light main button[class*="bg-cyan-600"]:hover:not(:disabled),
+:root.light main a[class*="bg-cyan-600"]:hover:not(:disabled),
+:root.light main [type="submit"][class*="bg-cyan-600"]:hover:not(:disabled),
+:root.light [role="dialog"] button[class*="bg-cyan-600"]:hover:not(:disabled),
+:root.light [role="alertdialog"] button[class*="bg-cyan-600"]:hover:not(:disabled) {
+  background-color: #0f172a !important;
+  border-color: #475569 !important;
+  color: #ffffff !important;
+}
+
+:root.light main button.custom-tab-button[data-state="active"],
+:root.light main button[class*="from-cyan-500"][class*="to-cyan-600"] {
+  background-image: linear-gradient(to right, #020617, #0f172a) !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+:root.light main [role="tab"][data-state="active"] {
+  background-color: #020617 !important;
+  background-image: none !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+  box-shadow: 0 1px 2px 0 rgb(15 23 42 / 0.08) !important;
+}
+
+:root.light main [role="tab"][data-state="active"]:hover {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
 }
 

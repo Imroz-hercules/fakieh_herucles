@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, request, jsonify
 from models import db
 from models.rfid import RFIDTag, RFIDConfig
@@ -9,6 +10,22 @@ import json, time, random
 from datetime import datetime
 
 rfid_bp = Blueprint('rfid', __name__, url_prefix='/api/rfid')
+
+_RFID_LIST_MAX = int(os.getenv("RFID_LIST_MAX", "2000"))
+_RFID_LIST_DEFAULT = int(os.getenv("RFID_LIST_DEFAULT", "500"))
+
+
+def _rfid_limit_offset():
+    try:
+        limit = int(request.args.get("limit", _RFID_LIST_DEFAULT))
+    except ValueError:
+        limit = _RFID_LIST_DEFAULT
+    limit = max(1, min(limit, _RFID_LIST_MAX))
+    try:
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        offset = 0
+    return limit, max(0, offset)
 
 
 
@@ -68,8 +85,19 @@ def simulate_ping():
 # === RFID Tags ===
 @rfid_bp.route('/tags', methods=['GET'])
 def get_tags():
-    tags = RFIDTag.query.all()
-    return jsonify([tag.to_dict() for tag in tags])
+    limit, offset = _rfid_limit_offset()
+    q = RFIDTag.query.order_by(RFIDTag.id.desc())
+    total = q.count()
+    tags = q.limit(limit).offset(offset).all()
+    return jsonify(
+        {
+            "items": [tag.to_dict() for tag in tags],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(tags) < total,
+        }
+    )
 
 @rfid_bp.route('/tags', methods=['POST'])
 def add_tag():
@@ -117,8 +145,19 @@ def delete_tag(tag_id):
 # === RFID Config ===
 @rfid_bp.route('/config', methods=['GET'])
 def get_configs():
-    configs = RFIDConfig.query.all()
-    return jsonify([c.to_dict() for c in configs])
+    limit, offset = _rfid_limit_offset()
+    q = RFIDConfig.query.order_by(RFIDConfig.id.desc())
+    total = q.count()
+    configs = q.limit(limit).offset(offset).all()
+    return jsonify(
+        {
+            "items": [c.to_dict() for c in configs],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(configs) < total,
+        }
+    )
 
 @rfid_bp.route('/config', methods=['POST'])
 def add_config():
