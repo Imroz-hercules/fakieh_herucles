@@ -41,11 +41,22 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
       
       {/* Main Content — shared inset matches topbar / header width in both nav modes */}
       <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col px-3 pt-3 sm:px-5 sm:pt-4">
+        <div
+          className={cn(
+            'flex min-h-0 min-w-0 flex-1 flex-col',
+            isTopbar ? 'px-3 pt-3 sm:px-5 sm:pt-4' : 'pl-0 pr-3 pt-0 sm:pr-5'
+          )}
+        >
         {isTopbar ? (
           <WaterTopNav />
         ) : (
-          <header className="app-chrome-dark mb-2 flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-700/50 bg-slate-900/95 px-6 py-4 shadow-lg backdrop-blur-sm sm:mb-3">
+          <header
+            className={cn(
+              'app-chrome-dark flex min-h-[108px] min-w-0 shrink-0 flex-wrap items-center justify-between gap-3',
+              'border border-l-0 border-slate-700/50 bg-slate-900/95 px-6 py-4 backdrop-blur-sm',
+              'rounded-none rounded-tr-2xl shadow-none'
+            )}
+          >
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-white">{title}</h1>
               <p className="text-sm font-bold text-white">{subtitle}</p>
@@ -124,7 +135,10 @@ export function WaterSystemLayout({ children, title, subtitle }: WaterSystemLayo
         <main
           className={cn(
             'relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6 smooth-scroll bg-transparent light:bg-gray-50',
-            'rounded-b-2xl border border-t-0 dark:border-slate-600/70 light:border-gray-200'
+            'border dark:border-slate-600/70 light:border-gray-200',
+            isTopbar
+              ? 'rounded-b-2xl border-t-0'
+              : 'rounded-none rounded-br-2xl border-l-0 border-t-0 app-chrome-dark bg-slate-900/95 backdrop-blur-sm light:bg-gray-50'
           )}
         >
           

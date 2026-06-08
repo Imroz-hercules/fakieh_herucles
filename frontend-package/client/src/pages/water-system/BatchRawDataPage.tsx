@@ -536,8 +536,8 @@ export function BatchRawDataPage() {
                   </div>
                 ) : (
                   <div className="max-w-full">
-                    <table className="min-w-full table-fixed text-sm">
-                      <thead className="reporting-table-head bg-gradient-to-r from-cyan-600 to-cyan-700 text-white uppercase tracking-wider text-sm shadow-sm">
+                    <table className="reporting-table min-w-full table-fixed text-sm">
+                      <thead className="reporting-table-head bg-gradient-to-r from-cyan-600 to-cyan-700 text-white uppercase text-sm shadow-sm">
                         <tr>
                           {tableHeaders.map((header, i) => (
                             <th

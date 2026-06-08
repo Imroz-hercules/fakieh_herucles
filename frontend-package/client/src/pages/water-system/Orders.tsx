@@ -11,6 +11,13 @@ import { useSilos } from '../../contexts/SiloContext'
 import axios from 'axios'
 import { API_BASE_URL, PLC_BASE_URL } from '../../config/api'
 import { useToast } from '@/hooks/use-toast'
+import {
+  isOutloadingTab,
+  isSiloSelectableForOrder,
+  getOutloadingSiloStatusSuffix,
+  formatDestSelLabel,
+  isOutloadingHighSilo,
+} from '../../utils/outloadingSilos'
 
 const baseUrl = API_BASE_URL
 const plcBase = PLC_BASE_URL;
@@ -46,8 +53,11 @@ const payloadFor = (orderType: OrderType, item: any) => {
       dest1: toNum(item.destinationSilo1),             // INT
       dest2: toNum(item.destinationSilo2),             // INT
     };
-    // Optional sel (if mapped on your PLC)
-    if (item.destSel !== undefined && item.destSel !== null) p.dest_sel = toNum(item.destSel);
+    if (orderType === 'outloading') {
+      p.dest_sel = toNum(item.destSel ?? 0);
+    } else if (item.destSel !== undefined && item.destSel !== null) {
+      p.dest_sel = toNum(item.destSel);
+    }
     return p;
   }
   if (orderType === 'bulk') {
@@ -258,10 +268,26 @@ export function Orders() {
     return used;
   };
   
+  const resolveOrderTypeFromTab = (tab: string): { orderType: string; line: number; isMineralOrder: boolean } => {
+    if (tab === 'intake-line-1') return { orderType: 'intake', line: 1, isMineralOrder: false };
+    if (tab === 'intake-line-2') return { orderType: 'intake', line: 2, isMineralOrder: false };
+    if (tab === 'mineral-intake') return { orderType: 'intake', line: 3, isMineralOrder: true };
+    if (tab === 'outloading-1') return { orderType: 'outloading', line: 1, isMineralOrder: false };
+    if (tab === 'outloading-2') return { orderType: 'outloading', line: 2, isMineralOrder: false };
+    if (tab === 'outloading-3') return { orderType: 'outloading', line: 3, isMineralOrder: false };
+    if (tab === 'bulk-line') return { orderType: 'bulk', line: 1, isMineralOrder: false };
+    if (tab === 'pt-line') return { orderType: 'pit', line: 1, isMineralOrder: false };
+    return { orderType: 'intake', line: 1, isMineralOrder: false };
+  };
+
   // Helper function to get available silos count for user feedback
   const getAvailableSilosCount = (fieldName: string) => {
+    const allSilos = getAvailableSilos();
+    const { orderType, line, isMineralOrder } = resolveOrderTypeFromTab(activeTab);
     if (fieldName === 'destinationSilo1' || fieldName === 'destinationSilo2') {
-      return getAvailableSilos().filter(silo => !silo.lock_active && !silo.hl_active && !usedSilos.has(silo.bin_name)).length;
+      return getSilosForOrderType(orderType, line, isMineralOrder).filter(
+        (silo) => isSiloSelectableForOrder(silo, orderType, allSilos) && !usedSilos.has(silo.bin_name)
+      ).length;
     } else if (fieldName === 'sourceSilo') {
       return getAvailableSilos().filter(silo => (silo.material_code || silo.material_name) && !usedSilos.has(silo.bin_name)).length;
     }
@@ -400,6 +426,9 @@ export function Orders() {
     const orderedSilos = targetSilos
       .map(siloName => availableSilos.find(silo => silo.bin_name === siloName))
       .filter(silo => silo !== undefined) // Remove undefined entries
+    if (orderType === 'outloading') {
+      return orderedSilos.filter((silo) => isOutloadingHighSilo(silo));
+    }
     return orderedSilos
   }
   
@@ -449,8 +478,12 @@ export function Orders() {
 
   const fetchRfidConfigs = useCallback(async () => {
     try {
-      const response = await axios.get(`${baseUrl}/rfid/config`)
-      setRfidConfigs(response.data || [])
+      const response = await axios.get(`${baseUrl}/rfid/config`, {
+        params: { limit: 2000, offset: 0 },
+      })
+      const body = response.data
+      const list = Array.isArray(body) ? body : body?.items ?? []
+      setRfidConfigs(list)
     } catch (error) {
       
     }
@@ -531,7 +564,7 @@ export function Orders() {
         statusCode: typeof plcOrder.status_word === 'object' ? plcOrder.status_word?.code || 0 : plcOrder.status_word || 0,
         rfidBadgeReading: plcOrder.rfid_badge_reading || '',
         activeBadge: plcOrder.active_badge || '',
-        destSel: plcOrder.dest_sel || '',
+        destSel: plcOrder.dest_sel ?? plcOrder.active_dest_sel ?? '',
         line: plcOrder.line,
         // Add timestamp for real-time tracking
         lastUpdated: new Date().toISOString()
@@ -660,6 +693,7 @@ export function Orders() {
     setEditFormData({
       badgeNo: order.badgeNo || '',
       sourceMaterialCode: order.sourceMaterialCode || '',
+      destSel: order.destSel !== undefined && order.destSel !== '' ? String(order.destSel) : '0',
       declaredQuantityKG: order.declaredQuantityKG || '',
       destinationSilo1: order.destinationSilo1 || '',
       destinationSilo2: order.destinationSilo2 || ''
@@ -761,12 +795,22 @@ export function Orders() {
       // Create updated order data (only editable fields)
       // Note: API expects specific field names
       // Add validation to prevent None values
-      const updatedOrderData = {
+      const updatedOrderData: {
+        badge_no: string;
+        material_code: string;
+        declared_qty_kg: number;
+        dest1: number;
+        dest2: number;
+        dest_sel?: number;
+      } = {
         badge_no: editFormData.badgeNo || "",
         material_code: editFormData.sourceMaterialCode || "",
         declared_qty_kg: Number(editFormData.declaredQuantityKG) || 0,
         dest1: Number(editFormData.destinationSilo1) || 0,
         dest2: Number(editFormData.destinationSilo2) || 0
+      }
+      if (orderType === 'outloading') {
+        updatedOrderData.dest_sel = Number(editFormData.destSel ?? 0);
       }
       
       // Validate required fields
@@ -843,11 +887,10 @@ export function Orders() {
         return [
           { name: 'badgeNo', label: 'RFID', type: 'select' },
           { name: 'sourceMaterialCode', label: 'Source Material Code', type: 'select' },
+          { name: 'destSel', label: 'Destination (Bulk / Packing)', type: 'select' },
           { name: 'declaredQuantityKG', label: 'Declared Quantity (KG)', type: 'number' },
           { name: 'destinationSilo1', label: 'Destination Silo 1 (Available Only)', type: 'select' },
           { name: 'destinationSilo2', label: 'Destination Silo 2 (Available Only)', type: 'select' },
-          // Optional if your PLC supports it:
-          // { name: 'destSel', label: 'Dest Selection', type: 'number' },
         ]
       case 'bulk-line':
         return [
@@ -970,6 +1013,7 @@ export function Orders() {
                 <TableHead className="text-white light:text-gray-900 font-semibold">RFID</TableHead>
                 <TableHead className="text-white light:text-gray-900 font-semibold">Source/Line Material</TableHead>
                 <TableHead className="text-white light:text-gray-900 font-semibold">Declared Quantity_KG</TableHead>
+                <TableHead className="text-white light:text-gray-900 font-semibold">Dest. Selection</TableHead>
                 <TableHead className="text-white light:text-gray-900 font-semibold">Destination 1 (Material)</TableHead>
                 <TableHead className="text-white light:text-gray-900 font-semibold">Destination 2 (Material)</TableHead>
                 <TableHead className="text-white light:text-gray-900 font-semibold">Active Destination (Material)</TableHead>
@@ -991,6 +1035,9 @@ export function Orders() {
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 light:bg-yellow-100 border border-yellow-500/20 light:border-yellow-300 text-yellow-400 light:text-yellow-600">
                       {item.declaredQuantityKG}
                     </span>
+                  </TableCell>
+                  <TableCell className="text-slate-300 light:text-gray-700">
+                    {formatDestSelLabel(item.destSel)}
                   </TableCell>
                   <TableCell className="text-slate-300 light:text-gray-700">
                     <div className="flex flex-col">
@@ -1236,7 +1283,13 @@ export function Orders() {
           </div>
         </div>
 
-        <Button className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white mb-4" onClick={() => setShowModal(true)}>
+        <Button
+          className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white mb-4"
+          onClick={() => {
+            setFormData(isOutloadingTab(activeTab) ? { destSel: '0' } : {});
+            setShowModal(true);
+          }}
+        >
           Add Order
         </Button>
         {showModal && (
@@ -1286,6 +1339,18 @@ export function Orders() {
 
                       // Create order in both PLC and database
                       const isMineralOrder = activeTab === 'mineral-intake';
+
+                      if (orderType === 'outloading') {
+                        const ds = toNum(newOrder.destSel);
+                        if (ds !== 0 && ds !== 1) {
+                          toast({
+                            title: 'Destination required',
+                            description: 'Select Bulk (0) or Packing (1) for destination selection.',
+                            variant: 'destructive',
+                          });
+                          return;
+                        }
+                      }
                       
                       // Validate mineral order destinations (401-408)
                       if (isMineralOrder) {
@@ -1380,7 +1445,7 @@ export function Orders() {
                       <label className="block text-slate-300 mb-1 text-xs font-medium">{labelWithCount}</label>
                       {field.type === 'select' ? (
                         <Select
-                          value={String(formData[field.name] || '')}
+                          value={field.name === 'destSel' ? String(formData.destSel ?? '0') : String(formData[field.name] || '')}
                           onValueChange={(value) => {
                             const newFormData = { ...formData, [field.name]: value };
                             
@@ -1396,7 +1461,7 @@ export function Orders() {
                             <SelectValue placeholder={`Select ${field.label}`} />
                           </SelectTrigger>
                           <SelectContent className="bg-slate-800 light:bg-white border-slate-600 light:border-gray-200">
-                            <SelectItem value="none">None</SelectItem>
+                            {field.name !== 'destSel' && <SelectItem value="none">None</SelectItem>}
                             {field.name === 'badgeNo' ? (
                               // RFID configs for badge number
                               rfidConfigs.map((rfid) => (
@@ -1404,6 +1469,11 @@ export function Orders() {
                                   {rfid.rfid_number} {rfid.rfid_used ? '(Used)' : '(Available)'}
                                 </SelectItem>
                               ))
+                            ) : field.name === 'destSel' ? (
+                              <>
+                                <SelectItem value="0">Bulk</SelectItem>
+                                <SelectItem value="1">Packing</SelectItem>
+                              </>
                             ) : field.name === 'sourceMaterialCode' || field.name === 'rawCode' ? (
                               // Material codes dropdown (for both sourceMaterialCode and rawCode)
                               materialCodes.map((material) => (
@@ -1487,10 +1557,10 @@ export function Orders() {
                                       materialCodeField = 'sourceMaterialCode';
                                     }
                                     
-                                  // FINAL: Filter by material code + exclude locked/high level silos + exclude already used silos
+                                  const allSilosList = getAvailableSilos();
+                                  // FINAL: Filter by material code + availability + exclude already used silos
                                   availableSilos = allSilosForType.filter(silo => {
-                                    // Must be unlocked and normal level
-                                    const isAvailable = !silo.lock_active && !silo.hl_active;
+                                    const isAvailable = isSiloSelectableForOrder(silo, orderType, allSilosList);
                                     
                                     // Must not be already used by another order
                                     const isNotUsed = !usedSilos.has(silo.bin_name);
@@ -1613,12 +1683,15 @@ export function Orders() {
                                 return availableSilos.map((silo) => {
                                   const siloNumber = silo.bin_name.split(' ')[1] || 'unknown';
                                   const materialInfo = silo.material_name || silo.material_code || 'No Material';
-                                  const statusInfo = [];
-                                  
-                                  if (silo.lock_active) statusInfo.push('LOCKED');
-                                  if (silo.hl_active) statusInfo.push('HIGH LEVEL');
-                                  
-                                  const statusText = statusInfo.length > 0 ? ` (${statusInfo.join(', ')})` : '';
+                                  const allSilosList = getAvailableSilos();
+                                  const statusText =
+                                    orderType === 'outloading'
+                                      ? getOutloadingSiloStatusSuffix(silo, allSilosList)
+                                      : silo.lock_active
+                                        ? ' (Locked)'
+                                        : silo.hl_active
+                                          ? ' (High Level)'
+                                          : ' (Available)';
                                   
                                   return (
                                     <SelectItem key={silo.bin_name} value={siloNumber}>
@@ -1736,9 +1809,9 @@ export function Orders() {
                       });
                       warningMessage = `⚠️ <strong>No matching silos:</strong> No available silos found that can store raw material "${formData.rawCode}". Check if the material code is correct or if silos are locked/full.`;
                     } else {
-                      // For intake/outloading orders, filter by material code
+                      const allSilosList = getAvailableSilos();
                       matchingSilos = getSilosForOrderType(orderType, line, isMineralOrder).filter(silo => {
-                      const isAvailable = !silo.lock_active && !silo.hl_active;
+                      const isAvailable = isSiloSelectableForOrder(silo, orderType, allSilosList);
                       
                       // Must match the material code if one is specified
                       const materialCodeStr = String(formData.sourceMaterialCode || '');
@@ -1757,7 +1830,9 @@ export function Orders() {
                       
                       return isAvailable && materialMatches;
                     });
-                      warningMessage = `⚠️ <strong>No matching silos:</strong> No available silos found that can store material "${formData.sourceMaterialCode}". Check if the material code is correct or if silos are locked/full.`;
+                      warningMessage = orderType === 'outloading'
+                        ? `⚠️ <strong>No matching silos:</strong> No available high-level outloading silos (801–824) for material "${formData.sourceMaterialCode}". Check material code, locks, or low-level active on paired bins.`
+                        : `⚠️ <strong>No matching silos:</strong> No available silos found that can store material "${formData.sourceMaterialCode}". Check if the material code is correct or if silos are locked/full.`;
                     }
                     
                     if (matchingSilos.length === 0) {
@@ -1884,6 +1959,22 @@ export function Orders() {
                     />
                   </div>
 
+                  {isOutloadingTab(activeTab) && (
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Destination (Bulk / Packing)
+                      </label>
+                      <select
+                        value={String(editFormData.destSel ?? '0')}
+                        onChange={(e) => setEditFormData({ ...editFormData, destSel: e.target.value })}
+                        className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      >
+                        <option value="0">Bulk</option>
+                        <option value="1">Packing</option>
+                      </select>
+                    </div>
+                  )}
+
                   {/* Destination Silo 1 */}
                   <div className="flex flex-col space-y-1">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1935,9 +2026,9 @@ export function Orders() {
                         }
 
                         const isMineralOrder = activeTab === 'mineral-intake';
+                        const allSilosList = getAvailableSilos();
                         return getSilosForOrderType(orderType, line, isMineralOrder).filter(silo => {
-                          // FINAL: Filter by material code + exclude locked/high level silos
-                          const isAvailable = !silo.lock_active && !silo.hl_active;
+                          const isAvailable = isSiloSelectableForOrder(silo, orderType, allSilosList);
                           
                           // Must match the material code if one is specified
                           const materialCodeStr = String(editFormData.sourceMaterialCode || '');
@@ -1957,7 +2048,10 @@ export function Orders() {
                           return isAvailable && materialMatches;
                         }).map((silo) => {
                         const materialInfo = silo.material_name ? ` - ${silo.material_name}` : '';
-                        const statusText = silo.lock_active ? ' (Locked)' : silo.hl_active ? ' (High Level)' : ' (Available)';
+                        const statusText =
+                          orderType === 'outloading'
+                            ? getOutloadingSiloStatusSuffix(silo, allSilosList)
+                            : silo.lock_active ? ' (Locked)' : silo.hl_active ? ' (High Level)' : ' (Available)';
                         return (
                           <option key={silo.bin_name} value={silo.silo_no || 0}>
                             {silo.bin_name}{materialInfo}{statusText}
@@ -2012,9 +2106,9 @@ export function Orders() {
 
                         const isMineralOrder = activeTab === 'mineral-intake';
                         const isDestinationField = true; // In edit modal, we're always dealing with destination fields
+                        const allSilosList = getAvailableSilos();
                         return getSilosForOrderType(orderType, line, isMineralOrder, isDestinationField).filter(silo => {
-                          // FINAL: Filter by material code + exclude locked/high level silos + exclude already used silos + exclude already selected silos
-                          const isAvailable = !silo.lock_active && !silo.hl_active;
+                          const isAvailable = isSiloSelectableForOrder(silo, orderType, allSilosList);
                           
                           // Must not be already used by another order
                           const isNotUsed = !usedSilos.has(silo.bin_name);
@@ -2073,7 +2167,10 @@ export function Orders() {
                           return isAvailable && isNotUsed && materialMatches && isNotAlreadySelected;
                         }).map((silo) => {
                         const materialInfo = silo.material_name ? ` - ${silo.material_name}` : '';
-                        const statusText = silo.lock_active ? ' (Locked)' : silo.hl_active ? ' (High Level)' : ' (Available)';
+                        const statusText =
+                          orderType === 'outloading'
+                            ? getOutloadingSiloStatusSuffix(silo, allSilosList)
+                            : silo.lock_active ? ' (Locked)' : silo.hl_active ? ' (High Level)' : ' (Available)';
                         return (
                           <option key={silo.bin_name} value={silo.silo_no || 0}>
                             {silo.bin_name}{materialInfo}{statusText}

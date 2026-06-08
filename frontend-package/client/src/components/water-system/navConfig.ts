@@ -12,6 +12,7 @@ import {
   FileBarChart,
   Table2,
   BarChart3,
+  Send,
 } from 'lucide-react'
 
 export interface SidebarNavItem {
@@ -134,6 +135,12 @@ export const sidebarNavEntries: SidebarNavEntry[] = [
     items: trucksItems,
   },
   {
+    path: '/fakieh/distribution',
+    icon: Send,
+    label: 'Distribution',
+    description: 'Scheduled report email & disk delivery',
+  },
+  {
     path: '/fakieh/admin',
     icon: Settings,
     label: 'Admin',
@@ -205,5 +212,11 @@ export const topNavItems: TopNavItem[] = [
       { path: '/fakieh/truck-management', label: 'Truck management' },
       { path: '/fakieh/truck-entry', label: 'Truck weighbridge' },
     ],
+  },
+  {
+    kind: 'link',
+    path: '/fakieh/distribution',
+    label: 'Distribution',
+    icon: Send,
   },
 ]

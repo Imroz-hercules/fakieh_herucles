@@ -3285,6 +3285,29 @@ main {
   color: #ffffff !important;
 }
 
+/* Fakieh reporting tables: clear Arial text for all table data */
+.reporting-table,
+.reporting-table th,
+.reporting-table td {
+  font-family: Arial, Helvetica, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.reporting-table {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.reporting-table th {
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+}
+
+.reporting-table td {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Fix Select dropdown text visibility in light mode */
 :root.light [data-radix-select-content] {
   background-color: #ffffff !important;

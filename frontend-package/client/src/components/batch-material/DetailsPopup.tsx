@@ -106,7 +106,7 @@ const DetailsPopup: React.FC<DetailsPopupProps> = ({ date, data, onClose, totalP
           <div>
             <h3 className="text-lg font-semibold mb-3 text-blue-600 dark:text-cyan-300">Product Totals</h3>
             <div className="overflow-auto max-h-80 border border-slate-300 dark:border-slate-700 rounded-lg">
-              <table className="w-full text-sm text-left">
+              <table className="reporting-table w-full text-sm text-left">
                 <thead className="reporting-table-head bg-gradient-to-r from-cyan-600 to-cyan-700 text-white sticky top-0 shadow-sm">
                   <tr>
                     <th className="px-6 py-3 border border-cyan-800/40 font-semibold text-white">Product Name</th>

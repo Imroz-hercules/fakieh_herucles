@@ -26,6 +26,10 @@ from routes.websocket_routes import websocket_bp, init_socketio
 from routes.sqlserver_routes import sqlserver_bp
 from routes.kpi_material_routes import kpi_material_bp
 from routes.kpi_calendar_routes import kpi_calendar_bp
+from routes.distribution_routes import distribution_bp
+from routes.settings_routes import settings_bp
+# Import models so db.create_all() picks up the new tables (PostgreSQL).
+from models.distribution import DistributionRule, SystemSetting
 from background_sync import start_silo_sync
 
 app = Flask(__name__)
@@ -117,6 +121,8 @@ app.register_blueprint(api_bp)
 app.register_blueprint(sqlserver_bp)
 app.register_blueprint(kpi_material_bp, url_prefix='/api')
 app.register_blueprint(kpi_calendar_bp, url_prefix='/api')
+app.register_blueprint(distribution_bp)
+app.register_blueprint(settings_bp)
 
 if __name__ == '__main__':
     with app.app_context():
@@ -124,6 +130,13 @@ if __name__ == '__main__':
         
         # Start background silo sync task (in-process; avoids HTTP self-call)
         start_silo_sync(app)
+
+        # Start the report-distribution scheduler (APScheduler cron jobs)
+        try:
+            from scheduler import start_scheduler
+            start_scheduler(app)
+        except Exception as _sched_err:
+            print(f"Distribution scheduler not started: {_sched_err}")
         
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, debug=False, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)

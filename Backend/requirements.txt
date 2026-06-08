@@ -6,3 +6,7 @@ python-snap7
 Flask-SocketIO
 eventlet
 pyodbc
+APScheduler
+openpyxl
+xhtml2pdf
+resend

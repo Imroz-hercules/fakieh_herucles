@@ -34,6 +34,7 @@ import { PLCReports } from "./pages/water-system/PLCReports";
 import { BatchCalendarPage } from "./pages/water-system/BatchCalendarPage";
 import { BatchHistoricalReports } from "./pages/water-system/BatchHistoricalReports";
 import { BatchRawDataPage } from "./pages/water-system/BatchRawDataPage";
+import { Distribution } from "./pages/water-system/Distribution";
 
 function Router() {
   const { isInitialized } = useTheme();
@@ -68,6 +69,7 @@ function Router() {
       <Route path="/fakieh/truck-entry" component={TruckEntry} />
       <Route path="/fakieh/alarms" component={Alarms} />
       <Route path="/fakieh/admin" component={Admin} />
+      <Route path="/fakieh/distribution" component={Distribution} />
       <Route path="/fakieh/engineering" component={PLCConfiguration} />
       <Route path="/fakieh/plc-reports" component={PLCReports} />
       <Route path="/fakieh/batch-calendar" component={BatchCalendarPage} />

@@ -109,18 +109,18 @@ function CollapsibleNavGroup({ group, collapsed }: { group: SidebarNavGroup; col
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <div
-      className={`app-chrome-dark relative flex h-screen flex-col border-r border-slate-700/50 bg-slate-900/95 shadow-lg backdrop-blur-sm 
+      className={`app-chrome-dark relative flex h-screen flex-col border-r border-slate-700/50 bg-slate-900/95 shadow-none backdrop-blur-sm 
                      transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}
     >
-      <div className="border-b border-slate-700/50 p-4">
+      <div className="flex min-h-[108px] shrink-0 items-center border-b border-slate-700/50 p-4">
         <div className="flex items-center justify-between">
           {!collapsed && (
             <div className="flex items-center space-x-3">
-              <span className="inline-flex rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-600/30">
+              <span className="inline-flex rounded-md bg-white p-1 shadow-sm ring-1 ring-slate-600/30">
                 <img
                   src={herculesLogo}
                   alt="Hercules"
-                  className="h-10 max-w-[160px] rounded object-contain"
+                  className="h-14 max-w-[220px] rounded object-contain"
                 />
               </span>
             </div>
@@ -130,7 +130,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <img
                 src={herculesLogo}
                 alt="Hercules"
-                className="h-8 max-w-[44px] rounded object-contain"
+                className="h-11 max-w-[56px] rounded object-contain"
               />
             </span>
           )}

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 type PartnerLogosVariant = 'topnav' | 'sidebar'
 
 interface PartnerLogosStripProps {
-  /** `topnav`: larger chips, can hide below `sm`. `sidebar`: compact, always visible in header. */
+  /** `topnav`: full-width bar chips (hidden below `sm`). `sidebar`: same sizes, always visible in page header. */
   variant?: PartnerLogosVariant
 }
 
@@ -26,8 +26,8 @@ export function PartnerLogosStrip({ variant = 'topnav' }: PartnerLogosStripProps
         className={cn(
           'flex items-center justify-center rounded-md bg-white/5 px-2.5 ring-1 ring-white/10 sm:px-3',
           isSidebar
-            ? 'h-11 max-w-[120px] sm:h-12 sm:max-w-[140px]'
-            : 'h-12 max-w-[140px] sm:h-14 sm:max-w-[170px] md:h-[3.75rem] md:max-w-[200px]'
+            ? 'h-14 max-w-[170px] sm:h-16 sm:max-w-[205px] md:h-[4.25rem] md:max-w-[245px]'
+            : 'h-28 max-w-[280px] sm:max-w-[320px] md:max-w-[360px]'
         )}
       >
         <img
@@ -35,17 +35,17 @@ export function PartnerLogosStrip({ variant = 'topnav' }: PartnerLogosStripProps
           alt="Fakieh"
           className={cn(
             'w-auto max-w-full object-contain',
-            isSidebar ? 'max-h-9 sm:max-h-10' : 'max-h-10 sm:max-h-11 md:max-h-12'
+            isSidebar ? 'max-h-12 sm:max-h-14 md:max-h-[4rem]' : 'max-h-[6.5rem]'
           )}
         />
       </div>
       {/* ASM — right */}
       <div
         className={cn(
-          'flex items-center rounded-md bg-white/5 px-2.5 ring-1 ring-white/10 sm:px-3',
+          'flex items-center rounded-md bg-white p-0.5 shadow-sm ring-1 ring-slate-600/25 sm:px-1',
           isSidebar
-            ? 'h-11 max-w-[160px] sm:h-12 sm:max-w-[200px]'
-            : 'h-12 max-w-[220px] sm:h-14 sm:max-w-[260px] md:h-[3.75rem] md:max-w-[300px]'
+            ? 'h-14 max-w-[260px] sm:h-16 sm:max-w-[305px] md:h-[4.25rem] md:max-w-[360px]'
+            : 'h-28 max-w-[400px] sm:max-w-[460px] md:max-w-[520px]'
         )}
       >
         <img
@@ -53,7 +53,7 @@ export function PartnerLogosStrip({ variant = 'topnav' }: PartnerLogosStripProps
           alt="ASM Process Automation"
           className={cn(
             'w-auto max-w-full object-contain object-left',
-            isSidebar ? 'max-h-9 sm:max-h-10' : 'max-h-10 sm:max-h-11 md:max-h-12'
+            isSidebar ? 'max-h-12 sm:max-h-14 md:max-h-[4rem]' : 'max-h-[6.5rem]'
           )}
         />
       </div>

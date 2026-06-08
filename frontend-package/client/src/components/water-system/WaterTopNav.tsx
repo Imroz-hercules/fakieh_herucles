@@ -169,27 +169,27 @@ export function WaterTopNav() {
   return (
     <header
       className={cn(
-        'water-top-nav app-chrome-dark mb-2 flex w-full min-h-[80px] shrink-0 items-center gap-4 rounded-2xl border px-5 py-4 shadow-lg backdrop-blur-sm sm:mb-3',
+        'water-top-nav app-chrome-dark mb-2 flex w-full min-h-[132px] shrink-0 items-center gap-4 rounded-2xl border px-5 py-2 shadow-lg backdrop-blur-sm sm:mb-3',
         'border-slate-600/70 bg-slate-950/95 text-slate-100'
       )}
     >
       <div
         className={cn(
-          'flex shrink-0 items-center gap-2 rounded-lg border-l border-slate-600/80 bg-slate-900/35 py-1.5 pl-3 pr-3 sm:pl-4 sm:pr-4'
+          'flex shrink-0 items-center gap-2 rounded-lg border-l border-slate-600/80 bg-slate-900/35 py-0 pl-3 pr-3 sm:pl-4 sm:pr-4'
         )}
       >
         <Link href="/fakieh/fakieh-dashboard" className="flex shrink-0 items-center">
-          <span className="inline-flex shrink-0 rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-600/25">
+          <span className="inline-flex shrink-0 rounded-md bg-white p-0.5 shadow-sm ring-1 ring-slate-600/25">
             <img
               src={herculesLogo}
               alt="Hercules"
-              className="h-9 w-auto max-w-[180px] shrink-0 rounded object-contain"
+              className="h-28 w-auto max-w-[420px] shrink-0 rounded object-contain"
             />
           </span>
         </Link>
       </div>
 
-      <div className="h-10 w-px shrink-0 self-center bg-slate-400/60" aria-hidden />
+      <div className="h-28 w-px shrink-0 self-center bg-slate-400/60" aria-hidden />
 
       <nav
         className={cn(

@@ -170,9 +170,21 @@ For each PLC DB number `N`, the code loads a map `m = load_map_from_pg(N)`, then
 
 **Write-side / order fields (lower addresses):** e.g. `L1_BadgeNo` @ 0, `L1_SourceRawMaterialCode` @ 2, … through `L3_DestinationSilo2` @ 88 — see `load_map_from_pg(2)` in `plc_routes.py` for the full list.
 
+**Destination selection (`DEST_SEL`) — write on order create (INT):**
+
+| Line | Tag | Byte offset | Values |
+|------|-----|-------------|--------|
+| 1 | `L1_DEST_SEL` | 20 | 0 = Bulk, 1 = Packing |
+| 2 | `L2_DEST_SEL` | 50 | 0 = Bulk, 1 = Packing |
+| 3 | `L3_DEST_SEL` | 80 | 0 = Bulk, 1 = Packing |
+
+Frontend (`Orders.tsx`) sends `dest_sel` in the create-order API body; backend writes the tag above.
+
 **800-series silos:** material `code`/`name` start at base **90** + **(silo_no − 801) × 52** bytes.
 
 **HL/LOCK bits for 801–848:** start byte **2586** with **2 bits per silo** (HL then LOCK), computed in `hl_map`.
+
+**Outloading UI silo picker (Orders page):** destination dropdown lists **high-tier silos 801–824** only. A high silo is hidden when its paired **low-tier** silo (`N + 24`, i.e. 825–848) has `hl_active` (low level active). High silos are **not** hidden by their own `hl_active`.
 
 **`max_byte`** for DB2 mapping: **2640**.
 

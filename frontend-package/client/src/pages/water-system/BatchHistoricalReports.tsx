@@ -1232,16 +1232,16 @@ export function BatchHistoricalReports() {
       case "Product Batch Summary":
         return (
           <tr key={index} className={baseRowClasses}>
-            <td className="px-4 py-2 text-slate-900 dark:text-white font-mono text-sm w-auto">{item.batchName}</td>
+            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.batchName}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.productName}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatToLocalCustom(item.batchStart, true)}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatToLocalCustom(item.batchEnd, true)}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.batchQuantity}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.materialName}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white font-mono text-sm w-auto">{item.materialCode}</td>
+            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.materialCode}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.setPointFloat?.toFixed(2) || '-'}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.actualValueFloat?.toFixed(2) || '-'}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white font-mono text-sm w-auto">{item.orderId}</td>
+            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.orderId}</td>
           </tr>
         );
       case "Weekly":
@@ -1290,7 +1290,7 @@ export function BatchHistoricalReports() {
             <td className={`px-4 py-2 text-sm ${isTotalRow ? 'font-bold' : ''} text-slate-900 dark:text-white`}>
               {item.materialName}
             </td>
-            <td className={`px-4 py-2 font-mono text-sm ${isTotalRow ? 'font-bold' : ''} text-slate-900 dark:text-white`}>
+            <td className={`px-4 py-2 text-sm ${isTotalRow ? 'font-bold' : ''} text-slate-900 dark:text-white`}>
               {item.materialCode}
             </td>
             <td className={`px-4 py-2 text-sm ${isTotalRow ? 'font-bold' : ''} text-slate-900 dark:text-white`}>
@@ -1312,7 +1312,7 @@ export function BatchHistoricalReports() {
         return (
           <tr key={index} className={baseRowClasses}>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.materialName}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white font-mono text-sm">{item.code}</td>
+            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.code}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.plannedKG?.toFixed(2) || '-'}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.actualKG?.toFixed(2) || '-'}</td>
             <td className={`px-4 py-2 text-sm font-bold ${getPercentClass(item.differencePercent)}`}>{item.differencePercent ? `${item.differencePercent}%` : '-'}</td>
@@ -2434,8 +2434,8 @@ export function BatchHistoricalReports() {
               <ErrorMessage message={error} />
             ) : (
               <div className="overflow-x-auto w-full">
-                <table className="w-full text-sm text-slate-900 dark:text-white border-collapse">
-                  <thead className="reporting-table-head bg-gradient-to-r from-cyan-600 to-cyan-700 text-white uppercase text-xs tracking-wider shadow-sm">
+                <table className="reporting-table w-full text-sm text-slate-900 dark:text-white border-collapse">
+                  <thead className="reporting-table-head bg-gradient-to-r from-cyan-600 to-cyan-700 text-white uppercase text-sm shadow-sm">
                     <tr>
                       {getTableHeaders(activeTab).map((header) => (
                         <th key={header} className="border border-cyan-800/40 px-4 py-3 text-left w-auto font-semibold text-white">{header}</th>
