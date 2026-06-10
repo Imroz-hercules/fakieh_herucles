@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select"
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { CalendarIcon, Filter, RotateCcw, Clock, TrendingUp, Package, Database, Zap, Warehouse, Truck } from 'lucide-react'
+import { CalendarIcon, Filter, RotateCcw, Clock, TrendingUp, Package, Database, Zap, Truck } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { Line, Pie, Bar, Doughnut } from 'react-chartjs-2'
@@ -43,9 +43,27 @@ ChartJS.register(
   BarElement
 )
 
+// Previous calendar week: last Monday 7 AM → this Monday 7 AM
+const getDefaultDates = () => {
+  const now = new Date()
+  const dayOfWeek = now.getDay()
+  const daysToThisMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+
+  const endDate = new Date(now)
+  endDate.setDate(now.getDate() - daysToThisMonday)
+  endDate.setHours(7, 0, 0, 0)
+
+  const startDate = new Date(endDate)
+  startDate.setDate(endDate.getDate() - 7)
+
+  return { startDate, endDate }
+}
+
+const defaultDates = getDefaultDates()
+
 export default function FakiehDashboard() {
-  const [startDate, setStartDate] = useState<Date>(new Date('2025-02-08T07:00:00'))
-  const [endDate, setEndDate] = useState<Date>(new Date('2025-02-09T07:00:00'))
+  const [startDate, setStartDate] = useState<Date>(defaultDates.startDate)
+  const [endDate, setEndDate] = useState<Date>(defaultDates.endDate)
   const [selectedProduct, setSelectedProduct] = useState<string>('all')
   const [selectedBatch, setSelectedBatch] = useState<string>('all')
   const [selectedMaterial, setSelectedMaterial] = useState<string>('all')
@@ -58,7 +76,6 @@ export default function FakiehDashboard() {
   
   // New state variables for API data
   const [totalOrders, setTotalOrders] = useState(0)
-  const [totalStorage, setTotalStorage] = useState(0)
   const [totalTrucks, setTotalTrucks] = useState(0)
   
   // Computed KPI values from SQL Server data
@@ -625,11 +642,18 @@ export default function FakiehDashboard() {
   }
 
   // Fetch batch materials from SQL Server
-  const fetchBatchMaterials = async (limit: number = 50) => {
+  const fetchBatchMaterials = async (limit: number = 1000) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`/api/sqlserver/batch-materials?limit=${limit}`)
+      const params = new URLSearchParams({ limit: String(limit) })
+      if (startDate) params.append('startDate', startDate.toISOString())
+      if (endDate) params.append('endDate', endDate.toISOString())
+      if (selectedProduct !== 'all') params.append('product_name', selectedProduct)
+      if (selectedBatch !== 'all') params.append('batch_name', selectedBatch)
+      if (selectedMaterial !== 'all') params.append('material_name', selectedMaterial)
+
+      const response = await fetch(`/api/sqlserver/batch-materials?${params}`)
       const data = await response.json()
       
       if (data.success) {
@@ -665,7 +689,6 @@ export default function FakiehDashboard() {
     fetchBatchMaterials()
     fetchTotalCount()
     fetchTotalOrders()
-    fetchTotalStorage()
     fetchTotalTrucks()
   }, [])
 
@@ -706,26 +729,6 @@ export default function FakiehDashboard() {
     }
   }
 
-  // Fetch total storage count
-  const fetchTotalStorage = async () => {
-    try {
-      const response = await fetch('/api/storage')
-      const data = await response.json()
-      
-      if (data.success) {
-        setTotalStorage(data.data ? data.data.length : 0)
-      } else {
-        // Try alternative endpoint
-        const altResponse = await fetch('/api/storage/silos')
-        const altData = await altResponse.json()
-        setTotalStorage(altData.success ? (altData.data ? altData.data.length : 0) : 0)
-      }
-    } catch (err) {
-      
-      setTotalStorage(0)
-    }
-  }
-
   // Fetch total truck entries count
   const fetchTotalTrucks = async () => {
     try {
@@ -752,9 +755,7 @@ export default function FakiehDashboard() {
   }
 
   const handleApplyFilters = () => {
-    // Handle filter application logic here
-    // Refresh data when filters are applied
-    fetchBatchMaterials(50)
+    fetchBatchMaterials()
   }
 
   return (
@@ -930,7 +931,7 @@ export default function FakiehDashboard() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg p-6 shadow-lg light:shadow-xl relative overflow-hidden group hover:shadow-2xl transition-all duration-300">
             {/* Futuristic border glow */}
             <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 via-transparent to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -986,29 +987,6 @@ export default function FakiehDashboard() {
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                   <Package className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-
-
-          {/* Active Silos KPI Card */}
-          <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg p-6 shadow-lg light:shadow-xl relative overflow-hidden group hover:shadow-2xl transition-all duration-300">
-            {/* Futuristic border glow */}
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-transparent to-indigo-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-400 light:text-gray-600">Total Silos</p>
-                  <p className="text-2xl font-bold text-white light:text-gray-900">{totalStorage}</p>
-                  <p className="text-xs text-indigo-400 flex items-center">
-                    <span className="w-2 h-2 bg-indigo-400 rounded-full mr-2 animate-pulse"></span>
-                    {totalStorage} total silos
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Warehouse className="h-6 w-6 text-white" />
                 </div>
               </div>
             </div>
