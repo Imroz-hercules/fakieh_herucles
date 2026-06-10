@@ -7,6 +7,7 @@ const settingsBase = `${API_BASE_URL}/settings`
 export type DeliveryMethod = 'email' | 'disk' | 'both'
 export type ScheduleType = 'daily' | 'weekly' | 'monthly'
 export type ReportFormat = 'pdf' | 'xlsx' | 'csv'
+export type WindowMode = 'auto' | 'custom'
 
 export interface DistributionRule {
   id?: number
@@ -20,6 +21,11 @@ export interface DistributionRule {
   schedule_time: string
   schedule_day_of_week: number | null
   schedule_day_of_month: number | null
+  window_mode: WindowMode
+  window_start_time: string
+  window_end_time: string
+  custom_start: string | null
+  custom_end: string | null
   enabled: boolean
   last_run_at?: string | null
   last_run_status?: string | null

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useNavLayout } from '@/contexts/NavLayoutContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { useToast } from '@/hooks/use-toast'
 import { settingsApi, type EmailConfig } from '@/lib/distributionApi'
 import {
@@ -37,7 +38,9 @@ const DEFAULT_CONFIG: EmailConfig = {
 
 export function Admin() {
   const { navLayout, setNavLayout } = useNavLayout()
+  const { theme } = useTheme()
   const { toast } = useToast()
+  const pageBg = theme === 'dark' ? '#0a0f1a' : '#f3f4f6'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentLogo, setCurrentLogo] = useState<string | null>(null)
 
@@ -124,7 +127,10 @@ export function Admin() {
 
   return (
     <WaterSystemLayout title="Admin Panel" subtitle="System administration and configuration">
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div
+        className="-m-6 min-h-full space-y-6 px-6 py-6 md:px-8 md:py-8 lg:px-10"
+        style={{ background: pageBg }}
+      >
         {/* Navigation layout */}
         <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200 light:shadow-md">
           <CardHeader>
@@ -269,20 +275,25 @@ export function Admin() {
                     key={m.id}
                     type="button"
                     onClick={() => updateConfig({ send_method: m.id })}
-                    className={`relative rounded-lg border p-4 text-left transition-colors ${
-                      selected
-                        ? 'border-cyan-500 bg-cyan-600/10'
-                        : 'border-slate-600 light:border-gray-300 hover:border-cyan-500/50'
-                    }`}
+                    className="relative block w-full text-left"
                   >
-                    {selected && (
-                      <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500">
-                        <Check className="h-3 w-3 text-white" />
-                      </span>
-                    )}
-                    <Icon className={`h-6 w-6 ${selected ? 'text-cyan-400' : 'text-slate-400'}`} />
-                    <h3 className="mt-2 font-bold text-white light:text-gray-900">{m.title}</h3>
-                    <p className="text-xs text-slate-400 light:text-gray-600">{m.desc}</p>
+                    <div
+                      style={selected ? { backgroundColor: '#0f172a' } : undefined}
+                      className={`relative rounded-lg border p-4 transition-colors ${
+                        selected
+                          ? 'app-chrome-dark border-cyan-500'
+                          : 'border-slate-600 light:border-gray-300 light:bg-white hover:border-cyan-500/50'
+                      }`}
+                    >
+                      {selected && (
+                        <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500">
+                          <Check className="h-3 w-3 text-white" />
+                        </span>
+                      )}
+                      <Icon className={`h-6 w-6 ${selected ? 'text-cyan-400' : 'text-slate-400'}`} />
+                      <h3 className={`mt-2 font-bold ${selected ? 'text-white' : 'text-white light:text-gray-900'}`}>{m.title}</h3>
+                      <p className={`text-xs ${selected ? 'text-slate-300' : 'text-slate-400 light:text-gray-600'}`}>{m.desc}</p>
+                    </div>
                   </button>
                 )
               })}

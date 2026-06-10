@@ -194,6 +194,14 @@ export function BatchCalendarPage() {
 
   const filteredData = generateCalendarGrid();
 
+  // Today as YYYY-MM-DD (local), matching the grid's fullDate format.
+  // Future days (strictly after today) are blanked with "—" so they aren't
+  // mistaken for zero-production days.
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+
   return (
     <>
       <WaterSystemLayout
@@ -260,12 +268,14 @@ export function BatchCalendarPage() {
           {/* Calendar Grid */}
           {!loading && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
-              {filteredData.map((item, index) => (
+              {filteredData.map((item, index) => {
+                const isFuture = item.fullDate > todayStr;
+                return (
                 <div
                   key={index}
                   onClick={() => handleCardClick(item.fullDate, item.data)}
                   className={`p-4 rounded-xl bg-slate-900/95 dark:bg-slate-900/95 light:bg-white/95 border border-slate-700 dark:border-slate-700 light:border-slate-300 shadow-md transition-all
-                    ${item.data.total_actual_ton > 0 ? "cursor-pointer hover:shadow-[0_0_20px_rgba(0,255,255,0.4)] hover:border-cyan-400" : "opacity-60"}
+                    ${item.data.total_actual_ton > 0 ? "cursor-pointer hover:shadow-[0_0_20px_rgba(0,255,255,0.4)] hover:border-cyan-400" : isFuture ? "opacity-50" : "opacity-60"}
                   `}
                 >
                   {/* Day & Date */}
@@ -278,40 +288,49 @@ export function BatchCalendarPage() {
                   <div className="flex items-center justify-center gap-2 mb-3 text-center">
                     <BarChart3
                       className={`text-xl ${
-                        item.data.total_actual_ton === 0 ? "text-red-500" : "text-green-400"
+                        isFuture
+                          ? "text-slate-500"
+                          : item.data.total_actual_ton === 0
+                          ? "text-red-500"
+                          : "text-green-400"
                       }`}
                     />
                     <span
                       className={`text-lg font-bold ${
-                        item.data.total_actual_ton === 0 ? "text-red-500" : "text-green-400"
+                        isFuture
+                          ? "text-slate-500"
+                          : item.data.total_actual_ton === 0
+                          ? "text-red-500"
+                          : "text-green-400"
                       }`}
                     >
-                      {item.data.total_actual_ton.toFixed(2)} ton
+                      {isFuture ? "—" : `${item.data.total_actual_ton.toFixed(2)} ton`}
                     </span>
                   </div>
 
                   {/* Products */}
                   <div className="flex items-center justify-center gap-2 mb-2 text-center">
-                    <Package className="text-blue-400 text-md" />
-                    <span className="text-blue-400 text-sm font-bold">
-                      {item.data.product_count} products
+                    <Package className={isFuture ? "text-slate-500 text-md" : "text-blue-400 text-md"} />
+                    <span className={`text-sm font-bold ${isFuture ? "text-slate-500" : "text-blue-400"}`}>
+                      {isFuture ? "—" : `${item.data.product_count} products`}
                     </span>
                   </div>
 
                   {/* Batches */}
                   <div className="flex items-center justify-center gap-2 mb-2 text-center">
-                    <Calendar className="text-purple-400 text-md" />
-                    <span className="text-purple-400 text-sm font-bold">
-                      {item.data.batch_count} batches
+                    <Calendar className={isFuture ? "text-slate-500 text-md" : "text-purple-400 text-md"} />
+                    <span className={`text-sm font-bold ${isFuture ? "text-slate-500" : "text-purple-400"}`}>
+                      {isFuture ? "—" : `${item.data.batch_count} batches`}
                     </span>
                   </div>
 
                   {/* Actual KG (small text) */}
                   <div className="mt-2 text-xs text-slate-400 dark:text-slate-400 light:text-slate-600 text-center font-bold">
-                    {item.data.total_actual_kg.toFixed(0)} kg
+                    {isFuture ? "—" : `${item.data.total_actual_kg.toFixed(0)} kg`}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

@@ -6,7 +6,6 @@ import {
   History,
   Radio,
   Scale,
-  Settings,
   ShoppingCart,
   Calendar,
   FileBarChart,
@@ -93,7 +92,7 @@ const fakiehReportingItems: SidebarNavItem[] = [
   },
 ]
 
-/** Sidebar + Admin */
+/** Sidebar navigation entries */
 export const sidebarNavEntries: SidebarNavEntry[] = [
   {
     id: 'fakieh-reporting',
@@ -140,24 +139,22 @@ export const sidebarNavEntries: SidebarNavEntry[] = [
     label: 'Distribution',
     description: 'Scheduled report email & disk delivery',
   },
-  {
-    path: '/fakieh/admin',
-    icon: Settings,
-    label: 'Admin',
-    description: 'System Administration & Configuration',
-  },
 ]
 
 export type TopNavLinkItem = {
   kind: 'link'
   path: string
   label: string
+  /** Shorter label for the top navigation bar when space is tight. */
+  shortLabel?: string
   icon: LucideIcon
 }
 
 export type TopNavGroupItem = {
   kind: 'group'
   label: string
+  /** Shorter label for the top navigation bar when space is tight. */
+  shortLabel?: string
   icon: LucideIcon
   items: { path: string; label: string }[]
 }
@@ -169,6 +166,7 @@ export const topNavItems: TopNavItem[] = [
   {
     kind: 'group',
     label: 'Fakieh Reporting',
+    shortLabel: 'Reporting',
     icon: BarChart3,
     items: [
       { path: '/fakieh/fakieh-dashboard', label: 'Fakieh Dashboard' },
@@ -202,6 +200,7 @@ export const topNavItems: TopNavItem[] = [
     kind: 'link',
     path: '/fakieh/weighbridge',
     label: 'Weighbridge Log',
+    shortLabel: 'Weighbridge',
     icon: Scale,
   },
   {

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'wouter'
 import { ChevronDown } from 'lucide-react'
 import { User, Settings, LogOut, Sun, Moon } from 'lucide-react'
-import herculesLogo from '@/assets/Hercules_New.png'
+import herculesLogo from '@/assets/Hercules_New_white.png'
 import { PartnerLogosStrip } from './PartnerLogosStrip'
 import { useTheme } from '@/contexts/ThemeContext'
 import { topNavItems, type TopNavGroupItem } from './navConfig'
@@ -17,10 +17,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+function topNavLabel(item: { label: string; shortLabel?: string }) {
+  return item.shortLabel ?? item.label
+}
+
 /** Top bar is always dark chrome (even when the app theme is light). */
 function navItemClass(active: boolean) {
   return cn(
-    'flex items-center gap-2.5 whitespace-nowrap rounded-lg px-4 py-3 text-base font-bold transition-colors',
+    'flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-semibold transition-colors sm:gap-1.5 sm:px-2.5 sm:py-2 sm:text-sm',
     active
       ? 'bg-slate-900/95 text-white ring-1 ring-cyan-500/40'
       : 'text-slate-200 hover:bg-slate-800/80 hover:text-cyan-300'
@@ -71,7 +75,6 @@ function TopNavDropdownGroup({
     }
   }, [open, updatePosition])
 
-  const Icon = item.icon
   const groupActive = isGroupActive(item, location)
   const id = slug(item.label)
 
@@ -112,10 +115,9 @@ function TopNavDropdownGroup({
           aria-controls={`topnav-menu-${id}`}
           onClick={() => setOpenMenuLabel((prev) => (prev === item.label ? null : item.label))}
         >
-          <Icon className="h-5 w-5 shrink-0 opacity-95" />
-          {item.label}
+          {topNavLabel(item)}
           <ChevronDown
-            className={cn('h-4 w-4 shrink-0 text-slate-300 opacity-80 transition-transform duration-200', open && 'rotate-180')}
+            className={cn('h-3 w-3 shrink-0 text-slate-300 opacity-80 transition-transform duration-200 sm:h-3.5 sm:w-3.5', open && 'rotate-180')}
           />
         </button>
       </div>
@@ -169,45 +171,32 @@ export function WaterTopNav() {
   return (
     <header
       className={cn(
-        'water-top-nav app-chrome-dark mb-2 flex w-full min-h-[132px] shrink-0 items-center gap-4 rounded-2xl border px-5 py-2 shadow-lg backdrop-blur-sm sm:mb-3',
+        'water-top-nav app-chrome-dark mb-2 flex w-full min-h-[76px] shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 shadow-lg backdrop-blur-sm sm:mb-3 lg:gap-3 lg:px-4 xl:min-h-[132px] xl:gap-4 xl:px-5',
         'border-slate-600/70 bg-slate-950/95 text-slate-100'
       )}
     >
-      <div
-        className={cn(
-          'flex shrink-0 items-center gap-2 rounded-lg border-l border-slate-600/80 bg-slate-900/35 py-0 pl-3 pr-3 sm:pl-4 sm:pr-4'
-        )}
-      >
-        <Link href="/fakieh/fakieh-dashboard" className="flex shrink-0 items-center">
-          <span className="inline-flex shrink-0 rounded-md bg-white p-0.5 shadow-sm ring-1 ring-slate-600/25">
-            <img
-              src={herculesLogo}
-              alt="Hercules"
-              className="h-28 w-auto max-w-[420px] shrink-0 rounded object-contain"
-            />
-          </span>
+      <div className="flex shrink-0 items-center overflow-visible rounded-lg border-l border-slate-600/80 bg-slate-900/35 py-0 pl-3 pr-3 sm:pl-4 sm:pr-4">
+        <Link href="/fakieh/fakieh-dashboard" className="flex shrink-0 items-center overflow-visible">
+          <img
+            src={herculesLogo}
+            alt="Hercules"
+            className="h-14 w-auto shrink-0 object-contain object-left md:h-16 lg:h-20 xl:h-28"
+          />
         </Link>
       </div>
 
-      <div className="h-28 w-px shrink-0 self-center bg-slate-400/60" aria-hidden />
+      <div className="h-12 w-px shrink-0 self-center bg-slate-400/60 lg:h-20 xl:h-28" aria-hidden />
 
       <nav
-        className={cn(
-          'flex min-h-0 min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-visible py-1 pl-3 sm:gap-2 sm:pl-4',
-          '[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
-        )}
+        className="flex min-h-0 min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-visible py-1 sm:gap-1.5"
         aria-label="Main"
       >
         {topNavItems.map((item) => {
           if (item.kind === 'link') {
-            const Icon = item.icon
             const active = location === item.path
             return (
-              <Link key={item.path} href={item.path}>
-                <span className={navItemClass(active)}>
-                  <Icon className="h-5 w-5 shrink-0 opacity-95" />
-                  {item.label}
-                </span>
+              <Link key={item.path} href={item.path} className="shrink-0">
+                <span className={navItemClass(active)}>{topNavLabel(item)}</span>
               </Link>
             )
           }

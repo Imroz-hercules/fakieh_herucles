@@ -10,6 +10,7 @@ import { API_ENDPOINTS } from '@/config/api';
 import { fetchAllKpiPages } from '@/utils/kpiFetchAll';
 import asmLogo from '@/assets/Asm_Logo.png';
 import fakiehBrandLogo from '@/assets/fakiehlogo.webp';
+import herculesLogo from '@/assets/Hercules_New.png';
 
 const tabs = [
   "Product Batch Summary",
@@ -1682,17 +1683,20 @@ export function BatchHistoricalReports() {
       let asmLogoBase64 = '';
       // let aghtiaLogoBase64 = ''; // Agthia logo commented out
       let fakiehLogoBase64 = '';
+      let herculesLogoBase64 = '';
       
       try {
         asmLogoBase64 = await imageToBase64(asmLogo);
         // aghtiaLogoBase64 = await imageToBase64(aghtiaLogo); // Agthia logo commented out
         fakiehLogoBase64 = await imageToBase64(fakiehBrandLogo);
+        herculesLogoBase64 = await imageToBase64(herculesLogo);
       } catch (error) {
         console.error('Error converting logos to base64:', error);
         // Fallback: use the image paths directly
         asmLogoBase64 = asmLogo;
         // aghtiaLogoBase64 = aghtiaLogo; // Agthia logo commented out
         fakiehLogoBase64 = fakiehBrandLogo;
+        herculesLogoBase64 = herculesLogo;
       }
       
       // Create a new window for printing
@@ -1945,9 +1949,10 @@ export function BatchHistoricalReports() {
           <div class="page-header">
             <div class="logo-container">
               <div class="logo-left">
-                <img src="${fakiehLogoBase64}" alt="Fakieh" />
+                <img src="${herculesLogoBase64}" alt="Hercules" />
               </div>
               <div class="logo-right">
+                <img src="${fakiehLogoBase64}" alt="Fakieh" />
                 <img src="${asmLogoBase64}" alt="ASM Logo" />
               </div>
             </div>

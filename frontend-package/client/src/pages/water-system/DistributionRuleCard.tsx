@@ -1,4 +1,7 @@
-import { Send, Edit, Trash2, Clock, Mail, HardDrive, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { Play, Pencil, Trash2, Clock, Mail, HardDrive, Loader2 } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { DistributionRule } from '@/lib/distributionApi'
 
 interface Props {
@@ -11,97 +14,209 @@ interface Props {
   running: boolean
 }
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DELIVERY_ICONS = { email: Mail, disk: HardDrive, both: Mail } as const
 
-function scheduleLabel(rule: DistributionRule): string {
-  if (rule.schedule_type === 'daily') return `Daily at ${rule.schedule_time}`
-  if (rule.schedule_type === 'weekly')
-    return `Weekly on ${DAYS[rule.schedule_day_of_week ?? 0]} at ${rule.schedule_time}`
-  return `Monthly on day ${rule.schedule_day_of_month ?? 1} at ${rule.schedule_time}`
+function formatSchedule(rule: DistributionRule): string {
+  const time = rule.schedule_time || '08:00'
+  if (rule.schedule_type === 'daily') return `Daily at ${time}`
+  if (rule.schedule_type === 'weekly') return `${DAY_NAMES[rule.schedule_day_of_week ?? 0]}s at ${time}`
+  if (rule.schedule_type === 'monthly') return `${rule.schedule_day_of_month ?? 1} of month at ${time}`
+  return rule.schedule_type
 }
 
 export default function DistributionRuleCard({
-  rule, catalogLabels, onToggle, onEdit, onDelete, onRunNow, running,
+  rule,
+  catalogLabels,
+  onToggle,
+  onEdit,
+  onDelete,
+  onRunNow,
+  running,
 }: Props) {
+  const [hovered, setHovered] = useState(false)
+  const { theme } = useTheme()
+  const dark = theme === 'dark'
+
+  const accentBar = rule.enabled
+    ? dark ? '#34d399' : '#059669'
+    : dark ? '#475569' : '#9ca3af'
+
+  const DeliveryIcon = DELIVERY_ICONS[rule.delivery_method] || Mail
   const sources = (rule.report_sources || []).map((s) => catalogLabels[s] || s)
+  const formatLabel = (rule.formats || []).join(', ') || 'pdf'
+
+  const statusBadge = () => {
+    if (!rule.last_run_status) return null
+    const ok = rule.last_run_status === 'success'
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+        style={{
+          background: ok ? (dark ? 'rgba(16,185,129,0.12)' : '#ecfdf5') : (dark ? 'rgba(239,68,68,0.12)' : '#fef2f2'),
+          color: ok ? (dark ? '#34d399' : '#047857') : (dark ? '#f87171' : '#b91c1c'),
+        }}
+      >
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'currentColor' }} />
+        {ok ? 'OK' : 'Failed'}
+      </span>
+    )
+  }
+
+  const accent = dark ? '#22d3ee' : '#0369a1'
+  const accentBg = dark ? 'rgba(34,211,238,0.10)' : 'rgba(3,105,161,0.08)'
+  const surface = dark ? '#111827' : '#ffffff'
+  const border = dark ? '#1e293b' : '#e5e7eb'
+  const cardHoverBorder = dark ? 'rgba(34,211,238,0.3)' : 'rgba(3,105,161,0.25)'
+  const text = dark ? '#f0f4f8' : '#111827'
+  const textSecondary = dark ? '#8899ab' : '#6b7280'
+  const textMuted = dark ? '#556677' : '#9ca3af'
 
   return (
-    <div className="flex items-center gap-4 rounded-lg border border-slate-700 light:border-gray-200 bg-slate-800/40 light:bg-white px-5 py-4 transition-colors hover:border-cyan-500/40">
-      {/* Enabled toggle */}
-      <button
-        type="button"
-        onClick={() => onToggle(rule)}
-        title={rule.enabled ? 'Active — click to pause' : 'Paused — click to activate'}
-        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-          rule.enabled ? 'bg-cyan-600' : 'bg-slate-600'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
-            rule.enabled ? 'left-[18px]' : 'left-0.5'
-          }`}
-        />
-      </button>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.25 }}
+      className="group relative cursor-pointer overflow-hidden rounded-lg transition-all duration-150"
+      style={{
+        background: surface,
+        border: `1px solid ${hovered ? cardHoverBorder : border}`,
+        opacity: rule.enabled ? 1 : 0.55,
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => onEdit(rule)}
+    >
+      <div className="absolute start-0 top-0 bottom-0 w-[3px]" style={{ background: accentBar }} />
 
-      {/* Main info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <h3 className="truncate font-bold text-white light:text-gray-900">
-            {rule.name || 'Untitled rule'}
-          </h3>
-          {rule.last_run_status === 'error' && (
-            <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
-              last run failed
+      <div className="flex items-center gap-4 py-4 ps-5 pe-4">
+        <label
+          className="relative inline-flex shrink-0 cursor-pointer items-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={rule.enabled}
+            onChange={() => onToggle(rule)}
+            className="peer sr-only"
+          />
+          <div
+            className="h-[18px] w-8 rounded-full transition-colors after:absolute after:start-[2px] after:top-[2px] after:h-[14px] after:w-[14px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:after:translate-x-[14px]"
+            style={{ background: rule.enabled ? accent : (dark ? '#334155' : '#d1d5db') }}
+          />
+        </label>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-base font-semibold" style={{ color: text }}>
+              {rule.name || 'Untitled rule'}
             </span>
-          )}
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 light:text-gray-600">
-          <span className="inline-flex items-center gap-1">
-            <Clock className="h-3 w-3" /> {scheduleLabel(rule)}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            {rule.delivery_method === 'disk' ? <HardDrive className="h-3 w-3" /> : <Mail className="h-3 w-3" />}
-            {rule.delivery_method}
-          </span>
-          <span className="uppercase">{(rule.formats || []).join(', ')}</span>
-        </div>
-        {sources.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {sources.map((label) => (
-              <span key={label} className="rounded bg-slate-700/60 light:bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-300 light:text-gray-700">
+            {statusBadge()}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            {sources.slice(0, 3).map((label) => (
+              <span
+                key={label}
+                className="inline-flex rounded px-2 py-0.5 text-xs font-medium"
+                style={{ background: accentBg, color: accent }}
+              >
                 {label}
               </span>
             ))}
+            {sources.length > 3 && (
+              <span className="text-xs font-medium" style={{ color: textMuted }}>
+                +{sources.length - 3} more
+              </span>
+            )}
+            {sources.length === 0 && (
+              <span className="text-sm" style={{ color: textMuted }}>
+                No reports selected
+              </span>
+            )}
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Actions */}
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={() => rule.id && onRunNow(rule.id)}
-          disabled={running}
-          className="inline-flex items-center gap-1.5 rounded-md bg-cyan-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-cyan-700 disabled:opacity-60"
+        <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+          <Clock size={14} style={{ color: textMuted }} />
+          <span className="whitespace-nowrap text-sm font-medium" style={{ color: textSecondary }}>
+            {formatSchedule(rule)}
+          </span>
+        </div>
+
+        <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
+          <DeliveryIcon size={14} style={{ color: textMuted }} />
+          <span className="text-sm font-medium" style={{ color: textSecondary }}>
+            {rule.delivery_method === 'both' ? 'Email + Disk' : rule.delivery_method}
+          </span>
+        </div>
+
+        <span
+          className="hidden shrink-0 items-center rounded px-2.5 py-1 text-xs font-bold uppercase sm:inline-flex"
+          style={{ background: accentBg, color: accent }}
         >
-          {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-          Run now
-        </button>
-        <button
-          type="button"
-          onClick={() => onEdit(rule)}
-          className="rounded-md border border-slate-600 light:border-gray-300 p-1.5 text-slate-300 light:text-gray-600 transition-colors hover:text-cyan-400"
+          {formatLabel}
+        </span>
+
+        <div
+          className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+          onClick={(e) => e.stopPropagation()}
         >
-          <Edit className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => rule.id && onDelete(rule.id)}
-          className="rounded-md border border-slate-600 light:border-gray-300 p-1.5 text-slate-300 light:text-gray-600 transition-colors hover:text-red-400"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+          <button
+            type="button"
+            onClick={() => rule.id && onRunNow(rule.id)}
+            disabled={running}
+            title="Run now"
+            className="rounded-md p-1.5 transition-colors disabled:opacity-60"
+            style={{ color: textMuted }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = dark ? '#34d399' : '#059669'
+              e.currentTarget.style.background = dark ? 'rgba(16,185,129,0.1)' : '#ecfdf5'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = textMuted
+              e.currentTarget.style.background = ''
+            }}
+          >
+            {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(rule)}
+            title="Edit rule"
+            className="rounded-md p-1.5 transition-colors"
+            style={{ color: textMuted }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = accent
+              e.currentTarget.style.background = accentBg
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = textMuted
+              e.currentTarget.style.background = ''
+            }}
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => rule.id && onDelete(rule.id)}
+            title="Delete"
+            className="rounded-md p-1.5 transition-colors"
+            style={{ color: textMuted }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#ef4444'
+              e.currentTarget.style.background = dark ? 'rgba(239,68,68,0.1)' : '#fef2f2'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = textMuted
+              e.currentTarget.style.background = ''
+            }}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

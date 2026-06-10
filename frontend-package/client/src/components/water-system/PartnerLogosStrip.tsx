@@ -16,18 +16,21 @@ export function PartnerLogosStrip({ variant = 'topnav' }: PartnerLogosStripProps
   return (
     <div
       className={cn(
-        'shrink-0 items-center gap-2.5 border-r border-slate-600/70 pr-4 md:gap-3 md:pr-5',
-        isSidebar ? 'flex' : 'hidden sm:flex'
+        'shrink-0 items-center gap-2.5 border-r pr-3 md:gap-3 md:pr-4',
+        isSidebar
+          ? 'flex border-slate-700/70'
+          : 'hidden border-slate-600/70 xl:flex'
       )}
       aria-label="Fakieh and ASM"
     >
       {/* Fakieh — left */}
       <div
         className={cn(
-          'flex items-center justify-center rounded-md bg-white/5 px-2.5 ring-1 ring-white/10 sm:px-3',
+          'flex items-center justify-center rounded-md px-2 sm:px-2.5',
+          isSidebar ? 'bg-white ring-1 ring-gray-200' : 'bg-white/5 ring-1 ring-white/10 sm:px-3',
           isSidebar
-            ? 'h-14 max-w-[170px] sm:h-16 sm:max-w-[205px] md:h-[4.25rem] md:max-w-[245px]'
-            : 'h-28 max-w-[280px] sm:max-w-[320px] md:max-w-[360px]'
+            ? 'h-[4.5rem] max-w-[170px] sm:max-w-[200px]'
+            : 'h-[5.25rem] max-w-[260px] 2xl:h-28 2xl:max-w-[340px]'
         )}
       >
         <img
@@ -35,7 +38,7 @@ export function PartnerLogosStrip({ variant = 'topnav' }: PartnerLogosStripProps
           alt="Fakieh"
           className={cn(
             'w-auto max-w-full object-contain',
-            isSidebar ? 'max-h-12 sm:max-h-14 md:max-h-[4rem]' : 'max-h-[6.5rem]'
+            isSidebar ? 'max-h-[3.75rem]' : 'max-h-[5rem] 2xl:max-h-[6.5rem]'
           )}
         />
       </div>
@@ -44,8 +47,8 @@ export function PartnerLogosStrip({ variant = 'topnav' }: PartnerLogosStripProps
         className={cn(
           'flex items-center rounded-md bg-white p-0.5 shadow-sm ring-1 ring-slate-600/25 sm:px-1',
           isSidebar
-            ? 'h-14 max-w-[260px] sm:h-16 sm:max-w-[305px] md:h-[4.25rem] md:max-w-[360px]'
-            : 'h-28 max-w-[400px] sm:max-w-[460px] md:max-w-[520px]'
+            ? 'h-[4.5rem] max-w-[300px] sm:max-w-[360px]'
+            : 'h-[5.25rem] max-w-[380px] 2xl:h-28 2xl:max-w-[520px]'
         )}
       >
         <img
@@ -53,7 +56,7 @@ export function PartnerLogosStrip({ variant = 'topnav' }: PartnerLogosStripProps
           alt="ASM Process Automation"
           className={cn(
             'w-auto max-w-full object-contain object-left',
-            isSidebar ? 'max-h-12 sm:max-h-14 md:max-h-[4rem]' : 'max-h-[6.5rem]'
+            isSidebar ? 'max-h-[3.75rem]' : 'max-h-[5rem] 2xl:max-h-[6.5rem]'
           )}
         />
       </div>
