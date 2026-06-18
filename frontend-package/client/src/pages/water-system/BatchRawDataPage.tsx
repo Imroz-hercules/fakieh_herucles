@@ -367,9 +367,18 @@ export function BatchRawDataPage() {
   const totalPages = Math.ceil(totalRecords / rowsPerPage);
 
   const tableHeaders = [
-    "Batch Name", "Product Name", "Batch Act Start", "Batch Act End",
-    "Quantity", "Material Name", "Material Code", "SetPoint Float", "Actual Value Float",
-    "OrderId", "EventID", "Batch Transfer Time"
+    "Batch Name",
+    "Product Name",
+    "Batch Act Start",
+    "Batch Act End",
+    "Quantity",
+    "Material Name",
+    "Material Code",
+    "SetPoint Float",
+    "Actual Value Float",
+    "OrderId",
+    "EventID",
+    "Batch Transfer Time",
   ];
 
   const renderTableRow = (item: any, index: number) => (
