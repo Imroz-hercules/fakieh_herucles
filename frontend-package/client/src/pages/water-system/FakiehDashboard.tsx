@@ -16,6 +16,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon, Filter, RotateCcw, Clock, TrendingUp, Package, Database, Zap, Truck } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
+import {
+  BUSINESS_TZ,
+  calendarDayWithSaudiTime,
+  formatSaudiFromUtcDate,
+  getDefaultDashboardWeekRange,
+  getSaudiPartsForInstant,
+  parseUtcDate,
+} from '@/utils/timezone'
 import { Line, Pie, Bar, Doughnut } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -43,23 +51,12 @@ ChartJS.register(
   BarElement
 )
 
-// Previous calendar week: last Monday 7 AM → this Monday 7 AM
-const getDefaultDates = () => {
-  const now = new Date()
-  const dayOfWeek = now.getDay()
-  const daysToThisMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+const defaultDates = getDefaultDashboardWeekRange()
 
-  const endDate = new Date(now)
-  endDate.setDate(now.getDate() - daysToThisMonday)
-  endDate.setHours(7, 0, 0, 0)
-
-  const startDate = new Date(endDate)
-  startDate.setDate(endDate.getDate() - 7)
-
-  return { startDate, endDate }
+const saudiTimeInputValue = (date: Date) => {
+  const p = getSaudiPartsForInstant(date)
+  return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`
 }
-
-const defaultDates = getDefaultDates()
 
 export default function FakiehDashboard() {
   const [startDate, setStartDate] = useState<Date>(defaultDates.startDate)
@@ -104,9 +101,9 @@ export default function FakiehDashboard() {
     if (batchMaterials.length === 0) return null
     
     const dates = batchMaterials.map(item => {
-      const startDate = item['Batch Act Start'] ? new Date(item['Batch Act Start']) : null
-      const endDate = item['Batch Act End'] ? new Date(item['Batch Act End']) : null
-      const transferDate = item['Batch Transfer Time'] ? new Date(item['Batch Transfer Time']) : null
+      const startDate = item['Batch Act Start'] ? parseUtcDate(item['Batch Act Start']) : null
+      const endDate = item['Batch Act End'] ? parseUtcDate(item['Batch Act End']) : null
+      const transferDate = item['Batch Transfer Time'] ? parseUtcDate(item['Batch Transfer Time']) : null
       
       return [startDate, endDate, transferDate].filter(Boolean)
     }).flat()
@@ -154,12 +151,12 @@ export default function FakiehDashboard() {
               // Get the date from Batch Act Start, Batch Act End, or Batch Transfer Time
         const dateStr = item['Batch Act Start'] || item['Batch Act End'] || item['Batch Transfer Time']
         if (dateStr) {
-          const date = new Date(dateStr)
-          if (!isNaN(date.getTime())) { // Check if date is valid
-            const dateKey = date.toISOString().split('T')[0] // YYYY-MM-DD format
-            
+          const date = parseUtcDate(dateStr)
+          if (date) {
+            const dateKey = date.toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ })
+
             if (dailyProduction.has(dateKey)) {
-              dailyProduction.set(dateKey, dailyProduction.get(dateKey) + quantity)
+              dailyProduction.set(dateKey, dailyProduction.get(dateKey)! + quantity)
             } else {
               dailyProduction.set(dateKey, quantity)
             }
@@ -173,8 +170,9 @@ export default function FakiehDashboard() {
     
     // Format dates for display
     const labels = last7Days.map(dateStr => {
-      const date = new Date(dateStr)
-      return format(date, 'MM/dd')
+      const [y, m, d] = dateStr.split('-').map(Number)
+      const noonUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+      return noonUtc.toLocaleDateString('en-US', { timeZone: BUSINESS_TZ, month: '2-digit', day: '2-digit' })
     })
     
     const data = last7Days.map(dateStr => dailyProduction.get(dateStr) || 0)
@@ -328,9 +326,9 @@ export default function FakiehDashboard() {
     };
 
     batchMaterials.forEach((item) => {
-      const batchDate = new Date(item["Batch Act Start"] || '');
-      if (!isNaN(batchDate.getTime())) { // Check if date is valid
-        const dayOfWeek = batchDate.toLocaleDateString("en-US", { weekday: "long" });
+      const batchDate = parseUtcDate(item["Batch Act Start"] || '')
+      if (batchDate) {
+        const dayOfWeek = batchDate.toLocaleDateString("en-US", { timeZone: BUSINESS_TZ, weekday: "long" });
         const batchGUID = item["Batch GUID"] || "unknown";
         if (productionByDaySets.hasOwnProperty(dayOfWeek)) {
           productionByDaySets[dayOfWeek].add(batchGUID);
@@ -785,7 +783,7 @@ export default function FakiehDashboard() {
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "MM/dd/yyyy h:mm a") : <span>Pick a date</span>}
+                    {startDate ? formatSaudiFromUtcDate(startDate) : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-slate-800 light:bg-white border-slate-700 light:border-gray-300">
@@ -793,7 +791,11 @@ export default function FakiehDashboard() {
                     <Calendar
                       mode="single"
                       selected={startDate}
-                      onSelect={(date) => date && setStartDate(date)}
+                      onSelect={(date) => {
+                        if (!date) return
+                        const parts = getSaudiPartsForInstant(startDate)
+                        setStartDate(calendarDayWithSaudiTime(date, parts.hour, parts.minute))
+                      }}
                       initialFocus
                       className="bg-slate-800 light:bg-white text-slate-300 light:text-gray-700"
                     />
@@ -801,12 +803,17 @@ export default function FakiehDashboard() {
                       <Label className="text-sm font-medium text-slate-300 light:text-gray-700 mb-2 block">Time</Label>
                       <Input
                         type="time"
-                        value={format(startDate, "HH:mm")}
+                        value={saudiTimeInputValue(startDate)}
                         onChange={(e) => {
                           const [hours, minutes] = e.target.value.split(':')
-                          const newDate = new Date(startDate)
-                          newDate.setHours(parseInt(hours), parseInt(minutes))
-                          setStartDate(newDate)
+                          const parts = getSaudiPartsForInstant(startDate)
+                          setStartDate(
+                            calendarDayWithSaudiTime(
+                              new Date(parts.year, parts.month - 1, parts.day),
+                              parseInt(hours, 10),
+                              parseInt(minutes, 10),
+                            ),
+                          )
                         }}
                         className="bg-slate-800 light:bg-white border-slate-700 light:border-gray-300 text-slate-300 light:text-gray-700"
                       />
@@ -829,7 +836,7 @@ export default function FakiehDashboard() {
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "MM/dd/yyyy h:mm a") : <span>Pick a date</span>}
+                    {endDate ? formatSaudiFromUtcDate(endDate) : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-slate-800 light:bg-white border-slate-700 light:border-gray-300">
@@ -837,7 +844,11 @@ export default function FakiehDashboard() {
                     <Calendar
                       mode="single"
                       selected={endDate}
-                      onSelect={(date) => date && setEndDate(date)}
+                      onSelect={(date) => {
+                        if (!date) return
+                        const parts = getSaudiPartsForInstant(endDate)
+                        setEndDate(calendarDayWithSaudiTime(date, parts.hour, parts.minute))
+                      }}
                       initialFocus
                       className="bg-slate-800 light:bg-white text-slate-300 light:text-gray-700"
                     />
@@ -845,12 +856,17 @@ export default function FakiehDashboard() {
                       <Label className="text-sm font-medium text-slate-300 light:text-gray-700 mb-2 block">Time</Label>
                       <Input
                         type="time"
-                        value={format(endDate, "HH:mm")}
+                        value={saudiTimeInputValue(endDate)}
                         onChange={(e) => {
                           const [hours, minutes] = e.target.value.split(':')
-                          const newDate = new Date(endDate)
-                          newDate.setHours(parseInt(hours), parseInt(minutes))
-                          setEndDate(newDate)
+                          const parts = getSaudiPartsForInstant(endDate)
+                          setEndDate(
+                            calendarDayWithSaudiTime(
+                              new Date(parts.year, parts.month - 1, parts.day),
+                              parseInt(hours, 10),
+                              parseInt(minutes, 10),
+                            ),
+                          )
                         }}
                         className="bg-slate-800 light:bg-white border-slate-700 light:border-gray-300 text-slate-300 light:text-gray-700"
                       />
@@ -1022,11 +1038,11 @@ export default function FakiehDashboard() {
                 <div>
                   <p className="text-sm font-medium text-slate-400 light:text-gray-600">Latest Batch Date</p>
                   <p className="text-2xl font-bold text-white light:text-gray-900">
-                    {latestBatchDate ? format(latestBatchDate, "MM/dd") : 'N/A'}
+                    {latestBatchDate ? formatSaudiFromUtcDate(latestBatchDate) : 'N/A'}
                   </p>
                   <p className="text-xs text-purple-400 flex items-center">
                     <span className="w-2 h-2 bg-purple-400 rounded-full mr-2 animate-pulse"></span>
-                    {latestBatchDate ? format(latestBatchDate, "MMM dd, yyyy") : 'No batches'}
+                    {latestBatchDate ? formatSaudiFromUtcDate(latestBatchDate) : 'No batches'}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">

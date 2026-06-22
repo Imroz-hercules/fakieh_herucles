@@ -8,6 +8,11 @@ import { FileText, Download, Calendar, Loader2, ChevronDown, Check, X } from "lu
 import axios from "axios";
 import { API_ENDPOINTS } from '@/config/api';
 import { fetchAllKpiPages } from '@/utils/kpiFetchAll';
+import {
+  formatSaudiTime,
+  getDefaultPreviousMonthRange,
+  saudiDatetimeLocalToUtcIso,
+} from '@/utils/timezone';
 
 // MultiSelect Component
 interface MultiSelectProps {
@@ -124,53 +129,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   );
 };
 
-// Default dates: Last month with 7 AM time
-const getDefaultDates = () => {
-  const today = new Date();
-  const lastMonth = new Date();
-  lastMonth.setMonth(today.getMonth() - 1);
-
-  const startDate = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1, 7, 0, 0);
-  const endDate = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0, 7, 0, 0);
-
-  const formatForInput = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  return { startDate: formatForInput(startDate), endDate: formatForInput(endDate) };
-};
-
-// Format date and time for display
-const formatToUTCCustom = (dateString: string, includeSeconds: boolean = false) => {
-  if (!dateString || dateString === 'N/A') return 'N/A';
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    
-    const options: Intl.DateTimeFormatOptions = {
-      timeZone: 'UTC',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    };
-    
-    if (includeSeconds) {
-      options.second = '2-digit';
-    }
-    
-    return date.toLocaleString('en-US', options);
-  } catch (error) {
-    return 'Invalid Date';
-  }
-};
+const getDefaultDates = () => getDefaultPreviousMonthRange();
 
 export function BatchRawDataPage() {
   const defaultDates = getDefaultDates();
@@ -202,32 +161,18 @@ export function BatchRawDataPage() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [csvExporting, setCsvExporting] = useState(false);
 
-  // 4-hour offset function like in old code
-  const getApiDateWithOffset = (displayDate: Date) => {
-    if (!displayDate) return null;
-    const apiDate = new Date(displayDate);
-    apiDate.setHours(apiDate.getHours() - 4);
-    return apiDate;
-  };
-
-
   // Fetch filter options
   const fetchFilterOptions = async () => {
     try {
       const params = new URLSearchParams();
-      const startDateOffset = getApiDateWithOffset(new Date(startDate));
-      const endDateOffset = getApiDateWithOffset(new Date(endDate));
+      params.append("startDate", saudiDatetimeLocalToUtcIso(startDate));
+      params.append("endDate", saudiDatetimeLocalToUtcIso(endDate));
 
-      if (startDateOffset && endDateOffset) {
-        params.append("startDate", startDateOffset.toISOString());
-        params.append("endDate", endDateOffset.toISOString());
-
-        const response = await axios.get(`${API_ENDPOINTS.BATCH_FILTER_OPTIONS}?${params}`);
-        const body = response.data || {};
-        setProductOptions(Array.isArray(body.products) ? body.products : []);
-        setBatchOptions(Array.isArray(body.batches) ? body.batches : []);
-        setMaterialOptions(Array.isArray(body.materials) ? body.materials : []);
-      }
+      const response = await axios.get(`${API_ENDPOINTS.BATCH_FILTER_OPTIONS}?${params}`);
+      const body = response.data || {};
+      setProductOptions(Array.isArray(body.products) ? body.products : []);
+      setBatchOptions(Array.isArray(body.batches) ? body.batches : []);
+      setMaterialOptions(Array.isArray(body.materials) ? body.materials : []);
     } catch (error) {
     }
   };
@@ -238,31 +183,26 @@ export function BatchRawDataPage() {
       setError(null);
 
       const params = new URLSearchParams();
-      const startDateOffset = getApiDateWithOffset(new Date(startDate));
-      const endDateOffset = getApiDateWithOffset(new Date(endDate));
+      params.append("startDate", saudiDatetimeLocalToUtcIso(startDate));
+      params.append("endDate", saudiDatetimeLocalToUtcIso(endDate));
+      params.append("page", currentPage.toString());
+      params.append("limit", rowsPerPage.toString());
+      params.append("includeTotal", "true");
 
-      if (startDateOffset && endDateOffset) {
-        params.append("startDate", startDateOffset.toISOString());
-        params.append("endDate", endDateOffset.toISOString());
-        params.append("page", currentPage.toString());
-        params.append("limit", rowsPerPage.toString());
-        params.append("includeTotal", "true");
-
-        if (selectedProducts.length > 0) {
-          selectedProducts.forEach(product => params.append("product", product));
-        }
-        if (selectedBatches.length > 0) {
-          selectedBatches.forEach(batch => params.append("batch", batch));
-        }
-        if (selectedMaterials.length > 0) {
-          selectedMaterials.forEach(material => params.append("material", material));
-        }
-
-        const response = await axios.get(`${API_ENDPOINTS.BATCH_KPI}/csv-format-report?${params}`);
-        const payload = response.data || {};
-        setRawData(Array.isArray(payload.data) ? payload.data : []);
-        setTotalRecords(typeof payload.total === "number" ? payload.total : 0);
+      if (selectedProducts.length > 0) {
+        selectedProducts.forEach(product => params.append("product", product));
       }
+      if (selectedBatches.length > 0) {
+        selectedBatches.forEach(batch => params.append("batch", batch));
+      }
+      if (selectedMaterials.length > 0) {
+        selectedMaterials.forEach(material => params.append("material", material));
+      }
+
+      const response = await axios.get(`${API_ENDPOINTS.BATCH_KPI}/csv-format-report?${params}`);
+      const payload = response.data || {};
+      setRawData(Array.isArray(payload.data) ? payload.data : []);
+      setTotalRecords(typeof payload.total === "number" ? payload.total : 0);
     } catch (err: any) {
       setError(err.message || "Failed to fetch data");
       setRawData([]);
@@ -294,70 +234,58 @@ export function BatchRawDataPage() {
 
       // Fetch all data for export (not just current page)
       const params = new URLSearchParams();
-      const startDateOffset = getApiDateWithOffset(new Date(startDate));
-      const endDateOffset = getApiDateWithOffset(new Date(endDate));
+      params.append("startDate", saudiDatetimeLocalToUtcIso(startDate));
+      params.append("endDate", saudiDatetimeLocalToUtcIso(endDate));
 
-      if (startDateOffset && endDateOffset) {
-        params.append("startDate", startDateOffset.toISOString());
-        params.append("endDate", endDateOffset.toISOString());
-
-        // Apply same filters as current view
-        if (selectedProducts.length > 0) {
-          selectedProducts.forEach(product => params.append("product", product));
-        }
-        if (selectedBatches.length > 0) {
-          selectedBatches.forEach(batch => params.append("batch", batch));
-        }
-        if (selectedMaterials.length > 0) {
-          selectedMaterials.forEach(material => params.append("material", material));
-        }
-
-        const allData = (await fetchAllKpiPages(
-          `${API_ENDPOINTS.BATCH_KPI}/csv-format-report`,
-          params
-        )) as Record<string, unknown>[];
-
-        if (allData.length === 0) {
-          return;
-        }
-
-        // Create CSV headers
-        const headers = tableHeaders.join(',');
-        
-        // Create CSV rows
-        const csvRows = allData.map((item: any) => 
-          tableHeaders.map(header => {
-            const value = item[header];
-            // Handle values that might contain commas or quotes
-            if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-              return `"${value.replace(/"/g, '""')}"`;
-            }
-            return value || '';
-          }).join(',')
-        );
-        
-        // Combine headers and rows
-        const csvContent = [headers, ...csvRows].join('\n');
-        
-        // Create and download file
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        
-        // Generate filename with current date range and record count
-        const startDateStr = new Date(startDate).toISOString().split('T')[0];
-        const endDateStr = new Date(endDate).toISOString().split('T')[0];
-        const filename = `reports_${startDateStr}_to_${endDateStr}_${allData.length}_records.csv`;
-        
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        // Show success message (no popup)
+      if (selectedProducts.length > 0) {
+        selectedProducts.forEach(product => params.append("product", product));
       }
+      if (selectedBatches.length > 0) {
+        selectedBatches.forEach(batch => params.append("batch", batch));
+      }
+      if (selectedMaterials.length > 0) {
+        selectedMaterials.forEach(material => params.append("material", material));
+      }
+
+      const allData = (await fetchAllKpiPages(
+        `${API_ENDPOINTS.BATCH_KPI}/csv-format-report`,
+        params
+      )) as Record<string, unknown>[];
+
+      if (allData.length === 0) {
+        return;
+      }
+
+      // Create CSV headers
+      const headers = tableHeaders.join(',');
+      
+      // Create CSV rows
+      const csvRows = allData.map((item: any) => 
+        tableHeaders.map(header => {
+          const value = item[header];
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value || '';
+        }).join(',')
+      );
+      
+      const csvContent = [headers, ...csvRows].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      
+      const startDateStr = startDate.split('T')[0];
+      const endDateStr = endDate.split('T')[0];
+      const filename = `reports_${startDateStr}_to_${endDateStr}_${allData.length}_records.csv`;
+
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error) {
     } finally {
       setCsvExporting(false);
@@ -396,10 +324,8 @@ export function BatchRawDataPage() {
         let cellValue = item[header] || "-";
         
         // Apply special formatting for date/time columns
-        if (header === "Batch Act Start" || header === "Batch Act End") {
-          cellValue = formatToUTCCustom(item[header], true);
-        } else if (header === "Batch Transfer Time") {
-          cellValue = formatToUTCCustom(item[header], true);
+        if (header === "Batch Act Start" || header === "Batch Act End" || header === "Batch Transfer Time") {
+          cellValue = formatSaudiTime(item[header], true);
         } else if (typeof item[header] === "number") {
           cellValue = item[header].toFixed(2);
         }

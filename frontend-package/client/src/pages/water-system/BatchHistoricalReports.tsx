@@ -8,6 +8,18 @@ import { FileText, Download, Printer, Calendar, Loader2, AlertCircle, CheckCircl
 import axios from 'axios';
 import { API_ENDPOINTS } from '@/config/api';
 import { fetchAllKpiPages } from '@/utils/kpiFetchAll';
+import {
+  addSaudiDays,
+  addSaudiMonths,
+  formatSaudiDateLabel,
+  formatSaudiTime,
+  formatSaudiTimeLabel,
+  getDefaultProductionDayRange,
+  getSpecificDateDefaults,
+  parseUtcDate,
+  saudiDatetimeLocalToUtcDate,
+  saudiDatetimeLocalToUtcIso,
+} from '@/utils/timezone';
 import asmLogo from '@/assets/Asm_Logo.png';
 import fakiehBrandLogo from '@/assets/fakiehlogo.webp';
 import herculesLogo from '@/assets/Hercules_New.png';
@@ -25,148 +37,7 @@ const tabs = [
 /** Axios ceiling for large historical payloads (server can exceed 30s on wide ranges). */
 const LARGE_REPORT_TIMEOUT_MS = 120_000;
 
-// Helper function to get default dates (yesterday like new system)
-const getDefaultDates = () => {
-  // Get current time in UTC
-  const now = new Date();
-  const utcTime = new Date(now.toLocaleString("en-US", {timeZone: "UTC"}));
-  
-  // Set start date to yesterday at 7 AM UTC
-  const startDate = new Date(utcTime);
-  startDate.setDate(utcTime.getDate() - 1);
-  startDate.setHours(7, 0, 0, 0);
-
-  // Set end date to today at 7 AM UTC (end of yesterday)
-  const endDate = new Date(utcTime);
-  endDate.setHours(7, 0, 0, 0);
-
-  // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-  const formatForInput = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  const result = {
-    startDate: formatForInput(startDate),
-    endDate: formatForInput(endDate)
-  };
-
-
-  return result;
-};
-
-// Helper function to get specific date defaults for weekly, daily, monthly filters
-// 4-hour offset function like in old code
-const getApiDateWithOffset = (displayDate: Date) => {
-  if (!displayDate) return null;
-  // Create a new date object to avoid modifying the original
-  const apiDate = new Date(displayDate);
-  // Subtract 4 hours from the display date for API calls
-  apiDate.setHours(apiDate.getHours() - 4);
-  return apiDate;
-};
-
-// Helper function to format dates to UTC with 12-hour format
-const formatToUTC = (dateString: string) => {
-  if (!dateString || dateString === 'N/A') return 'N/A';
-  
-  try {
-    // Parse the date string
-    const date = new Date(dateString);
-    
-    // Check if date is valid
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    
-    // Format to UTC with 12-hour format
-    return date.toLocaleString('en-US', {
-      timeZone: 'UTC',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
-  } catch (error) {
-    return 'Invalid Date';
-  }
-};
-
-// Helper function to format dates to local time with 4-hour offset applied
-const formatToLocalCustom = (dateString: string, includeSeconds: boolean = false) => {
-  if (!dateString || dateString === 'N/A') return 'N/A';
-  
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    
-    // Apply 4-hour offset to the date (subtract 4 hours)
-    const offsetDate = new Date(date.getTime() - (4 * 60 * 60 * 1000));
-    
-    const options: Intl.DateTimeFormatOptions = {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    };
-    
-    if (includeSeconds) {
-      options.second = '2-digit';
-    }
-    
-    return offsetDate.toLocaleString('en-US', options);
-  } catch (error) {
-    return 'Invalid Date';
-  }
-};
-
-const getSpecificDateDefaults = () => {
-  // Get current time in UTC
-  const now = new Date();
-  const utcTime = new Date(now.toLocaleString("en-US", {timeZone: "UTC"}));
-
-  // Last day start date (yesterday at 7 AM UTC)
-  const lastDay = new Date(utcTime);
-  lastDay.setDate(utcTime.getDate() - 1);
-  lastDay.setHours(7, 0, 0, 0);
-
-  // Last week start date (last Monday at 7 AM UTC)
-  const lastWeekStart = new Date(utcTime);
-  const dayOfWeek = utcTime.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If today is Sunday, go back 6 days to last Monday
-  lastWeekStart.setDate(utcTime.getDate() - daysToSubtract - 7); // Go back to last week's Monday
-  lastWeekStart.setHours(7, 0, 0, 0);
-
-  // Monthly start date (first day of previous month at 7 AM UTC)
-  const lastMonthStart = new Date(utcTime.getFullYear(), utcTime.getMonth() - 1, 1, 7, 0, 0);
-
-  // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-  const formatForInput = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  const result = {
-    weeklyStart: formatForInput(lastWeekStart),
-    dailyStart: formatForInput(lastDay),
-    monthlyStart: formatForInput(lastMonthStart)
-  };
-
-
-  return result;
-};
-
+const getDefaultDates = () => getDefaultProductionDayRange();
 
 // Custom MultiSelect Component
 interface MultiSelectProps {
@@ -428,12 +299,8 @@ export function BatchHistoricalReports() {
       const params = new URLSearchParams();
       
       // Use the applied filter dates for API call
-      const startDate = new Date(appliedStartDate);
-      const endDate = new Date(appliedEndDate);
-      
-      // Don't apply 4-hour offset for filter options - use exact dates as selected
-      params.append('startDate', startDate.toISOString());
-      params.append('endDate', endDate.toISOString());
+      params.append('startDate', saudiDatetimeLocalToUtcIso(appliedStartDate));
+      params.append('endDate', saudiDatetimeLocalToUtcIso(appliedEndDate));
       
       const fullUrl = apiUrl + '?' + params.toString();
       
@@ -471,13 +338,8 @@ export function BatchHistoricalReports() {
       const params = new URLSearchParams();
 
       // Use the applied filter dates for API call (more efficient)
-      const startDate = new Date(appliedStartDate);
-      const endDate = new Date(appliedEndDate);
-
-      // Don't apply 4-hour offset for Reports - use exact dates as selected
-      params.append('startDate', startDate.toISOString());
-      params.append('endDate', endDate.toISOString());
-      params.append('strictDateFilter', 'true');
+      params.append('startDate', saudiDatetimeLocalToUtcIso(appliedStartDate));
+      params.append('endDate', saudiDatetimeLocalToUtcIso(appliedEndDate));
 
       // Apply filters if available - handle arrays
       if (selectedBatch.length > 0) {
@@ -558,9 +420,7 @@ export function BatchHistoricalReports() {
   // Fetch daily report data when Detailed Report or Material Consumption Report is active to ensure consistency
   useEffect(() => {
     if (activeTab === "Detailed Report" || activeTab === "Material Consumption Report" || activeTab === "Total Material Consumption") {
-      const startDate = new Date(appliedStartDate);
-      const endDate = new Date(appliedEndDate);
-      fetchReportData('daily', startDate.toISOString(), endDate.toISOString());
+      fetchReportData('daily', appliedStartDate, appliedEndDate);
     }
   }, [activeTab, appliedStartDate, appliedEndDate, selectedProduct, selectedBatch, selectedMaterial]);
 
@@ -572,17 +432,15 @@ export function BatchHistoricalReports() {
   // Fetch report data when monthly/weekly/daily tabs are selected
   useEffect(() => {
     if (activeTab === "Monthly") {
-      const monthEndDate = new Date(monthlyStartDate);
-      monthEndDate.setMonth(monthEndDate.getMonth() + 1);
-      fetchReportData('monthly', monthlyStartDate, monthEndDate.toISOString());
+      const monthEndDate = addSaudiMonths(monthlyStartDate, 1);
+      fetchReportData('monthly', monthlyStartDate, monthEndDate);
     }
   }, [activeTab, monthlyStartDate]);
 
   useEffect(() => {
     if (activeTab === "Weekly") {
-      const weekEndDate = new Date(weeklyStartDate);
-      weekEndDate.setDate(weekEndDate.getDate() + 7);
-      fetchReportData('weekly', weeklyStartDate, weekEndDate.toISOString());
+      const weekEndDate = addSaudiDays(weeklyStartDate, 7);
+      fetchReportData('weekly', weeklyStartDate, weekEndDate);
     }
   }, [activeTab, weeklyStartDate]);
 
@@ -616,9 +474,8 @@ export function BatchHistoricalReports() {
       const apiUrl = API_ENDPOINTS.BATCH_REPORTS_QUERY;
       const params = new URLSearchParams();
 
-      // Don't apply 4-hour offset for reports - use exact dates as selected
-      params.append('startDate', new Date(startDate).toISOString());
-      params.append('endDate', new Date(endDate).toISOString());
+      params.append('startDate', saudiDatetimeLocalToUtcIso(startDate));
+      params.append('endDate', saudiDatetimeLocalToUtcIso(endDate));
       params.append('reportType', reportType);
 
       if (selectedBatch.length > 0) {
@@ -796,9 +653,10 @@ export function BatchHistoricalReports() {
       // First filter by date range
       const dateFilteredData = rawData.filter((item: any) => {
         if (!item.batchStart) return false;
-        const itemDate = new Date(item.batchStart);
-        const start = new Date(appliedStartDate);
-        const end = new Date(appliedEndDate);
+        const itemDate = parseUtcDate(item.batchStart);
+        const start = saudiDatetimeLocalToUtcDate(appliedStartDate);
+        const end = saudiDatetimeLocalToUtcDate(appliedEndDate);
+        if (!itemDate) return false;
         return itemDate >= start && itemDate <= end;
       });
 
@@ -840,10 +698,10 @@ export function BatchHistoricalReports() {
       // Date filtering (if item has batchStart or batchEnd or date)
       let dateMatch = true;
       if (item.batchStart || item.date) {
-        const itemDate = new Date(item.batchStart || item.date);
-        const start = new Date(appliedStartDate);
-        const end = new Date(appliedEndDate);
-        dateMatch = itemDate >= start && itemDate <= end;
+        const itemDate = parseUtcDate(item.batchStart || item.date);
+        const start = saudiDatetimeLocalToUtcDate(appliedStartDate);
+        const end = saudiDatetimeLocalToUtcDate(appliedEndDate);
+        dateMatch = !!itemDate && itemDate >= start && itemDate <= end;
       }
       // Product filter - handle arrays
       const productMatch = selectedProduct.length > 0 ? selectedProduct.includes(item.productName) : true;
@@ -887,7 +745,6 @@ export function BatchHistoricalReports() {
 
   const materialData = useMemo(() => {
     // For Material Consumption Report, use dailyReportData to ensure consistency with other reports
-    // This ensures the 4-hour offset is applied consistently
     let sourceData = dailyReportData.length > 0 ? dailyReportData : filteredData;
     
     // Apply material filter to the data before aggregation
@@ -1126,44 +983,25 @@ export function BatchHistoricalReports() {
 
   // Handlers for specific tab date filters
   const applyWeeklyFilter = () => {
-    // For weekly, calculate end date (7 days later)
-    const startDate = new Date(weeklyStartDate);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 7); // 7 days total
-    endDate.setHours(7, 0, 0, 0); // Set to 7 AM like old system
-
-    // Fetch data using the reports API
-    fetchReportData('weekly', startDate.toISOString(), endDate.toISOString());
+    const endDate = addSaudiDays(weeklyStartDate, 7);
+    fetchReportData('weekly', weeklyStartDate, endDate);
     setCurrentPage(1);
   };
 
   const applyMonthlyFilter = () => {
-    // For monthly, calculate end date (1 month later)
-    const startDate = new Date(monthlyStartDate);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 1);
-    endDate.setHours(7, 0, 0, 0); // Set to 7 AM like old system
-
-    // Fetch data using the reports API
-    fetchReportData('monthly', startDate.toISOString(), endDate.toISOString());
+    const endDate = addSaudiMonths(monthlyStartDate, 1);
+    fetchReportData('monthly', monthlyStartDate, endDate);
     setCurrentPage(1);
   };
 
   const applyDailyFilter = (isManualTrigger = false) => {
-    // For daily, calculate end date (next day)
-    const startDate = new Date(dailyStartDate);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 1);
-    endDate.setHours(7, 0, 0, 0); // Set to 7 AM like old system
+    const endDate = addSaudiDays(dailyStartDate, 1);
 
-
-    // Only set trigger flag if this is a manual trigger (VIEW button click)
     if (isManualTrigger) {
       setDailyReportTriggered(true);
     }
 
-    // Fetch data using the reports API
-    fetchReportData('daily', startDate.toISOString(), endDate.toISOString());
+    fetchReportData('daily', dailyStartDate, endDate);
     setCurrentPage(1);
   };
 
@@ -1235,8 +1073,8 @@ export function BatchHistoricalReports() {
           <tr key={index} className={baseRowClasses}>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.batchName}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.productName}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatToLocalCustom(item.batchStart, true)}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatToLocalCustom(item.batchEnd, true)}</td>
+            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatSaudiTime(item.batchStart, true)}</td>
+            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatSaudiTime(item.batchEnd, true)}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.batchQuantity}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.materialName}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.materialCode}</td>
@@ -1274,11 +1112,11 @@ export function BatchHistoricalReports() {
                   </div>
                   <div className="border-b border-slate-300 dark:border-slate-600 pb-1">
                     <div className="text-cyan-600 dark:text-cyan-300 font-bold text-xs uppercase tracking-wide">Started</div>
-                    <div className="text-slate-900 dark:text-white font-medium">{formatToLocalCustom(batchGroup?.batchStart || 'N/A', true)}</div>
+                    <div className="text-slate-900 dark:text-white font-medium">{formatSaudiTime(batchGroup?.batchStart || 'N/A', true)}</div>
                   </div>
                   <div className="border-b border-slate-300 dark:border-slate-600 pb-1">
                     <div className="text-cyan-600 dark:text-cyan-300 font-bold text-xs uppercase tracking-wide">Ended</div>
-                    <div className="text-slate-900 dark:text-white font-medium">{formatToLocalCustom(batchGroup?.batchEnd || 'N/A', true)}</div>
+                    <div className="text-slate-900 dark:text-white font-medium">{formatSaudiTime(batchGroup?.batchEnd || 'N/A', true)}</div>
                   </div>
                   <div>
                     <div className="text-cyan-600 dark:text-cyan-300 font-bold text-xs uppercase tracking-wide">Quantity</div>
@@ -1346,21 +1184,16 @@ export function BatchHistoricalReports() {
   // Helper function to get date range string for CSV
   const getDateRangeString = () => {
     if (activeTab === "Weekly") {
-      const start = new Date(weeklyStartDate);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 6);
-      return `Weekly Production Period: ${start.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${start.toLocaleTimeString('en-US', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: true })} - ${end.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${end.toLocaleTimeString('en-US', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: true })}`;
+      const end = addSaudiDays(weeklyStartDate, 6);
+      return `Weekly Production Period: ${formatSaudiDateLabel(weeklyStartDate, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(weeklyStartDate, { hour: '2-digit', minute: '2-digit', hour12: true })} - ${formatSaudiDateLabel(end, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(end, { hour: '2-digit', minute: '2-digit', hour12: true })} (AST)`;
     } else if (activeTab === "Monthly") {
-      const start = new Date(monthlyStartDate);
-      const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-      return `Monthly Production Period: ${start.toLocaleDateString('en-US', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' })} ${start.toLocaleTimeString('en-US', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: true })} - ${end.toLocaleDateString('en-US', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' })} 11:59 PM`;
+      const end = addSaudiMonths(monthlyStartDate, 1);
+      return `Monthly Production Period: ${formatSaudiDateLabel(monthlyStartDate, { day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(monthlyStartDate, { hour: '2-digit', minute: '2-digit', hour12: true })} - ${formatSaudiDateLabel(end, { day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(end, { hour: '2-digit', minute: '2-digit', hour12: true })} (AST)`;
     } else if (activeTab === "Daily Report") {
-      const startDate = new Date(dailyStartDate);
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + 1);
-      return `Daily Production Period: ${startDate.toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} - ${endDate.toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+      const endDate = addSaudiDays(dailyStartDate, 1);
+      return `Daily Production Period: ${formatSaudiDateLabel(dailyStartDate, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(dailyStartDate, { hour: '2-digit', minute: '2-digit', hour12: true })} - ${formatSaudiDateLabel(endDate, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(endDate, { hour: '2-digit', minute: '2-digit', hour12: true })} (AST)`;
     } else {
-      return `Date Range: ${appliedStartDate} to ${appliedEndDate}`;
+      return `Date Range: ${appliedStartDate} to ${appliedEndDate} (AST)`;
     }
   };
 
@@ -1418,10 +1251,10 @@ export function BatchHistoricalReports() {
               value = item.productName || '';
               break;
             case 'Batch Start':
-              value = formatToLocalCustom(item.batchStart || '', true);
+              value = formatSaudiTime(item.batchStart || '', true);
               break;
             case 'Batch End':
-              value = formatToLocalCustom(item.batchEnd || '', true);
+              value = formatSaudiTime(item.batchEnd || '', true);
               break;
             case 'Batch Quantity':
               value = item.batchQuantity || item.quantity || '';
@@ -1561,8 +1394,8 @@ export function BatchHistoricalReports() {
           const row = [
             item.batchName || '',
             item.productName || '',
-            formatToLocalCustom(item.batchStart || '', true),
-            formatToLocalCustom(item.batchEnd || '', true),
+            formatSaudiTime(item.batchStart || '', true),
+            formatSaudiTime(item.batchEnd || '', true),
             item.batchQuantity || '',
             item.materialName || '',
             item.materialCode || '',
@@ -2020,8 +1853,8 @@ export function BatchHistoricalReports() {
                 <td rowspan="${batchRowSpan}">
                   <strong>Batch:</strong> ${item.batchName || 'N/A'}<br>
                   <strong>Product:</strong> ${item.productName || 'N/A'}<br>
-                  <strong>Start:</strong> ${formatToLocalCustom(item.batchStart || 'N/A', true)}<br>
-                  <strong>End:</strong> ${formatToLocalCustom(item.batchEnd || 'N/A', true)}<br>
+                  <strong>Start:</strong> ${formatSaudiTime(item.batchStart || 'N/A', true)}<br>
+                  <strong>End:</strong> ${formatSaudiTime(item.batchEnd || 'N/A', true)}<br>
                   <strong>Quantity:</strong> ${item.batchQuantity || 'N/A'}
                 </td>
               `;
@@ -2061,10 +1894,10 @@ export function BatchHistoricalReports() {
                 value = item.productName || '';
                 break;
               case 'Batch Start':
-                value = formatToLocalCustom(item.batchStart || '', true);
+                value = formatSaudiTime(item.batchStart || '', true);
                 break;
               case 'Batch End':
-                value = formatToLocalCustom(item.batchEnd || '', true);
+                value = formatSaudiTime(item.batchEnd || '', true);
                 break;
               case 'Batch Quantity':
                 value = item.batchQuantity || item.quantity || '';
@@ -2408,24 +2241,7 @@ export function BatchHistoricalReports() {
               {activeTab === "Daily Report" && "Daily Report Summary"}
             </h3>
             <p className="text-slate-600 dark:text-slate-400 font-medium text-sm">
-              {activeTab === "Weekly" && (() => {
-                const start = new Date(weeklyStartDate);
-                const end = new Date(start);
-                end.setDate(end.getDate() + 6);
-                return `Weekly Production Period: ${start.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${start.toLocaleTimeString('en-US', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: true })} - ${end.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${end.toLocaleTimeString('en-US', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: true })}`;
-              })()}
-              {activeTab === "Monthly" && (() => {
-                const start = new Date(monthlyStartDate);
-                const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-                return `Monthly Production Period: ${start.toLocaleDateString('en-US', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' })} ${start.toLocaleTimeString('en-US', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: true })} - ${end.toLocaleDateString('en-US', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' })} 11:59 PM`;
-              })()}
-              {activeTab === "Daily Report" && (() => {
-                const startDate = new Date(dailyStartDate);
-                const endDate = new Date(startDate);
-                endDate.setDate(endDate.getDate() + 1);
-                // For Daily Report, display the exact selected time without timezone conversion
-                return `Daily Production Period: ${startDate.toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} - ${endDate.toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
-              })()}
+              {getDateRangeString()}
             </p>
           </div>
         )}
