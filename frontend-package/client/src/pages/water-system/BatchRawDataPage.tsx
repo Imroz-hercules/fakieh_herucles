@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,10 @@ import { FileText, Download, Calendar, Loader2, ChevronDown, Check, X } from "lu
 import axios from "axios";
 import { API_ENDPOINTS } from '@/config/api';
 import { fetchAllKpiPages } from '@/utils/kpiFetchAll';
+import {
+  BatchFilterOption,
+  normalizeBatchFilterOptions,
+} from '@/utils/batchFilterOptions';
 import {
   formatSaudiTime,
   getDefaultPreviousMonthRange,
@@ -22,6 +26,7 @@ interface MultiSelectProps {
   placeholder: string;
   allSelectedText: string;
   onDeselectAll?: () => void;
+  optionLabels?: Record<string, string>;
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -30,7 +35,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   onChange,
   placeholder,
   allSelectedText,
-  onDeselectAll
+  onDeselectAll,
+  optionLabels,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -117,7 +123,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
               }`}
               onClick={() => handleOptionClick(option)}
             >
-              <span className="text-sm text-slate-900 dark:text-white truncate">{option}</span>
+              <span className="text-sm text-slate-900 dark:text-white truncate">{optionLabels?.[option] ?? option}</span>
               {selectedValues.includes(option) && (
                 <Check className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
               )}
@@ -149,7 +155,7 @@ export function BatchRawDataPage() {
 
   // Filter options
   const [productOptions, setProductOptions] = useState<string[]>([]);
-  const [batchOptions, setBatchOptions] = useState<string[]>([]);
+  const [batchFilterOptions, setBatchFilterOptions] = useState<BatchFilterOption[]>([]);
   const [materialOptions, setMaterialOptions] = useState<string[]>([]);
 
   // Selected filters
@@ -161,6 +167,17 @@ export function BatchRawDataPage() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [csvExporting, setCsvExporting] = useState(false);
 
+  const { batchOptions, batchOptionLabels } = useMemo(() => {
+    const labels: Record<string, string> = {};
+    batchFilterOptions.forEach((b) => {
+      labels[b.value] = b.label;
+    });
+    const values = batchFilterOptions.map((b) => b.value).sort((a, b) =>
+      (labels[a] || a).localeCompare(labels[b] || b),
+    );
+    return { batchOptions: values, batchOptionLabels: labels };
+  }, [batchFilterOptions]);
+
   // Fetch filter options
   const fetchFilterOptions = async () => {
     try {
@@ -171,7 +188,7 @@ export function BatchRawDataPage() {
       const response = await axios.get(`${API_ENDPOINTS.BATCH_FILTER_OPTIONS}?${params}`);
       const body = response.data || {};
       setProductOptions(Array.isArray(body.products) ? body.products : []);
-      setBatchOptions(Array.isArray(body.batches) ? body.batches : []);
+      setBatchFilterOptions(normalizeBatchFilterOptions(body.batches));
       setMaterialOptions(Array.isArray(body.materials) ? body.materials : []);
     } catch (error) {
     }
@@ -406,6 +423,7 @@ export function BatchRawDataPage() {
                     <Label className="text-slate-600 dark:text-slate-300 font-medium">Select Batch:</Label>
                     <MultiSelect
                       options={batchOptions}
+                      optionLabels={batchOptionLabels}
                       selectedValues={selectedBatches}
                       onChange={setSelectedBatches}
                       placeholder="Select Batch"

@@ -9,6 +9,12 @@ import axios from 'axios';
 import { API_ENDPOINTS } from '@/config/api';
 import { fetchAllKpiPages } from '@/utils/kpiFetchAll';
 import {
+  batchGuidOf,
+  BatchFilterOption,
+  matchesBatchFilter,
+  normalizeBatchFilterOptions,
+} from '@/utils/batchFilterOptions';
+import {
   addSaudiDays,
   addSaudiMonths,
   formatSaudiDateLabel,
@@ -46,7 +52,8 @@ interface MultiSelectProps {
   onChange: (values: string[]) => void;
   placeholder: string;
   allSelectedText: string;
-  onDeselectAll?: () => void; // Callback for when deselecting all
+  onDeselectAll?: () => void;
+  optionLabels?: Record<string, string>;
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -55,7 +62,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   onChange,
   placeholder,
   allSelectedText,
-  onDeselectAll
+  onDeselectAll,
+  optionLabels,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -94,11 +102,13 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     }
   };
 
+  const labelFor = (value: string) => optionLabels?.[value] ?? value;
+
   const getDisplayText = () => {
     if (selectedValues.length === 0) return `${placeholder} (${options.length} available)`;
     if (selectedValues.length === options.length) return allSelectedText;
     if (selectedValues.length === 1) {
-      const label = selectedValues[0];
+      const label = labelFor(selectedValues[0]);
       const short = label.length > 42 ? `${label.slice(0, 39)}…` : label;
       return `${short} (${options.length} available)`;
     }
@@ -146,7 +156,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
                 }`}
               onClick={() => handleOptionClick(option)}
             >
-              <span className="truncate flex-1 text-xs">{option}</span>
+              <span className="truncate flex-1 text-xs">{labelFor(option)}</span>
               {selectedValues.includes(option) && (
                 <Check className="h-3 w-3 text-cyan-400 dark:text-cyan-400 text-cyan-600 ml-1 flex-shrink-0" />
               )}
@@ -274,7 +284,7 @@ export function BatchHistoricalReports() {
   
   // Filter options from backend
   const [allProductOptions, setAllProductOptions] = useState<string[]>([]);
-  const [allBatchOptions, setAllBatchOptions] = useState<string[]>([]);
+  const [allBatchOptions, setAllBatchOptions] = useState<BatchFilterOption[]>([]);
   const [allMaterialOptions, setAllMaterialOptions] = useState<string[]>([]);
   
   // Toast notification state
@@ -314,7 +324,7 @@ export function BatchHistoricalReports() {
         setAllProductOptions(data.products);
       }
       if (data.batches) {
-        setAllBatchOptions(data.batches);
+        setAllBatchOptions(normalizeBatchFilterOptions(data.batches));
       }
       if (data.materials) {
         setAllMaterialOptions(data.materials);
@@ -554,7 +564,7 @@ export function BatchHistoricalReports() {
 
     let filteredData = rawData;
     if (pendingBatch.length > 0) {
-      filteredData = filteredData.filter((item) => pendingBatch.includes(item.batchName));
+      filteredData = filteredData.filter((item) => matchesBatchFilter(item, pendingBatch));
     }
     filteredData = filteredData.filter((item: any) => {
       if (!item.batchStart) return false;
@@ -571,8 +581,11 @@ export function BatchHistoricalReports() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [rawData, pendingBatch, pendingStartDate, pendingEndDate, allProductOptions, pendingProduct]);
 
-  const batchOptions = useMemo(() => {
-    const set = new Set<string>();
+  const { batchOptions, batchOptionLabels } = useMemo(() => {
+    const labels: Record<string, string> = {};
+    allBatchOptions.forEach((b) => {
+      labels[b.value] = b.label;
+    });
 
     let filteredData = rawData;
     if (pendingProduct.length > 0) {
@@ -586,11 +599,19 @@ export function BatchHistoricalReports() {
       return itemDate >= start && itemDate <= end;
     });
     filteredData.forEach((item: any) => {
-      if (item.batchName) set.add(item.batchName);
+      const id = batchGuidOf(item);
+      if (id) {
+        labels[id] = labels[id] || item.batchName || id;
+      }
     });
-    allBatchOptions.forEach((b) => set.add(b));
-    pendingBatch.forEach((b) => set.add(b));
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    pendingBatch.forEach((id) => {
+      if (!labels[id]) labels[id] = id;
+    });
+
+    const values = Object.keys(labels).sort((a, b) =>
+      (labels[a] || a).localeCompare(labels[b] || b),
+    );
+    return { batchOptions: values, batchOptionLabels: labels };
   }, [rawData, pendingProduct, pendingStartDate, pendingEndDate, allBatchOptions, pendingBatch]);
 
   const materialOptions = useMemo(() => {
@@ -601,7 +622,7 @@ export function BatchHistoricalReports() {
       filteredData = filteredData.filter((item) => pendingProduct.includes(item.productName));
     }
     if (pendingBatch.length > 0) {
-      filteredData = filteredData.filter((item) => pendingBatch.includes(item.batchName));
+      filteredData = filteredData.filter((item) => matchesBatchFilter(item, pendingBatch));
     }
     filteredData = filteredData.filter((item: any) => {
       if (!item.batchStart) return false;
@@ -687,7 +708,7 @@ export function BatchHistoricalReports() {
       // Apply additional filters - handle arrays
       return flattenedData.filter((item: any) => {
         const productMatch = selectedProduct.length > 0 ? selectedProduct.includes(item.productName) : true;
-        const batchMatch = selectedBatch.length > 0 ? selectedBatch.includes(item.batchName) : true;
+        const batchMatch = matchesBatchFilter(item, selectedBatch);
         const materialMatch = selectedMaterial.length > 0 ? selectedMaterial.includes(item.materialName) : true;
         return productMatch && batchMatch && materialMatch;
       });
@@ -706,7 +727,7 @@ export function BatchHistoricalReports() {
       // Product filter - handle arrays
       const productMatch = selectedProduct.length > 0 ? selectedProduct.includes(item.productName) : true;
       // Batch filter - handle arrays
-      const batchMatch = selectedBatch.length > 0 ? selectedBatch.includes(item.batchName) : true;
+      const batchMatch = matchesBatchFilter(item, selectedBatch);
       // Material filter - handle arrays
       const materialMatch = selectedMaterial.length > 0 ? selectedMaterial.includes(item.materialName) : true;
       return dateMatch && productMatch && batchMatch && materialMatch;
@@ -797,7 +818,7 @@ export function BatchHistoricalReports() {
     // Apply filters to the data
     detailedData = detailedData.filter((item: any) => {
       const productMatch = selectedProduct.length > 0 ? selectedProduct.includes(item.productName) : true;
-      const batchMatch = selectedBatch.length > 0 ? selectedBatch.includes(item.batchName) : true;
+      const batchMatch = matchesBatchFilter(item, selectedBatch);
       const materialMatch = selectedMaterial.length > 0 ? selectedMaterial.includes(item.materialName) : true;
       return productMatch && batchMatch && materialMatch;
     });
@@ -2073,6 +2094,7 @@ export function BatchHistoricalReports() {
                 <Label className="text-slate-300 dark:text-slate-300 text-slate-600 font-medium text-xs">Select Batch:</Label>
                 <MultiSelect
                   options={batchOptions}
+                  optionLabels={batchOptionLabels}
                   selectedValues={pendingBatch}
                   onChange={setPendingBatch}
                   placeholder="Select Batch"
