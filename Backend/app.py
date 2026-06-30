@@ -28,8 +28,10 @@ from routes.kpi_material_routes import kpi_material_bp
 from routes.kpi_calendar_routes import kpi_calendar_bp
 from routes.distribution_routes import distribution_bp
 from routes.settings_routes import settings_bp
+from routes.client_routes import client_bp
 # Import models so db.create_all() picks up the new tables (PostgreSQL).
 from models.distribution import DistributionRule, SystemSetting
+from models.client import Client
 from background_sync import start_silo_sync
 
 app = Flask(__name__)
@@ -53,7 +55,11 @@ CORS(app, origins=[
 # Health check endpoint
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({'status': 'Server is running'})
+    return jsonify({
+        'status': 'Server is running',
+        'sqlserver_database': config.SQLSERVER_DATABASE,
+        'batch_materials_table': config.SQLSERVER_BATCH_MATERIALS_TABLE,
+    })
 
 # Test endpoint to verify database connection
 @app.route('/api/test', methods=['GET'])
@@ -123,10 +129,24 @@ app.register_blueprint(kpi_material_bp, url_prefix='/api')
 app.register_blueprint(kpi_calendar_bp, url_prefix='/api')
 app.register_blueprint(distribution_bp)
 app.register_blueprint(settings_bp)
+app.register_blueprint(client_bp)
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Creates tables if they don't exist
+
+        # Add distribution window columns on pre-existing installs
+        try:
+            from models.distribution import ensure_distribution_columns
+            ensure_distribution_columns()
+        except Exception as _mig_err:
+            print(f"Distribution column migration skipped: {_mig_err}")
+
+        try:
+            from models.client import ensure_clients_index
+            ensure_clients_index()
+        except Exception as _client_idx_err:
+            print(f"Clients index migration skipped: {_client_idx_err}")
         
         # Start background silo sync task (in-process; avoids HTTP self-call)
         start_silo_sync(app)

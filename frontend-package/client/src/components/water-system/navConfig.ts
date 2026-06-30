@@ -12,6 +12,7 @@ import {
   Table2,
   BarChart3,
   Send,
+  Users,
 } from 'lucide-react'
 
 export interface SidebarNavItem {
@@ -62,6 +63,12 @@ const trucksItems: SidebarNavItem[] = [
     icon: Scale,
     label: 'Truck Weighbridge',
     description: 'Live Weighbridge & Entry Management',
+  },
+  {
+    path: '/fakieh/client-information',
+    icon: Users,
+    label: 'Client Information',
+    description: 'Manage client name and contact number',
   },
 ]
 
@@ -210,6 +217,7 @@ export const topNavItems: TopNavItem[] = [
     items: [
       { path: '/fakieh/truck-management', label: 'Truck management' },
       { path: '/fakieh/truck-entry', label: 'Truck weighbridge' },
+      { path: '/fakieh/client-information', label: 'Client information' },
     ],
   },
   {

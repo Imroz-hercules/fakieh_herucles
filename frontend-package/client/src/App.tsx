@@ -27,6 +27,7 @@ import { RFID } from "./pages/water-system/RFID";
 import { Weighbridge } from "./pages/water-system/Weighbridge";
 import TruckManagement from "./pages/water-system/TruckManagement";
 import TruckEntry from "./pages/water-system/TruckEntry";
+import ClientInformation from "./pages/water-system/ClientInformation";
 import { Alarms } from "./pages/water-system/Alarms";
 import { Admin } from "./pages/water-system/Admin";
 import { PLCConfiguration } from "./pages/water-system/PlcConfiguration";
@@ -67,6 +68,7 @@ function Router() {
       <Route path="/fakieh/weighbridge" component={Weighbridge} />
       <Route path="/fakieh/truck-management" component={TruckManagement} />
       <Route path="/fakieh/truck-entry" component={TruckEntry} />
+      <Route path="/fakieh/client-information" component={ClientInformation} />
       <Route path="/fakieh/alarms" component={Alarms} />
       <Route path="/fakieh/admin" component={Admin} />
       <Route path="/fakieh/distribution" component={Distribution} />
