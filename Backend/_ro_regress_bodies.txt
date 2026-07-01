@@ -1,0 +1,512 @@
+
+
+################## usp_Collect_From_Server1  (modify_date=2025-08-11 20:38:19.480000) ##################
+CREATE   PROCEDURE dbo.usp_Collect_From_Server1
+AS
+BEGIN
+  SET NOCOUNT ON;
+  EXEC dbo.usp_StagePV_FromServer1;          -- you already created & tested this
+  EXEC dbo.usp_Upsert_BatchCopy_FromPV;
+  EXEC dbo.usp_Merge_BatchMaterials_FromLocal;
+END
+
+
+################## usp_Collect_From_Server2  (modify_date=2025-09-01 11:58:16.890000) ##################
+CREATE   PROCEDURE dbo.usp_Collect_From_Server2
+AS
+BEGIN
+  SET NOCOUNT ON;
+  EXEC dbo.usp_StagePV_FromServer2;          -- you already created & tested this
+  EXEC dbo.usp_Upsert_BatchCopy_FromPV;
+  EXEC dbo.usp_Merge_BatchMaterials_FromLocal;
+END
+
+
+################## usp_StagePV_FromServer1  (modify_date=2026-06-17 16:36:08.450000) ##################
+CREATE PROCEDURE [dbo].[usp_StagePV_FromServer1]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @LastSync DATETIME;
+    DECLARE @NewMaxTime DATETIME;
+
+    SELECT @LastSync = LastTimeStamp
+    FROM dbo.DataSyncTracker
+    WHERE [Source Server] = 'Server1';
+
+	 ;WITH S AS
+	(
+		SELECT
+			v.ROOTGUID,
+			v.POBJID,
+			v.POTID,
+			v.P2OBJID,
+			v.P2OTID,
+			v.OBJID,
+			v.ActivationCounter,
+			v.EventID,
+			v.[TimeStamp],
+			v.[Name] COLLATE DATABASE_DEFAULT AS [Name],
+			v.EventNotifyType,
+			v.UsageId,
+			v.DataTypeId,
+			v.DataTypeName COLLATE DATABASE_DEFAULT AS DataTypeName,
+			v.UoMId,
+			v.UoMName COLLATE DATABASE_DEFAULT AS UoMName,
+			v.HighValue,
+			v.LowValue,
+			v.RecHighValue,
+			v.RecLowValue,
+			v.sp_float,
+			v.av_float,
+			v.sp_matname COLLATE DATABASE_DEFAULT AS sp_matname,
+			v.sp_matcode COLLATE DATABASE_DEFAULT AS sp_matcode,
+			v.sp_prot,
+			'Server1' AS SourceServer
+		FROM [FAKIEH_SERVER1].SimaticBatch.SIMATIC_BATCH.ParValueOnline v
+		WHERE v.[Name] IS NOT NULL
+		  AND (
+				@LastSync IS NULL
+				OR v.[TimeStamp] > @LastSync
+			  )
+	)
+
+    MERGE dbo.ParValueOnline_copy AS T
+    USING S
+       ON T.ROOTGUID = S.ROOTGUID
+      AND T.[TimeStamp] = S.[TimeStamp]
+      AND T.[Name] = S.[Name]
+
+    WHEN NOT MATCHED THEN
+        INSERT
+        (
+            ROOTGUID,POBJID,POTID,P2OBJID,P2OTID,
+            OBJID,ActivationCounter,EventID,
+            [TimeStamp],[Name],EventNotifyType,
+            UsageId,DataTypeId,DataTypeName,
+            UoMId,UoMName,HighValue,LowValue,
+            RecHighValue,RecLowValue,
+            sp_float,av_float,
+            sp_matname,sp_matcode,sp_prot,
+            SourceServer
+        )
+        VALUES
+        (
+            S.ROOTGUID,S.POBJID,S.POTID,S.P2OBJID,S.P2OTID,
+            S.OBJID,S.ActivationCounter,S.EventID,
+            S.[TimeStamp],S.[Name],S.EventNotifyType,
+            S.UsageId,S.DataTypeId,S.DataTypeName,
+            S.UoMId,S.UoMName,S.HighValue,S.LowValue,
+            S.RecHighValue,S.RecLowValue,
+            S.sp_float,S.av_float,
+            S.sp_matname,S.sp_matcode,S.sp_prot,
+            S.SourceServer
+        );
+
+    SELECT
+        @NewMaxTime = MAX([TimeStamp])
+    FROM dbo.ParValueOnline_copy
+    WHERE SourceServer = 'Server1';
+
+    IF @NewMaxTime IS NOT NULL
+    BEGIN
+        MERGE dbo.DataSyncTracker AS T
+        USING
+        (
+            SELECT
+                'Server1' AS SourceServer,
+                @NewMaxTime AS LastTimeStamp
+        ) AS S
+        ON T.[Source Server] = S.SourceServer
+
+        WHEN MATCHED THEN
+            UPDATE SET
+                LastTimeStamp = S.LastTimeStamp
+
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                [Source Server],
+                LastTimeStamp
+            )
+            VALUES
+            (
+                S.SourceServer,
+                S.LastTimeStamp
+            );
+    END
+END
+
+
+################## usp_StagePV_FromServer2  (modify_date=2026-06-20 08:15:01.827000) ##################
+
+/*============================================================================
+  FIX 3 â€” usp_StagePV_FromServer2
+  Only difference vs production:
+      FROM [FAKIEH_SERVER2].SimaticBatch.SIMATIC_BATCH.ParValueOnline   -- was FAKIEH_SERVER1
+      'Server2' AS SourceServer                                         -- was 'Server1'
+  (watermark read/update already correctly keyed on 'Server2').
+============================================================================*/
+CREATE PROCEDURE [dbo].[usp_StagePV_FromServer2]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @LastSync   DATETIME;
+    DECLARE @NewMaxTime DATETIME;
+
+    SELECT @LastSync = LastTimeStamp
+    FROM dbo.DataSyncTracker
+    WHERE [Source Server] = 'Server2';
+
+    ;WITH S AS
+    (
+        SELECT
+            v.ROOTGUID, v.POBJID, v.POTID, v.P2OBJID, v.P2OTID, v.OBJID,
+            v.ActivationCounter, v.EventID, v.[TimeStamp],
+            v.[Name] COLLATE DATABASE_DEFAULT AS [Name],
+            v.EventNotifyType, v.UsageId, v.DataTypeId,
+            v.DataTypeName COLLATE DATABASE_DEFAULT AS DataTypeName,
+            v.UoMId, v.UoMName COLLATE DATABASE_DEFAULT AS UoMName,
+            v.HighValue, v.LowValue, v.RecHighValue, v.RecLowValue,
+            v.sp_float, v.av_float,
+            v.sp_matname COLLATE DATABASE_DEFAULT AS sp_matname,
+            v.sp_matcode COLLATE DATABASE_DEFAULT AS sp_matcode,
+            v.sp_prot,
+            'Server2' AS SourceServer                                   -- FIX: tag Server2
+        FROM [FAKIEH_SERVER2].SimaticBatch.SIMATIC_BATCH.ParValueOnline v   -- FIX: read OS2
+        WHERE v.[Name] IS NOT NULL
+          AND (@LastSync IS NULL OR v.[TimeStamp] > @LastSync)
+    )
+    MERGE dbo.ParValueOnline_copy AS T
+    USING S
+       ON T.ROOTGUID    = S.ROOTGUID
+      AND T.[TimeStamp] = S.[TimeStamp]
+      AND T.[Name]      = S.[Name]
+    WHEN NOT MATCHED THEN
+        INSERT (ROOTGUID,POBJID,POTID,P2OBJID,P2OTID,OBJID,ActivationCounter,EventID,
+                [TimeStamp],[Name],EventNotifyType,UsageId,DataTypeId,DataTypeName,
+                UoMId,UoMName,HighValue,LowValue,RecHighValue,RecLowValue,
+                sp_float,av_float,sp_matname,sp_matcode,sp_prot,SourceServer)
+        VALUES (S.ROOTGUID,S.POBJID,S.POTID,S.P2OBJID,S.P2OTID,S.OBJID,S.ActivationCounter,S.EventID,
+                S.[TimeStamp],S.[Name],S.EventNotifyType,S.UsageId,S.DataTypeId,S.DataTypeName,
+                S.UoMId,S.UoMName,S.HighValue,S.LowValue,S.RecHighValue,S.RecLowValue,
+                S.sp_float,S.av_float,S.sp_matname,S.sp_matcode,S.sp_prot,S.SourceServer);
+
+    SELECT @NewMaxTime = MAX([TimeStamp])
+    FROM dbo.ParValueOnline_copy
+    WHERE SourceServer = 'Server2';
+
+    IF @NewMaxTime IS NOT NULL
+    BEGIN
+        MERGE dbo.DataSyncTracker AS T
+        USING (SELECT 'Server2' AS SourceServer, @NewMaxTime AS LastTimeStamp) AS S
+        ON T.[Source Server] = S.SourceServer
+        WHEN MATCHED THEN UPDATE SET LastTimeStamp = S.LastTimeStamp
+        WHEN NOT MATCHED THEN INSERT ([Source Server], LastTimeStamp) VALUES (S.SourceServer, S.LastTimeStamp);
+    END
+END
+
+
+################## usp_Upsert_BatchCopy_FromPV  (modify_date=2026-06-20 08:15:01.800000) ##################
+
+/*============================================================================
+  FIX 1 â€” usp_Upsert_BatchCopy_FromPV
+  Only difference vs production:
+    INSERT  ROOTGUID = ISNULL(S.BatchROOTGUID, S.BatchOGUID)   -- was S.BatchROOTGUID
+    UPDATE  T.ROOTGUID = ISNULL(S.BatchROOTGUID, T.ROOTGUID)   -- was S.BatchROOTGUID
+  Preserved: BatchOGUID = ISNULL(b.OGUID, a.ROOTGUID); Name COALESCE; SourceServer.
+============================================================================*/
+CREATE PROCEDURE [dbo].[usp_Upsert_BatchCopy_FromPV]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @LastSync     DATETIME;
+    DECLARE @MaxTimeStamp DATETIME;
+
+    SELECT @LastSync = LastTimeStamp
+    FROM dbo.DataSyncTracker
+    WHERE [Source Server] = 'BatchCopy';
+
+    ;WITH agg AS
+    (
+        SELECT
+            ROOTGUID,
+            MAX(SourceServer) AS SourceServer,
+            MIN([TimeStamp])  AS ActStart,
+            MAX([TimeStamp])  AS ActEnd,
+            MAX([TimeStamp])  AS BatchTransferTime
+        FROM dbo.ParValueOnline_copy
+        WHERE @LastSync IS NULL
+           OR [TimeStamp] > @LastSync
+        GROUP BY ROOTGUID
+    ),
+    BatchSource AS
+    (
+        SELECT OGUID, ROOTGUID, ROOTOBJID, ROOTOTID, OBJID, OTID, Created, OrderId,
+               ProductName, Quantity, FormulaName, FormulaCategoryName, BatchTransferTime,
+               'Server1' AS SourceServer
+        FROM [FAKIEH_SERVER1].SimaticBatch.SIMATIC_BATCH.Batch
+        UNION ALL
+        SELECT OGUID, ROOTGUID, ROOTOBJID, ROOTOTID, OBJID, OTID, Created, OrderId,
+               ProductName, Quantity, FormulaName, FormulaCategoryName, BatchTransferTime,
+               'Server2' AS SourceServer
+        FROM [FAKIEH_SERVER2].SimaticBatch.SIMATIC_BATCH.Batch
+    ),
+    src AS
+    (
+        SELECT
+            ISNULL(b.OGUID, a.ROOTGUID)                  AS BatchOGUID,
+            a.ROOTGUID,
+            ISNULL(b.SourceServer, a.SourceServer)       AS SourceServer,
+            a.ActStart,
+            a.ActEnd,
+            COALESCE(b.BatchTransferTime, a.BatchTransferTime) AS BatchTransferTime,
+            b.ROOTGUID  AS BatchROOTGUID,
+            b.ROOTOBJID, b.ROOTOTID, b.OBJID, b.OTID, b.Created, b.OrderId,
+            COALESCE(b.FormulaName, b.ProductName, N'Auto from PV') AS [Name],
+            b.ProductName, b.Quantity, b.FormulaCategoryName
+        FROM agg a
+        LEFT JOIN BatchSource b
+            ON b.OGUID = a.ROOTGUID
+    )
+    MERGE dbo.BatchCopy AS T
+    USING src AS S
+        ON T.OGUID = S.BatchOGUID
+    WHEN NOT MATCHED THEN
+        INSERT (OGUID, ROOTGUID, ROOTOBJID, ROOTOTID, OBJID, OTID, Created, OrderId,
+                [Name], ProductName, ActStart, ActEnd, BatchTransferTime, Quantity,
+                FormulaCategoryName, SourceServer)
+        VALUES (S.BatchOGUID,
+                ISNULL(S.BatchROOTGUID, S.BatchOGUID),     -- FIX: fallback to OGUID when header purged
+                ISNULL(S.ROOTOBJID, 0), ISNULL(S.ROOTOTID, 0), ISNULL(S.OBJID, 0), ISNULL(S.OTID, 0),
+                ISNULL(S.Created, SYSDATETIMEOFFSET()), ISNULL(S.OrderId, 0),
+                S.[Name], S.ProductName, S.ActStart, S.ActEnd, S.BatchTransferTime,
+                ISNULL(S.Quantity, 0), S.FormulaCategoryName, S.SourceServer)
+    WHEN MATCHED THEN
+        UPDATE SET
+            T.ROOTGUID            = ISNULL(S.BatchROOTGUID, T.ROOTGUID),   -- FIX: never overwrite good ROOTGUID with NULL
+            T.ROOTOBJID           = ISNULL(S.ROOTOBJID, T.ROOTOBJID),
+            T.ROOTOTID            = ISNULL(S.ROOTOTID, T.ROOTOTID),
+            T.OBJID               = ISNULL(S.OBJID, T.OBJID),
+            T.OTID                = ISNULL(S.OTID, T.OTID),
+            T.Created             = ISNULL(S.Created, T.Created),
+            T.OrderId             = ISNULL(S.OrderId, T.OrderId),
+            T.[Name]              = ISNULL(S.[Name], T.[Name]),
+            T.ProductName         = ISNULL(S.ProductName, T.ProductName),
+            T.Quantity            = ISNULL(S.Quantity, T.Quantity),
+            T.FormulaCategoryName = ISNULL(S.FormulaCategoryName, T.FormulaCategoryName),
+            T.ActStart            = S.ActStart,
+            T.ActEnd              = S.ActEnd,
+            T.BatchTransferTime   = S.BatchTransferTime,
+            T.SourceServer        = S.SourceServer;
+
+    SELECT @MaxTimeStamp = MAX([TimeStamp]) FROM dbo.ParValueOnline_copy;
+
+    IF @MaxTimeStamp IS NOT NULL
+    BEGIN
+        MERGE dbo.DataSyncTracker AS T
+        USING (SELECT 'BatchCopy' AS Src, @MaxTimeStamp AS LastTimeStamp) AS S
+        ON T.[Source Server] = S.Src
+        WHEN MATCHED THEN UPDATE SET LastTimeStamp = S.LastTimeStamp
+        WHEN NOT MATCHED THEN INSERT ([Source Server], LastTimeStamp) VALUES (S.Src, S.LastTimeStamp);
+    END
+END
+
+
+################## usp_Merge_BatchMaterials_FromLocal  (modify_date=2026-06-21 18:11:04.050000) ##################
+CREATE PROCEDURE [dbo].[usp_Merge_BatchMaterials_FromLocal]
+AS
+BEGIN
+SET NOCOUNT ON;
+
+
+/*============================================================================
+  FIX 3 — usp_Merge_BatchMaterials_FromLocal
+
+  Root Cause:
+  Fakieh material records do not always populate both sp_float and av_float.
+  The previous filter required both values to be > 0:
+
+      pv.av_float > 0
+      AND pv.sp_float > 0
+      AND pv.sp_matname IS NOT NULL
+
+  Investigation Results:
+      Total PV rows      = 331
+      av_float > 0 rows  = 13
+      sp_float > 0 rows  = 158
+      Material rows      = 159
+      Final rows loaded  = 1
+
+  Therefore valid material rows were being excluded.
+
+  Changes:
+      1. Keep batches with FormulaCategoryName NULL.
+      2. Keep 'Auto from PV' batches.
+      3. Accept material rows when either:
+             sp_float > 0
+          OR av_float > 0
+      4. Preserve ROW_NUMBER() deduplication logic.
+      5. Preserve MERGE key compatible with existing unique index.
+
+============================================================================*/
+
+;WITH latest AS
+(
+    SELECT
+        ISNULL(bc.SourceServer,'Unknown') AS [Source Server],
+        bc.OGUID               AS [Batch GUID],
+        bc.ROOTGUID,
+        bc.OrderId,
+        bc.[Name]              AS [Batch Name],
+        bc.ProductName         AS [Product Name],
+        bc.FormulaCategoryName AS [FormulaCategoryName],
+        bc.ActStart            AS [Batch Act Start],
+        bc.ActEnd              AS [Batch Act End],
+        bc.BatchTransferTime   AS [Batch Transfer Time],
+        bc.Quantity,
+        pv.sp_matname          AS [Material Name],
+        pv.sp_matcode          AS [Material Code],
+        pv.sp_prot,
+        pv.sp_float            AS [SetPoint Float],
+        pv.av_float            AS [Actual Value Float],
+        pv.[TimeStamp],
+
+       ROW_NUMBER() OVER
+		(
+			PARTITION BY
+				ISNULL(bc.SourceServer,'Unknown'),
+				bc.OGUID,
+				pv.sp_matcode,
+				pv.sp_matname,
+				pv.sp_prot
+			ORDER BY
+				CASE
+					WHEN pv.Name = 'QTY'
+						 AND ISNULL(pv.av_float,0) > 0 THEN 0
+
+					WHEN ISNULL(pv.av_float,0) > 0 THEN 1
+
+					WHEN ISNULL(pv.sp_float,0) > 0 THEN 2
+
+					ELSE 3
+				END,
+				pv.[TimeStamp] DESC
+		) AS rn
+
+    FROM dbo.BatchCopy bc
+    INNER JOIN dbo.ParValueOnline_copy pv
+        ON pv.ROOTGUID = bc.OGUID
+
+	 WHERE pv.sp_matname IS NOT NULL
+	  AND pv.sp_matname <> 'Empty'
+	  AND (
+			ISNULL(pv.sp_float,0) > 0
+			OR
+			ISNULL(pv.av_float,0) > 0
+		  )
+
+    -- FormulaCategoryName filter intentionally removed
+    -- Auto from PV filter intentionally removed
+),
+
+agg AS
+(
+    SELECT
+        [Source Server],
+        [Batch GUID],
+        ROOTGUID,
+        OrderId,
+        [Batch Name],
+        [Product Name],
+        FormulaCategoryName,
+        [Batch Act Start],
+        [Batch Act End],
+        [Batch Transfer Time],
+        Quantity,
+        [Material Name],
+        [Material Code],
+        sp_prot,
+        [SetPoint Float],
+        [Actual Value Float]
+    FROM latest
+    WHERE rn = 1
+)
+
+MERGE dbo.BatchMaterials AS T
+USING agg AS S
+    ON  T.[Source Server] = S.[Source Server]
+    AND T.[Batch GUID]    = S.[Batch GUID]
+    AND T.[Material Name] = S.[Material Name]
+    AND (
+            (T.[Material Code] IS NULL AND S.[Material Code] IS NULL)
+            OR
+            T.[Material Code] = S.[Material Code]
+        )
+    AND (
+            (T.sp_prot IS NULL AND S.sp_prot IS NULL)
+            OR
+            T.sp_prot = S.sp_prot
+        )
+
+WHEN NOT MATCHED THEN
+    INSERT
+    (
+        [Source Server],
+        [Batch GUID],
+        ROOTGUID,
+        OrderId,
+        [Batch Name],
+        [Product Name],
+        FormulaCategoryName,
+        [Batch Act Start],
+        [Batch Act End],
+        [Batch Transfer Time],
+        Quantity,
+        [Material Name],
+        [Material Code],
+        sp_prot,
+        [SetPoint Float],
+        [Actual Value Float]
+    )
+    VALUES
+    (
+        S.[Source Server],
+        S.[Batch GUID],
+        S.ROOTGUID,
+        S.OrderId,
+        S.[Batch Name],
+        S.[Product Name],
+        S.FormulaCategoryName,
+        S.[Batch Act Start],
+        S.[Batch Act End],
+        S.[Batch Transfer Time],
+        S.Quantity,
+        S.[Material Name],
+        S.[Material Code],
+        S.sp_prot,
+        S.[SetPoint Float],
+        S.[Actual Value Float]
+    )
+
+WHEN MATCHED THEN
+    UPDATE SET
+        T.ROOTGUID              = S.ROOTGUID,
+        T.OrderId               = S.OrderId,
+        T.[Batch Name]          = S.[Batch Name],
+        T.[Product Name]        = S.[Product Name],
+        T.[Batch Act Start]     = S.[Batch Act Start],
+        T.[Batch Act End]       = S.[Batch Act End],
+        T.[Batch Transfer Time] = S.[Batch Transfer Time],
+        T.Quantity              = S.Quantity,
+        T.[Material Code]       = S.[Material Code],
+        T.sp_prot               = S.sp_prot,
+        T.[SetPoint Float]      = S.[SetPoint Float],
+        T.[Actual Value Float]  = S.[Actual Value Float],
+        T.[FormulaCategoryName] = S.[FormulaCategoryName],
+        T.[Source Server]       = S.[Source Server];
+
+END

@@ -1,0 +1,561 @@
+PHASE 5 GAP CLOSURE @ local 2026-06-20T06:44:45.843434 (Windows-auth sysadmin, READ-ONLY)
+
+===== 0.identity =====
+s | lg | sa | now
+DESKTOP-N8PGI9S\FAKIEH_REPORTING | DESKTOP-N8PGI9S\Hercu | 1 | 2026-06-20 06:44:45.8434341 +03:00
+(1 rows)
+
+############## A. OS1 RetrieveAndStoreAllBatchData_S1 BODY ##############
+
+----- [OS1_SQL] OS1 proc body via sys.sql_modules -----
+CREATE   PROCEDURE dbo.RetrieveAndStoreAllBatchData_S1
+  @StartDate DATETIME = NULL,
+  @EndDate   DATETIME = NULL
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  DECLARE @UseDateRange BIT =
+    CASE WHEN @StartDate IS NOT NULL AND @EndDate IS NOT NULL THEN 1 ELSE 0 END;
+
+  DECLARE @LastBT_S1 DATETIME;
+  SELECT @LastBT_S1 = LastTimeStamp
+  FROM dbo.DataSyncTracker
+  WHERE [Source Server] = 'Server1';
+
+  IF OBJECT_ID('tempdb..#TempBatchData') IS NOT NULL DROP TABLE #TempBatchData;
+  CREATE TABLE #TempBatchData (
+    [Source Server] NVARCHAR(50), [Batch GUID] UNIQUEIDENTIFIER, ROOTGUID UNIQUEIDENTIFIER, OrderId INT,
+    [Batch Name] NVARCHAR(255), [Product Name] NVARCHAR(255),
+    [Batch Act Start] DATETIME, [Batch Act End] DATETIME, [Batch Transfer Time] DATETIME,
+    Quantity FLOAT, [Material Name] NVARCHAR(255), [Material Code] NVARCHAR(255),
+    sp_prot FLOAT, [SetPoint Float] FLOAT, [Actual Value Float] FLOAT,
+    [TimeStamp] DATETIME, FormulaCategoryName NVARCHAR(255)
+  );
+
+  ;WITH S1 AS (
+    SELECT
+      'Server1' AS [Source Server],
+      BC.OGUID, BC.ROOTGUID, BC.OrderId,
+      BC.Name AS [Batch Name], BC.ProductName AS [Product Name],
+      CONVERT(DATETIME, BC.ActStart) AS [Batch Act Start],
+      CONVERT(DATETIME, BC.ActEnd)   AS [Batch Act End],
+      CONVERT(DATETIME, BC.BatchTransferTime) AS [Batch Transfer Time],
+      BC.Quantity,
+      PV.sp_matname AS [Material Name],
+      PV.sp_matcode AS [Material Code],
+      PV.sp_prot,
+      PV.sp_float   AS [SetPoint Float],
+      PV.av_float   AS [Actual Value Float],
+      PV.TimeStamp,
+      BC.FormulaCategoryName,
+      ROW_NUMBER() OVER (
+        PARTITION BY BC.OGUID, BC.FormulaCategoryName, PV.sp_matcode, PV.sp_matname, PV.sp_prot
+        ORDER BY PV.TimeStamp DESC
+      ) AS rn
+    FROM ASMBatchReports.dbo.BatchCopy           AS BC
+    JOIN ASMBatchReports.dbo.ParValueOnline_copy AS PV
+      ON BC.OGUID = PV.ROOTGUID
+    WHERE PV.av_float > 0 AND PV.sp_float > 0 AND PV.sp_matname IS NOT NULL
+      AND (
+            (@UseDateRange = 1 AND BC.BatchTransferTime BETWEEN @StartDate AND @EndDate)
+         OR (@UseDateRange = 0 AND (@LastBT_S1 IS NULL OR BC.BatchTransferTime > @LastBT_S1))
+          )
+  )
+  INSERT #TempBatchData
+  SELECT 'Server1', OGUID, ROOTGUID, OrderId, [Batch Name], [Product Name],
+         [Batch Act Start], [Batch Act End], [Batch Transfer Time],
+         Quantity, [Material Name], [Material Code], sp_prot,
+         [SetPoint Float], [Actual Value Float], TimeStamp, FormulaCategoryName
+  FROM S1 WHERE rn = 1;
+
+  ;WITH Agg AS (
+    SELECT
+      [Source Server], [Batch GUID], [Material Name], [Material Code], FormulaCategoryName, sp_prot,
+      MAX(ROOTGUID) AS ROOTGUID, MAX(OrderId) AS OrderId,
+      MAX([Batch Name]) AS [Batch Name], MAX([Product Name]) AS [Product Name],
+      MIN([Batch Act Start]) AS [Batch Act Start], MAX([Batch Act End]) AS [Batch Act End],
+      MAX([Batch Transfer Time]) AS [Batch Transfer Time],
+      MAX(Quantity) AS Quantity,
+      MAX([SetPoint Float]) AS [SetPoint Float],
+      MAX([Actual Value Float]) AS [Actual Value Float]
+    FROM #TempBatchData
+    GROUP BY [Source Server], [Batch GUID], [Material Name], [Material Code], FormulaCategoryName, sp_prot
+  )
+  MERGE dbo.BatchMaterials AS T
+  USING Agg AS S
+    ON  T.[Source Server]     = S.[Source Server]
+    AND T.[Batch GUID]        = S.[Batch GUID]
+    AND T.[Material Name]     = S.[Material Name]
+    AND ((T.[Material Code] IS NULL AND S.[Material Code] IS NULL) OR T.[Material Code] = S.[Material Code])
+    AND T.FormulaCategoryName = S.FormulaCategoryName
+    AND ((T.sp_prot IS NULL AND S.sp_prot IS NULL) OR T.sp_prot = S.sp_prot)
+  WHEN NOT MATCHED THEN
+    INSERT ([Source Server],[Batch GUID],ROOTGUID,OrderId,[Batch Name],[Product Name],
+            [Batch Act Start],[Batch Act End],[Batch Transfer Time],
+            Quantity,[Material Name],[Material Code],sp_prot,[SetPoint Float],[Actual Value Float],FormulaCategoryName)
+    VALUES (S.[Source Server],S.[Batch GUID],S.ROOTGUID,S.OrderId,S.[Batch Name],S.[Product Name],
+            S.[Batch Act Start],S.[Batch Act End],S.[Batch Transfer Time],
+            S.Quantity,S.[Material Name],S.[Material Code],S.sp_prot,S.[SetPoint Float],S.[Actual Value Float],S.FormulaCategoryName)
+  WHEN MATCHED THEN
+    UPDATE SET
+      T.ROOTGUID=S.ROOTGUID, T.OrderId=S.OrderId, T.[Batch Name]=S.[Batch Name], T.[Product Name]=S.[Product Name],
+      T.[Batch Act Start]=S.[Batch Act Start], T.[Batch Act End]=S.[Batch Act End],
+      T.[Batch Transfer Time]=S.[Batch Transfer Time], T.Quantity=S.Quantity,
+      T.[Material Code]=S.[Material Code], T.sp_prot=S.sp_prot,
+      T.[SetPoint Float]=S.[SetPoint Float], T.[Actual Value Float]=S.[Actual Value Float],
+      T.FormulaCategoryName=S.FormulaCategoryName;
+
+  IF @UseDateRange = 0
+  BEGIN
+    DECLARE @MaxBT_S1 DATETIME;
+    SELECT @MaxBT_S1 = MAX([Batch Transfer Time]) FROM #TempBatchData;
+    IF @MaxBT_S1 IS NOT NULL
+      MERGE dbo.DataSyncTracker AS T
+      USING (SELECT 'Server1' AS Src, @MaxBT_S1 AS BT) AS S
+      ON T.[Source Server]=S.Src
+      WHEN MATCHED THEN UPDATE SET LastTimeStamp = S.BT
+      WHEN NOT MATCHED THEN INSERT([Source Server],LastTimeStamp) VALUES(S.Src,S.BT);
+  END
+
+  DROP TABLE #TempBatchData;
+END
+
+
+----- [OS1_SQL] OS1 ASMBatchReports all programmable objects -----
+type_desc | name | cre | mod | deflen
+SQL_STORED_PROCEDURE | RetrieveAndStoreAllBatchData_S1 | 2025-08-11 17:43:28 | 2025-08-11 17:43:28 | 5362
+(1 rows)
+
+############## B. OS1 LOCAL JOB REAL STATE ##############
+
+----- [OS1_SQL] OS1 SQL Agent service status -----
+servicename | status_desc | startup_type_desc | last_start
+SQL Server (INFSERVER) | Running | Automatic | 2026-06-19 01:10:10 +03:00
+SQL Server Agent (INFSERVER) | Stopped | Manual | 
+(2 rows)
+
+----- [OS1_SQL] OS1 job last-run (sysjobservers) + enabled -----
+name | enabled | last_run_date | last_run_time | last_run_outcome | last_run_duration
+RetrieveAndStoreAllBatchData_S1 | 1 | 0 | 0 | 5 | 0
+(1 rows)
+
+----- [OS1_SQL] OS1 job activity (last start/stop, next run) -----
+started | stopped | next_run
+(0 rows)
+
+----- [OS1_SQL] OS1 job schedule attach + next_run -----
+name | sched | sched_enabled | mins | next_run_date | next_run_time
+RetrieveAndStoreAllBatchData_S1 | Every_10_Minutes | 1 | 10 | 0 | 0
+(1 rows)
+
+----- [OS1_SQL] OS1 recent job history rows (count check) -----
+hist_rows | max_run_date
+0 | 
+(1 rows)
+
+############## C. SIMATIC SOURCE KEYS (ParValueOnline / Order) ##############
+
+----- [OS1_SQL] OS1 SimaticBatch PK/unique on ParValueOnline/ParValue/Order -----
+tbl | idx | is_primary_key | is_unique | type_desc | col | key_ordinal
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | ROOTGUID | 1
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | ROOTOBJID | 2
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | ROOTOTID | 3
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | POBJID | 4
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | POTID | 5
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | P2OBJID | 6
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | P2OTID | 7
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | P3OBJID | 8
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | P3OTID | 9
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | OBJID | 10
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | OTID | 11
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | ROOTGUID | 1
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | POBJID | 2
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | POTID | 3
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | P2OBJID | 4
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | P2OTID | 5
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | OBJID | 6
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | ActivationCounter | 7
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | EventID | 8
+(19 rows)
+
+----- [OS1_SQL] OS1 ParValueOnline column schema (key cols) -----
+ORDINAL_POSITION | COLUMN_NAME | DATA_TYPE | IS_NULLABLE
+1 | ROOTGUID | uniqueidentifier | NO
+2 | POBJID | int | NO
+3 | POTID | int | NO
+4 | P2OBJID | int | NO
+5 | P2OTID | int | NO
+6 | OBJID | int | NO
+7 | ActivationCounter | int | NO
+8 | EventID | bigint | NO
+9 | TimeStamp | datetimeoffset | NO
+10 | Name | nvarchar | NO
+11 | EventNotifyType | int | NO
+12 | UsageId | int | YES
+13 | DataTypeId | int | YES
+14 | DataTypeName | nvarchar | YES
+15 | UoMId | int | YES
+16 | UoMName | nvarchar | YES
+17 | HighValue | float | YES
+18 | LowValue | float | YES
+19 | RecHighValue | float | YES
+20 | RecLowValue | float | YES
+21 | sp_float | float | YES
+22 | asp_float | float | YES
+23 | av_float | float | YES
+24 | sp_int | int | YES
+25 | asp_int | int | YES
+26 | av_int | int | YES
+27 | sp_string | nvarchar | YES
+28 | asp_string | nvarchar | YES
+29 | av_string | nvarchar | YES
+30 | loc_unitallocname | nvarchar | YES
+31 | loc_unitname | nvarchar | YES
+32 | sp_locname | nvarchar | YES
+33 | asp_locname | nvarchar | YES
+34 | av_locname | nvarchar | YES
+35 | sp_matname | nvarchar | YES
+36 | sp_matcode | nvarchar | YES
+37 | asp_matname | nvarchar | YES
+38 | asp_matcode | nvarchar | YES
+39 | av_matname | nvarchar | YES
+40 | av_matcode | nvarchar | YES
+41 | sp_EnumValue | nvarchar | YES
+42 | asp_EnumValue | nvarchar | YES
+43 | av_EnumValue | nvarchar | YES
+44 | sp_Unit | nvarchar | YES
+45 | asp_Unit | nvarchar | YES
+46 | av_Unit | nvarchar | YES
+47 | sp_prot | int | YES
+48 | asp_prot | int | YES
+49 | av_prot | int | YES
+(49 rows)
+
+----- [FAKIEH_SERVER2] OS2 SimaticBatch PK/unique on ParValueOnline/ParValue/Order -----
+tbl | idx | is_primary_key | is_unique | type_desc | col | key_ordinal
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | ROOTGUID | 1
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | ROOTOBJID | 2
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | ROOTOTID | 3
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | POBJID | 4
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | POTID | 5
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | P2OBJID | 6
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | P2OTID | 7
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | P3OBJID | 8
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | P3OTID | 9
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | OBJID | 10
+ParValue | SIMATIC_BATCH_PK__ParValue | True | True | NONCLUSTERED | OTID | 11
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | ROOTGUID | 1
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | POBJID | 2
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | POTID | 3
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | P2OBJID | 4
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | P2OTID | 5
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | OBJID | 6
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | ActivationCounter | 7
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | NONCLUSTERED | EventID | 8
+(19 rows)
+
+----- [FAKIEH_SERVER2] OS2 ParValueOnline column schema (key cols) -----
+ORDINAL_POSITION | COLUMN_NAME | DATA_TYPE | IS_NULLABLE
+1 | ROOTGUID | uniqueidentifier | NO
+2 | POBJID | int | NO
+3 | POTID | int | NO
+4 | P2OBJID | int | NO
+5 | P2OTID | int | NO
+6 | OBJID | int | NO
+7 | ActivationCounter | int | NO
+8 | EventID | bigint | NO
+9 | TimeStamp | datetimeoffset | NO
+10 | Name | nvarchar | NO
+11 | EventNotifyType | int | NO
+12 | UsageId | int | YES
+13 | DataTypeId | int | YES
+14 | DataTypeName | nvarchar | YES
+15 | UoMId | int | YES
+16 | UoMName | nvarchar | YES
+17 | HighValue | float | YES
+18 | LowValue | float | YES
+19 | RecHighValue | float | YES
+20 | RecLowValue | float | YES
+21 | sp_float | float | YES
+22 | asp_float | float | YES
+23 | av_float | float | YES
+24 | sp_int | int | YES
+25 | asp_int | int | YES
+26 | av_int | int | YES
+27 | sp_string | nvarchar | YES
+28 | asp_string | nvarchar | YES
+29 | av_string | nvarchar | YES
+30 | loc_unitallocname | nvarchar | YES
+31 | loc_unitname | nvarchar | YES
+32 | sp_locname | nvarchar | YES
+33 | asp_locname | nvarchar | YES
+34 | av_locname | nvarchar | YES
+35 | sp_matname | nvarchar | YES
+36 | sp_matcode | nvarchar | YES
+37 | asp_matname | nvarchar | YES
+38 | asp_matcode | nvarchar | YES
+39 | av_matname | nvarchar | YES
+40 | av_matcode | nvarchar | YES
+41 | sp_EnumValue | nvarchar | YES
+42 | asp_EnumValue | nvarchar | YES
+43 | av_EnumValue | nvarchar | YES
+44 | sp_Unit | nvarchar | YES
+45 | asp_Unit | nvarchar | YES
+46 | av_Unit | nvarchar | YES
+47 | sp_prot | int | YES
+48 | asp_prot | int | YES
+49 | av_prot | int | YES
+(49 rows)
+
+############## D. OS1 LOCAL-COPY FULL DDL METADATA ##############
+
+----- [OS1_SQL] OS1 BatchCopy columns (full DDL) -----
+column_id | col | dtype | max_length | precision | scale | collation_name | is_nullable | is_identity | is_computed | default_def
+1 | ROOTGUID | uniqueidentifier | 16 | 0 | 0 |  | False | False | False | 
+2 | ROOTOBJID | int | 4 | 10 | 0 |  | False | False | False | 
+3 | ROOTOTID | int | 4 | 10 | 0 |  | False | False | False | 
+4 | OGUID | uniqueidentifier | 16 | 0 | 0 |  | False | False | False | 
+5 | OBJID | int | 4 | 10 | 0 |  | False | False | False | 
+6 | OTID | int | 4 | 10 | 0 |  | False | False | False | 
+7 | Created | datetimeoffset | 9 | 30 | 3 |  | False | False | False | 
+8 | CreatedTSHostId | smallint | 2 | 5 | 0 |  | True | False | False | 
+9 | Deleted | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+10 | DeletedTSHostId | smallint | 2 | 5 | 0 |  | True | False | False | 
+11 | Name | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+12 | Description | nvarchar | -1 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+13 | Withdrawn | bit | 1 | 1 | 0 |  | True | False | False | 
+14 | ExAttribute | nvarchar | -1 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+15 | PredecessorBatchId | int | 4 | 10 | 0 |  | True | False | False | 
+16 | ChainMode | int | 4 | 10 | 0 |  | True | False | False | 
+17 | ChainIgnorePredecessorState | bit | 1 | 1 | 0 |  | True | False | False | 
+18 | Quantity | float | 8 | 53 | 0 |  | True | False | False | 
+19 | ActQuantity | float | 8 | 53 | 0 |  | True | False | False | 
+20 | ProductName | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+21 | ProductCode | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+22 | ProductGUID | uniqueidentifier | 16 | 0 | 0 |  | True | False | False | 
+23 | ProductUoMId | int | 4 | 10 | 0 |  | True | False | False | 
+24 | FormulaCategoryName | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+25 | FormulaName | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+26 | FormulaVersion | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+27 | FormulaGUID | uniqueidentifier | 16 | 0 | 0 |  | True | False | False | 
+28 | FormulaId | int | 4 | 10 | 0 |  | True | False | False | 
+29 | MRecipeName | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+30 | MRecipeVersion | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+31 | MRecipeGUID | uniqueidentifier | 16 | 0 | 0 |  | True | False | False | 
+32 | MRecipeId | int | 4 | 10 | 0 |  | True | False | False | 
+33 | OrderId | int | 4 | 10 | 0 |  | True | False | False | 
+34 | ReleaseTime | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+35 | PlanStart | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+36 | PlanEnd | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+37 | ActStart | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+38 | ActEnd | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+39 | Mode | int | 4 | 10 | 0 |  | True | False | False | 
+40 | Export | smallint | 2 | 5 | 0 |  | True | False | False | 
+41 | State | int | 4 | 10 | 0 |  | True | False | False | 
+42 | ExState | int | 4 | 10 | 0 |  | True | False | False | 
+43 | ModifiedBits | int | 4 | 10 | 0 |  | True | False | False | 
+44 | PCellGUID | uniqueidentifier | 16 | 0 | 0 |  | True | False | False | 
+45 | PCellId | int | 4 | 10 | 0 |  | True | False | False | 
+46 | PartId | int | 4 | 10 | 0 |  | True | False | False | 
+47 | BatchReleaseGroupId | int | 4 | 10 | 0 |  | True | False | False | 
+48 | CreationDateTime | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+49 | ModificationDateTime | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+50 | BatchHasNoTags | bit | 1 | 1 | 0 |  | True | False | False | 
+51 | CurrentBatchDataId | int | 4 | 10 | 0 |  | True | False | False | 
+52 | GapTime | int | 4 | 10 | 0 |  | True | False | False | 
+53 | BatchVersion | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+54 | LastOSCDateTime | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+55 | MarkByOSC | bit | 1 | 1 | 0 |  | True | False | False | 
+56 | BatchTransferTime | datetimeoffset | 9 | 30 | 3 |  | True | False | False | 
+(56 rows)
+
+----- [OS1_SQL] OS1 ParValueOnline_copy columns (full DDL) -----
+column_id | col | dtype | max_length | precision | scale | collation_name | is_nullable | is_identity | is_computed | default_def
+1 | ROOTGUID | uniqueidentifier | 16 | 0 | 0 |  | False | False | False | 
+2 | POBJID | int | 4 | 10 | 0 |  | False | False | False | 
+3 | POTID | int | 4 | 10 | 0 |  | False | False | False | 
+4 | P2OBJID | int | 4 | 10 | 0 |  | False | False | False | 
+5 | P2OTID | int | 4 | 10 | 0 |  | False | False | False | 
+6 | OBJID | int | 4 | 10 | 0 |  | False | False | False | 
+7 | ActivationCounter | int | 4 | 10 | 0 |  | False | False | False | 
+8 | EventID | bigint | 8 | 19 | 0 |  | False | False | False | 
+9 | TimeStamp | datetimeoffset | 9 | 30 | 3 |  | False | False | False | 
+10 | Name | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | False | False | False | 
+11 | EventNotifyType | int | 4 | 10 | 0 |  | False | False | False | 
+12 | UsageId | int | 4 | 10 | 0 |  | True | False | False | 
+13 | DataTypeId | int | 4 | 10 | 0 |  | True | False | False | 
+14 | DataTypeName | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+15 | UoMId | int | 4 | 10 | 0 |  | True | False | False | 
+16 | UoMName | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+17 | HighValue | float | 8 | 53 | 0 |  | True | False | False | 
+18 | LowValue | float | 8 | 53 | 0 |  | True | False | False | 
+19 | RecHighValue | float | 8 | 53 | 0 |  | True | False | False | 
+20 | RecLowValue | float | 8 | 53 | 0 |  | True | False | False | 
+21 | sp_float | float | 8 | 53 | 0 |  | True | False | False | 
+22 | asp_float | float | 8 | 53 | 0 |  | True | False | False | 
+23 | av_float | float | 8 | 53 | 0 |  | True | False | False | 
+24 | sp_int | int | 4 | 10 | 0 |  | True | False | False | 
+25 | asp_int | int | 4 | 10 | 0 |  | True | False | False | 
+26 | av_int | int | 4 | 10 | 0 |  | True | False | False | 
+27 | sp_string | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+28 | asp_string | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+29 | av_string | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+30 | loc_unitallocname | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+31 | loc_unitname | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+32 | sp_locname | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+33 | asp_locname | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+34 | av_locname | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+35 | sp_matname | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+36 | sp_matcode | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+37 | asp_matname | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+38 | asp_matcode | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+39 | av_matname | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+40 | av_matcode | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+41 | sp_EnumValue | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+42 | asp_EnumValue | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+43 | av_EnumValue | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+44 | sp_Unit | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+45 | asp_Unit | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+46 | av_Unit | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+47 | sp_prot | int | 4 | 10 | 0 |  | True | False | False | 
+48 | asp_prot | int | 4 | 10 | 0 |  | True | False | False | 
+49 | av_prot | int | 4 | 10 | 0 |  | True | False | False | 
+(49 rows)
+
+----- [OS1_SQL] OS1 OrderDetails columns (full DDL) -----
+column_id | col | dtype | max_length | precision | scale | collation_name | is_nullable | is_identity | is_computed | default_def
+1 | ROOTGUID | uniqueidentifier | 16 | 0 | 0 |  | False | False | False | 
+2 | OrderId | int | 4 | 10 | 0 |  | False | False | False | 
+3 | OrderName | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+4 | OrderCategory | nvarchar | 512 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+5 | CreationDateTime | datetimeoffset | 10 | 34 | 7 |  | True | False | False | 
+6 | Quantity | float | 8 | 53 | 0 |  | True | False | False | 
+7 | Description | nvarchar | -1 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+(7 rows)
+
+----- [OS1_SQL] OS1 BatchMaterials columns (full DDL) -----
+column_id | col | dtype | max_length | precision | scale | collation_name | is_nullable | is_identity | is_computed | default_def
+1 | Source Server | nvarchar | 100 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | False | False | False | 
+2 | Batch GUID | uniqueidentifier | 16 | 0 | 0 |  | False | False | False | 
+3 | ROOTGUID | uniqueidentifier | 16 | 0 | 0 |  | True | False | False | 
+4 | OrderId | int | 4 | 10 | 0 |  | True | False | False | 
+5 | Batch Name | nvarchar | 510 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+6 | Product Name | nvarchar | 510 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+7 | Batch Act Start | datetime | 8 | 23 | 3 |  | True | False | False | 
+8 | Batch Act End | datetime | 8 | 23 | 3 |  | True | False | False | 
+9 | Batch Transfer Time | datetime | 8 | 23 | 3 |  | True | False | False | 
+10 | Quantity | float | 8 | 53 | 0 |  | True | False | False | 
+11 | Material Name | nvarchar | 510 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+12 | Material Code | nvarchar | 510 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+13 | sp_prot | float | 8 | 53 | 0 |  | True | False | False | 
+14 | SetPoint Float | float | 8 | 53 | 0 |  | True | False | False | 
+15 | Actual Value Float | float | 8 | 53 | 0 |  | True | False | False | 
+16 | FormulaCategoryName | nvarchar | 510 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | True | False | False | 
+(16 rows)
+
+----- [OS1_SQL] OS1 DataSyncTracker columns (full DDL) -----
+column_id | col | dtype | max_length | precision | scale | collation_name | is_nullable | is_identity | is_computed | default_def
+1 | Source Server | nvarchar | 100 | 0 | 0 | Latin1_General_100_CI_AS_KS_WS | False | False | False | 
+2 | LastTimeStamp | datetime | 8 | 23 | 3 |  | True | False | False | 
+(2 rows)
+
+----- [OS1_SQL] OS1 ALL indexes/constraints on local-copy tables -----
+tbl | idx | is_primary_key | is_unique | type_desc | has_filter | col | key_ordinal | is_included_column
+DataSyncTracker | PK__DataSync__5831D05EC45168BB | True | True | CLUSTERED | False | Source Server | 1 | False
+OrderDetails | PK__OrderDet__51096E28A2DEA132 | True | True | CLUSTERED | False | ROOTGUID | 1 | False
+OrderDetails | PK__OrderDet__51096E28A2DEA132 | True | True | CLUSTERED | False | OrderId | 2 | False
+(3 rows)
+
+----- [OS1_SQL] OS1 DataSyncTracker content (already partly seen) -----
+Source Server | LastTimeStamp
+Server1 | 
+(1 rows)
+
+############## E. DISK CAPACITY + DB FILE SIZES ##############
+
+===== Reporting xp_fixeddrives (MB free) =====
+drive | MB free
+C | 408393
+(1 rows)
+
+===== Reporting DB file sizes (MB) =====
+db | name | type_desc | size_mb
+ASMBatchReports | ASMBatchReports | ROWS | 200
+ASMBatchReports | ASMBatchReports_log | LOG | 328
+(2 rows)
+
+===== Reporting ParValueOnline_copy + BatchMaterials space (MB) =====
+tbl | total_mb | used_mb | rows_
+BatchCopy | 0 | 0 | 246
+BatchMaterials | 4 | 4 | 21230
+ParValueOnline_copy | 99 | 99 | 715806
+(3 rows)
+
+----- [OS1_SQL] OS1 xp_fixeddrives (MB free) -----
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The metadata could not be determined because statement 'EXEC master.dbo.xp_fixeddrives' invokes an extended stored procedure. (11519) (SQLExecDirectW)")
+
+----- [OS1_SQL] OS1 all DB file sizes (MB) -----
+db | name | type_desc | size_mb
+ASMBatchReports | ASMBatchReports_log | LOG | 200
+ASMBatchReports | ASMBatchReports | ROWS | 264
+ReportServer | ReportServer_log | LOG | 72
+ReportServer | ReportServer | ROWS | 200
+ReportServerTempDB | ReportServerTempDB_log | LOG | 136
+ReportServerTempDB | ReportServerTempDB | ROWS | 72
+SimaticBatch | FG_BatchData_Log | LOG | 128
+SimaticBatch | FILEGROUP_1_NAME | ROWS | 32
+SimaticBatch | FILEGROUP_2_NAME | ROWS | 64
+SimaticBatch | FILEGROUP_3_NAME | ROWS | 32
+SimaticBatch | FG_BatchData_primary | ROWS | 128
+(11 rows)
+
+----- [FAKIEH_SERVER2] OS2 xp_fixeddrives (MB free) -----
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The metadata could not be determined because statement 'EXEC master.dbo.xp_fixeddrives' invokes an extended stored procedure. (11519) (SQLExecDirectW)")
+
+----- [FAKIEH_SERVER2] OS2 SimaticBatch file sizes (MB) -----
+db | name | type_desc | size_mb
+SimaticBatch | FG_BatchData_primary | ROWS | 128
+SimaticBatch | FG_BatchData_Log | LOG | 128
+SimaticBatch | FILEGROUP_1_NAME | ROWS | 32
+SimaticBatch | FILEGROUP_2_NAME | ROWS | 32
+SimaticBatch | FILEGROUP_3_NAME | ROWS | 32
+(5 rows)
+
+############## F. OS1 PARVALUEONLINE VOLUME + UPDATE-IN-PLACE ##############
+
+----- [OS1_SQL] OS1 ParValueOnline rows by day (volume/cadence) -----
+d | rows_ | roots
+2026-06-19 | 3608 | 1
+(1 rows)
+
+----- [OS1_SQL] OS1 ParValueOnline uniqueness of (ROOTGUID,POBJID,POTID) -----
+total_rows | distinct_keys | max_actcount
+3608 | 33 | 6
+(1 rows)
+
+----- [OS1_SQL] OS1 ParValueOnline TS span for the single live batch -----
+rows_ | min_ts | max_ts | distinct_params
+3608 | 2026-06-19T14:54:01.230+00:00 | 2026-06-19T16:34:12.857+00:00 | 27
+(1 rows)
+
+############## G. REPORTING CURRENT STATE REFRESH ##############
+
+===== Reporting DataSyncTracker (current watermarks) =====
+Source Server | LastTimeStamp
+BatchCopy | 2026-06-19T16:34:12.857
+Server1 | 2026-06-19T16:34:12.857
+Server2 | 2026-06-16T11:45:12.227
+(3 rows)
+
+===== Reporting current dup groups in BatchMaterials =====
+dup_groups | extra_rows
+0 | 0
+(1 rows)
+
+===== Reporting missing completed-qualifying summary (refreshed) =====
+missing_batches | oldest_first_pv | newest_last_pv | qual_rows_waiting
+26 | 2026-06-17T13:13:36.913+00:00 | 2026-06-19T15:49:19.562+00:00 | 812
+(1 rows)
+
+DONE PHASE5

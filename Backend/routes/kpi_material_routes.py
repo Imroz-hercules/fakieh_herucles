@@ -1,16 +1,19 @@
 from flask import Blueprint, request, jsonify
+from config import SQLSERVER_BATCH_MATERIALS_TABLE
 from models import db
 from models.kpi_material import KPIMaterial
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy import func, text
 import traceback
 import logging
 
 from utils.dashboard_kpi_stream import build_dashboard_payload
+from utils.timezone import format_db_datetime_utc_iso, parse_request_datetime, parse_request_datetime_optional
 from utils.kpi_pagination import (
     clamp_kpi_limit,
     parse_include_total,
     product_not_selected_clause,
+    apply_batch_filters,
     parse_cursor_token,
     keyset_filter_transfer_time_asc,
     keyset_filter_act_start_asc,
@@ -36,8 +39,8 @@ def _row_to_kpi_dict(mat, include_event_id=False):
         "Batch GUID": str(mat.batch_guid) if mat.batch_guid is not None else None,
         "Batch Name": mat.batch_name,
         "Product Name": mat.product_name,
-        "Batch Act Start": mat.batch_act_start.strftime("%Y-%m-%d %H:%M:%S") if mat.batch_act_start else None,
-        "Batch Act End": mat.batch_act_end.strftime("%Y-%m-%d %H:%M:%S") if mat.batch_act_end else None,
+        "Batch Act Start": format_db_datetime_utc_iso(mat.batch_act_start),
+        "Batch Act End": format_db_datetime_utc_iso(mat.batch_act_end),
         "Quantity": mat.quantity,
         "Material Name": mat.material_name,
         "Material Code": mat.material_code,
@@ -46,7 +49,7 @@ def _row_to_kpi_dict(mat, include_event_id=False):
         "Source Server": mat.source_server,
         "ROOTGUID": str(mat.rootguid) if mat.rootguid is not None else None,
         "OrderId": mat.order_id,
-        "Batch Transfer Time": mat.batch_transfer_time.strftime("%Y-%m-%d %H:%M:%S") if mat.batch_transfer_time else None,
+        "Batch Transfer Time": format_db_datetime_utc_iso(mat.batch_transfer_time),
         "FormulaCategoryName": mat.formula_category_name,
     }
     if include_event_id:
@@ -93,22 +96,6 @@ def _paginate_kpi_query(query, page, limit, include_total, order_cols_for_keyset
         "nextCursor": next_c if has_more and items else None,
     }
 
-# Helper function to apply 4-hour offset to dates
-def apply_four_hour_offset(date_obj):
-    """Apply 4-hour offset to datetime object (subtract 4 hours)"""
-    if date_obj:
-        return date_obj - timedelta(hours=4)
-    return date_obj
-
-# Helper function to apply 4-hour offset to start date only (for 24-hour period queries)
-def apply_four_hour_offset_start_only(start_date, end_date):
-    """Apply 4-hour offset to start date only, keep end date as is for 24-hour period"""
-    if start_date and end_date:
-        # Subtract 4 hours from start date, keep end date the same
-        adjusted_start = start_date - timedelta(hours=4)
-        return adjusted_start, end_date
-    return start_date, end_date
-
 # 🟢 Route to Get All KPI Data (BatchMaterials via SQL Server bind)
 @kpi_material_bp.route("/kpi", methods=["GET"])
 def get_kpis():
@@ -120,27 +107,13 @@ def get_kpis():
         material_filters = request.args.getlist("material")
         page = request.args.get("page", default=1, type=int)
         limit = clamp_kpi_limit(request.args.get("limit", type=int))
-        strict_date = request.args.get("strictDateFilter", "").lower() in ("true", "1", "yes")
         include_total = parse_include_total(request.args)
         cur = parse_cursor_token(request.args) or {}
         raw_cursor = request.args.get("cursor")
 
         date_filter = []
         if start_date_str and end_date_str:
-            try:
-                start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
-                end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-            except Exception:
-                try:
-                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
-                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    start_date = datetime.strptime(start_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-                    end_date = datetime.strptime(end_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-
-            if not strict_date:
-                start_date = apply_four_hour_offset(start_date)
-                end_date = apply_four_hour_offset(end_date)
+            start_date, end_date = parse_request_datetime_optional(start_date_str, end_date_str)
             # Use batch_transfer_time for date filter (same as Raw Data / csv-format-report) so Historical shows same batches
             date_filter = [KPIMaterial.batch_transfer_time >= start_date, KPIMaterial.batch_transfer_time <= end_date]
 
@@ -148,7 +121,7 @@ def get_kpis():
         if date_filter:
             query = query.filter(*date_filter)
         if batch_filters:
-            query = query.filter(KPIMaterial.batch_name.in_(batch_filters))
+            query = apply_batch_filters(query, KPIMaterial, batch_filters)
         if product_filters:
             query = query.filter(KPIMaterial.product_name.in_(product_filters))
         if material_filters:
@@ -225,30 +198,14 @@ def get_reports():
         if not start_date_str or not end_date_str:
             return jsonify({"error": "Start date and end date are required"}), 400
 
-        try:
-            start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
-            end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-        except Exception:
-            try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
-            except Exception:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-
-        # Apply 4-hour offset only for non-daily reports
-        # Daily Report should use exact times without offset
-        if report_type != 'daily':
-            # Apply 4-hour offset to start date only for 24-hour period queries
-            # This ensures we get the full 24-hour period when user selects 7 AM to 7 AM
-            start_date, end_date = apply_four_hour_offset_start_only(start_date, end_date)
+        start_date, end_date = parse_request_datetime_optional(start_date_str, end_date_str)
 
         query = KPIMaterial.query.filter(
             KPIMaterial.batch_act_start >= start_date,
             KPIMaterial.batch_act_start <= end_date
         )
         if batch_filters:
-            query = query.filter(KPIMaterial.batch_name.in_(batch_filters))
+            query = apply_batch_filters(query, KPIMaterial, batch_filters)
         if product_filters:
             query = query.filter(KPIMaterial.product_name.in_(product_filters))
         if material_filters:
@@ -312,20 +269,7 @@ def get_kpi_csv_format_report():
         if not start_date_str or not end_date_str:
             return jsonify({"error": "startDate and endDate are required"}), 400
 
-        try:
-            start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
-            end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-        except Exception:
-            try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
-            except Exception:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-
-        # Apply 4-hour offset to the filter dates (subtract 4 hours)
-        start_date = apply_four_hour_offset(start_date)
-        end_date = apply_four_hour_offset(end_date)
+        start_date, end_date = parse_request_datetime_optional(start_date_str, end_date_str)
 
         query = KPIMaterial.query.filter(
             KPIMaterial.batch_transfer_time >= start_date,
@@ -333,7 +277,7 @@ def get_kpi_csv_format_report():
             product_not_selected_clause(KPIMaterial),
         )
         if batch_filters:
-            query = query.filter(KPIMaterial.batch_name.in_(batch_filters))
+            query = apply_batch_filters(query, KPIMaterial, batch_filters)
         if product_filters:
             query = query.filter(KPIMaterial.product_name.in_(product_filters))
         if material_filters:
@@ -392,19 +336,7 @@ def get_filter_options():
         date_filter_sql = "1=1"
         bind = {}
         if start_date_str and end_date_str:
-            try:
-                start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
-                end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-            except Exception:
-                try:
-                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
-                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    start_date = datetime.strptime(start_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-                    end_date = datetime.strptime(end_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-
-            start_date = apply_four_hour_offset(start_date)
-            end_date = apply_four_hour_offset(end_date)
+            start_date, end_date = parse_request_datetime_optional(start_date_str, end_date_str)
             date_filter_sql = "[Batch Transfer Time] >= :sd AND [Batch Transfer Time] <= :ed"
             bind["sd"] = start_date
             bind["ed"] = end_date
@@ -413,43 +345,69 @@ def get_filter_options():
             ({date_filter_sql})
             AND LOWER(LTRIM(RTRIM([Product Name]))) <> 'not selected'
         """
-        sql = text(
+        tbl = SQLSERVER_BATCH_MATERIALS_TABLE
+        products_sql = text(
             f"""
-            SELECT kind, val FROM (
-                SELECT DISTINCT 'product' AS kind, CAST([Product Name] AS NVARCHAR(4000)) AS val
-                FROM dbo.[BatchMaterials]
-                WHERE {base_where} AND [Product Name] IS NOT NULL AND LTRIM(RTRIM([Product Name])) <> ''
-                UNION ALL
-                SELECT DISTINCT 'batch', CAST([Batch Name] AS NVARCHAR(4000))
-                FROM dbo.[BatchMaterials]
-                WHERE {base_where} AND [Batch Name] IS NOT NULL AND LTRIM(RTRIM([Batch Name])) <> ''
-                UNION ALL
-                SELECT DISTINCT 'material', CAST([Material Name] AS NVARCHAR(4000))
-                FROM dbo.[BatchMaterials]
-                WHERE {base_where} AND [Material Name] IS NOT NULL AND LTRIM(RTRIM([Material Name])) <> ''
-            ) q
-            WHERE val IS NOT NULL
+            SELECT DISTINCT CAST([Product Name] AS NVARCHAR(4000)) AS val
+            FROM dbo.[{tbl}]
+            WHERE {base_where}
+              AND [Product Name] IS NOT NULL AND LTRIM(RTRIM([Product Name])) <> ''
+            """
+        )
+        batches_sql = text(
+            f"""
+            SELECT DISTINCT
+                CAST([Batch GUID] AS NVARCHAR(36)) AS batch_id,
+                CAST([Batch Name] AS NVARCHAR(4000)) AS batch_name,
+                CAST([Source Server] AS NVARCHAR(255)) AS source_server
+            FROM dbo.[{tbl}]
+            WHERE {base_where}
+              AND [Batch GUID] IS NOT NULL
+              AND [Batch Name] IS NOT NULL AND LTRIM(RTRIM([Batch Name])) <> ''
+            """
+        )
+        materials_sql = text(
+            f"""
+            SELECT DISTINCT CAST([Material Name] AS NVARCHAR(4000)) AS val
+            FROM dbo.[{tbl}]
+            WHERE {base_where}
+              AND [Material Name] IS NOT NULL AND LTRIM(RTRIM([Material Name])) <> ''
             """
         )
         engine = db.get_engine(bind="sqlserver")
-        products, batches, materials = set(), set(), set()
+        products, materials = set(), set()
+        batch_rows = []
         with engine.connect() as conn:
-            for row in conn.execute(sql, bind).fetchall():
-                k = row._mapping.get("kind", row[0])
-                v = row._mapping.get("val", row[1])
-                if not v:
-                    continue
-                if k == "product":
+            for row in conn.execute(products_sql, bind).fetchall():
+                v = row._mapping.get("val", row[0])
+                if v:
                     products.add(v)
-                elif k == "batch":
-                    batches.add(v)
-                elif k == "material":
+            batch_rows = conn.execute(batches_sql, bind).fetchall()
+            for row in conn.execute(materials_sql, bind).fetchall():
+                v = row._mapping.get("val", row[0])
+                if v:
                     materials.add(v)
+
+        seen_labels = {}
+        batch_options = []
+        for row in batch_rows:
+            m = row._mapping
+            guid = str(m.get("batch_id", row[0])).strip()
+            name = str(m.get("batch_name", row[1]) or "").strip()
+            server = str(m.get("source_server", row[2] if len(row) > 2 else "") or "").strip()
+            if not guid or not name:
+                continue
+            label = f"{name} ({server})" if server else name
+            if label in seen_labels and seen_labels[label] != guid:
+                label = f"{label} · {guid[:8]}"
+            seen_labels[label] = guid
+            batch_options.append({"value": guid, "label": label})
+        batch_options.sort(key=lambda b: b["label"].lower())
 
         return jsonify(
             {
                 "products": sorted(products),
-                "batches": sorted(batches),
+                "batches": batch_options,
                 "materials": sorted(materials),
             }
         ), 200
@@ -477,20 +435,8 @@ def get_dashboard_analytics():
         if not start_date_str or not end_date_str:
             return jsonify({"error": "Start date and end date are required"}), 400
         
-        try:
-            start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
-            end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-        except Exception:
-            try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
-            except Exception:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-        
-        # Apply 4-hour offset to start date only
-        start_date, end_date = apply_four_hour_offset_start_only(start_date, end_date)
-        
+        start_date, end_date = parse_request_datetime_optional(start_date_str, end_date_str)
+
         # Build base query with filters
         query = KPIMaterial.query.filter(
             KPIMaterial.batch_act_start >= start_date,
@@ -498,7 +444,7 @@ def get_dashboard_analytics():
         )
         
         if batch_filters:
-            query = query.filter(KPIMaterial.batch_name.in_(batch_filters))
+            query = apply_batch_filters(query, KPIMaterial, batch_filters)
         if product_filters:
             query = query.filter(KPIMaterial.product_name.in_(product_filters))
         if material_filters:

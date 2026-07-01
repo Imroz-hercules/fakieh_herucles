@@ -1,8 +1,10 @@
-"""Batch calendar aggregates from SQL Server dbo.BatchMaterials."""
+"""Batch calendar aggregates from SQL Server batch materials table."""
 from flask import Blueprint, request, jsonify
 from models import db
 from sqlalchemy import text
 from datetime import datetime
+
+from config import SQLSERVER_BATCH_MATERIALS_TABLE
 
 kpi_calendar_bp = Blueprint("kpi_calendar", __name__)
 
@@ -28,16 +30,17 @@ def get_kpi_calendar():
             start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
             end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
 
-        sql_query = """
-        SELECT CAST(dbo.[BatchMaterials].[Batch Act Start] AS DATE) AS date,
-               sum(dbo.[BatchMaterials].[Actual Value Float]) AS total_actual,
-               count(distinct(dbo.[BatchMaterials].[Batch GUID])) AS batch_count,
-               count(distinct(dbo.[BatchMaterials].[Product Name])) AS product_count
-        FROM dbo.[BatchMaterials]
-        WHERE dbo.[BatchMaterials].[Batch Act Start] >= :start_date AND dbo.[BatchMaterials].[Batch Act Start] <= :end_date
-          AND lower(dbo.[BatchMaterials].[Product Name]) != 'not selected'
-        GROUP BY CAST(dbo.[BatchMaterials].[Batch Act Start] AS DATE)
-        ORDER BY CAST(dbo.[BatchMaterials].[Batch Act Start] AS DATE)
+        tbl = SQLSERVER_BATCH_MATERIALS_TABLE
+        sql_query = f"""
+        SELECT CAST(dbo.[{tbl}].[Batch Act Start] AS DATE) AS date,
+               sum(dbo.[{tbl}].[Actual Value Float]) AS total_actual,
+               count(distinct(dbo.[{tbl}].[Batch GUID])) AS batch_count,
+               count(distinct(dbo.[{tbl}].[Product Name])) AS product_count
+        FROM dbo.[{tbl}]
+        WHERE dbo.[{tbl}].[Batch Act Start] >= :start_date AND dbo.[{tbl}].[Batch Act Start] <= :end_date
+          AND lower(dbo.[{tbl}].[Product Name]) != 'not selected'
+        GROUP BY CAST(dbo.[{tbl}].[Batch Act Start] AS DATE)
+        ORDER BY CAST(dbo.[{tbl}].[Batch Act Start] AS DATE)
         """
 
         rows = _fetchall(sql_query, {"start_date": start_date, "end_date": end_date})
@@ -73,13 +76,14 @@ def get_kpi_calendar_details():
         except ValueError:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-        sql_query = """
-        SELECT dbo.[BatchMaterials].[Product Name] as product_name,
-               SUM(dbo.[BatchMaterials].[Actual Value Float]) as quantity_kg
-        FROM dbo.[BatchMaterials]
-        WHERE CAST(dbo.[BatchMaterials].[Batch Act Start] AS DATE) = :target_date
-          AND lower(dbo.[BatchMaterials].[Product Name]) != 'not selected'
-        GROUP BY dbo.[BatchMaterials].[Product Name]
+        tbl = SQLSERVER_BATCH_MATERIALS_TABLE
+        sql_query = f"""
+        SELECT dbo.[{tbl}].[Product Name] as product_name,
+               SUM(dbo.[{tbl}].[Actual Value Float]) as quantity_kg
+        FROM dbo.[{tbl}]
+        WHERE CAST(dbo.[{tbl}].[Batch Act Start] AS DATE) = :target_date
+          AND lower(dbo.[{tbl}].[Product Name]) != 'not selected'
+        GROUP BY dbo.[{tbl}].[Product Name]
         ORDER BY quantity_kg DESC
         """
 

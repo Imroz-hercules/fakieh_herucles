@@ -1,0 +1,43 @@
+PHASE 4 OS1 LOCAL PIPELINE @ local 2026-06-20T06:31:30.214075 (read-only)
+
+===== OS1 RetrieveAndStoreAllBatchData_S1 body =====
+
+----- [OS1_SQL] S1 proc body -----
+
+
+----- [OS1_SQL] OS1 job step full command -----
+job | step_id | subsystem | database_name | command
+RetrieveAndStoreAllBatchData_S1 | 1 | TSQL | ASMBatchReports | EXEC dbo.RetrieveAndStoreAllBatchData_S1;
+(1 rows)
+
+----- [OS1_SQL] OS1 job history (RetrieveAndStoreAllBatchData_S1) -----
+step_id | step_name | run_status | run_date | run_time | msg
+(0 rows)
+
+----- [OS1_SQL] OS1 job schedule -----
+job | sched | freq_type | freq_subday_type | freq_subday_interval | enabled
+RetrieveAndStoreAllBatchData_S1 | Every_10_Minutes | 4 | 4 | 10 | 1
+(1 rows)
+
+----- [OS1_SQL] OS1 ASMBatchReports DataSyncTracker content -----
+Source Server | LastTimeStamp
+Server1 | 
+(1 rows)
+
+----- [OS1_SQL] OS1 local-copy keys/indexes (BatchCopy/ParValueOnline_copy/OrderDetails) -----
+tbl | idx | is_primary_key | is_unique | col | key_ordinal
+OrderDetails | PK__OrderDet__51096E28A2DEA132 | True | True | ROOTGUID | 1
+OrderDetails | PK__OrderDet__51096E28A2DEA132 | True | True | OrderId | 2
+(2 rows)
+
+----- [OS1_SQL] OS1 triggers on local-copy tables -----
+parent | trig | is_disabled | is_instead_of_trigger
+(0 rows)
+
+----- [OS1_SQL] OS1 ASMBatchReports file sizes (MB) -----
+name | type_desc | size_mb
+ASMBatchReports | ROWS | 264
+ASMBatchReports_log | LOG | 200
+(2 rows)
+
+DONE PHASE4

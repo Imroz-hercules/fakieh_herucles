@@ -58,6 +58,42 @@ def product_not_selected_clause(model_cls):
     )
 
 
+def _try_parse_uuid(value):
+    if not value:
+        return None
+    s = str(value).strip().replace("{", "").replace("}", "")
+    try:
+        return UUID(s)
+    except ValueError:
+        return None
+
+
+def apply_batch_filters(query, model_cls, batch_filters):
+    """Filter by batch GUID and/or legacy batch name values."""
+    if not batch_filters:
+        return query
+    guids = []
+    names = []
+    for raw in batch_filters:
+        if not raw:
+            continue
+        uid = _try_parse_uuid(raw)
+        if uid is not None:
+            guids.append(uid)
+        else:
+            names.append(raw)
+    parts = []
+    if guids:
+        parts.append(model_cls.batch_guid.in_(guids))
+    if names:
+        parts.append(model_cls.batch_name.in_(names))
+    if not parts:
+        return query
+    if len(parts) == 1:
+        return query.filter(parts[0])
+    return query.filter(or_(*parts))
+
+
 def _encode_cursor(payload: dict) -> str:
     raw = json.dumps(payload, separators=(",", ":"), default=str).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")

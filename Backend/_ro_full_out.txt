@@ -1,0 +1,1276 @@
+FULL CAPTURE @ local 2026-06-20T05:22:23.613800 (Windows-auth sysadmin, READ-ONLY)
+
+===== 0.identity =====
+server | machine | ver | login_name | is_sa | now
+DESKTOP-N8PGI9S\FAKIEH_REPORTING | DESKTOP-N8PGI9S | 16.0.1180.1 | DESKTOP-N8PGI9S\Hercu | 1 | 2026-06-20 05:22:23.6138009 +03:00
+(1 rows)
+
+===== A1.jobs =====
+job_id | name | enabled | owner | date_created | date_modified
+AD401E05-7CB7-4614-8E20-237F7B693A0F | Collect Server1 → BatchMaterials | 1 | DESKTOP-N8PGI9S\Hercu | 2025-08-11 20:38:40.073000 | 2025-08-11 21:15:07.460000
+6734C651-1203-4C67-8DAF-AF8A05678544 | Collect Server2 — Batch | 1 | DESKTOP-N8PGI9S\Hercu | 2025-09-01 12:48:30.550000 | 2025-09-01 12:48:30.650000
+E156AD21-A7CC-4721-88FC-118705D735EA | syspolicy_purge_history | 1 | sa | 2025-08-02 23:01:02.350000 | 2026-05-13 02:10:08.230000
+(3 rows)
+
+===== A2.job_schedules =====
+job | sched | freq_type | freq_subday_type | freq_subday_interval | active_start_time | enabled
+Collect Server1 → BatchMaterials | Collect S1 – Every 10 minutes | 4 | 4 | 10 | 0 | 1
+Collect Server2 — Batch | Collect S2 — Every 10 minutes | 4 | 4 | 10 | 0 | 1
+syspolicy_purge_history | syspolicy_purge_history_schedule | 4 | 1 | 0 | 20000 | 1
+(3 rows)
+
+===== A3.job_steps_FULL =====
+
+--- JOB: Collect Server1 → BatchMaterials | step 1 'Run pipeline' | subsystem=TSQL | db=ASMBatchReports ---
+EXEC dbo.usp_Collect_From_Server1;
+
+--- JOB: Collect Server2 — Batch | step 1 'Run OS2 pipeline' | subsystem=TSQL | db=ASMBatchReports ---
+EXEC dbo.usp_Collect_From_Server2;
+
+--- JOB: syspolicy_purge_history | step 1 'Verify that automation is enabled.' | subsystem=TSQL | db=master ---
+EXECUTE AS LOGIN = '##MS_PolicyTsqlExecutionLogin##' WITH NO REVERT;
+        IF (msdb.dbo.fn_syspolicy_is_automation_enabled() != 1)
+        BEGIN
+            RAISERROR(34022, 16, 1)
+        END
+
+--- JOB: syspolicy_purge_history | step 2 'Purge history.' | subsystem=TSQL | db=master ---
+EXECUTE AS LOGIN = '##MS_PolicyTsqlExecutionLogin##' WITH NO REVERT;
+        EXEC msdb.dbo.sp_syspolicy_purge_history
+
+--- JOB: syspolicy_purge_history | step 3 'Erase Phantom System Health Records.' | subsystem=PowerShell | db=master ---
+if ('$(ESCAPE_SQUOTE(INST))' -eq 'MSSQLSERVER') {$a = '\DEFAULT'} ELSE {$a = ''};
+(Get-Item SQLSERVER:\SQLPolicy\$(ESCAPE_NONE(SRVR))$a).EraseSystemHealthPhantomRecords()
+(5 steps)
+
+===== A4.job_history_recent =====
+job | step_id | step_name | run_status | run_date | run_time | run_duration | msg
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 52000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 52000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 52000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 52000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 51000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 51000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 51000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 51000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 50000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 50000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 50000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 50000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 45000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 45000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 45000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 45000 | 0 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 44000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 44000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 44000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 44000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 43000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 43000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 43000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 43000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 42000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 42000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 42000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 42000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 41000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 41000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 41000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 41000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 40000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 40000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 40000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 40000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 35000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 35000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 35000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 35000 | 0 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 34000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 34000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 34000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 34000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 33001 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 33000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 33000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 33000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 32000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 32000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 32000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 32000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 31000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 31000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 31000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 31000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 30000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 30000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 30000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 30000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 25000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 25000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 25000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 25000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 24000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 24000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 24000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 24000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 23000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 23000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 23000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 23000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 22000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 22000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 22000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 22000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 21000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 21000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 21000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 21000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+syspolicy_purge_history | 1 | Verify that automation is enabled. | 1 | 20260620 | 20000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+syspolicy_purge_history | 2 | Purge history. | 1 | 20260620 | 20000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 20000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 20000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 20000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 20000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+syspolicy_purge_history | 3 | Erase Phantom System Health Records. | 1 | 20260620 | 20000 | 4 | Executed as user: NT Service\SQLAgent$FAKIEH_REPORTING. The step did not generate any output.  Process Exit Code 0.  The step succeeded.
+syspolicy_purge_history | 0 | (Job outcome) | 1 | 20260620 | 20000 | 4 | The job succeeded.  The Job was invoked by Schedule 8 (syspolicy_purge_history_schedule).  The last step to run was step 3 (Erase Phantom System Health Records.).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 15000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 15000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 15000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 15000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 14000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 14000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 14000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 14000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 13000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 13000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 13000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 13000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 12000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 12000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 12000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 12000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 11000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 11000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 11000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 11000 | 0 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 10000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 10000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 10000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 10000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 5000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 5000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 5000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 5000 | 0 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 4000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 4000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 4000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 4000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 3000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 3000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 3000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 3000 | 0 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 2000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 2000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 2000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 2000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 1000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 1000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 1000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 1000 | 0 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260620 | 0 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260620 | 0 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260620 | 0 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260620 | 0 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260619 | 235000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260619 | 235000 | 0 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260619 | 235000 | 0 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260619 | 235000 | 0 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260619 | 234000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260619 | 234000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260619 | 234000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260619 | 234000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260619 | 233000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260619 | 233000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+Collect Server2 — Batch | 1 | Run OS2 pipeline | 1 | 20260619 | 233000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | (Job outcome) | 1 | 20260619 | 233000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  The last step to run was step 1 (Run OS2 pipeline).
+Collect Server1 → BatchMaterials | 1 | Run pipeline | 1 | 20260619 | 232000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 → BatchMaterials | 0 | (Job outcome) | 1 | 20260619 | 232000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  The last step to run was step 1 (Run pipeline).
+(150 rows)
+
+===== A5.job_history_failures =====
+job | step_id | step_name | run_date | run_time | msg
+(0 rows)
+
+===== A6.active_jobs_now =====
+job_id | job | start_execution_date | stop_execution_date
+AD401E05-7CB7-4614-8E20-237F7B693A0F | Collect Server1 → BatchMaterials | 2026-01-14 15:20:00 | 
+6734C651-1203-4C67-8DAF-AF8A05678544 | Collect Server2 — Batch | 2026-01-14 15:20:00 | 
+(2 rows)
+
+===== B1.ASMBatchReports_all_programmable =====
+name | type_desc | create_date | modify_date | def_state | def_len
+RetrieveAndStoreAllBatchData_OLD | SQL_STORED_PROCEDURE | 2025-08-11 18:10:20.357000 | 2026-06-17 10:16:53.243000 | OK | 5380
+usp_Collect_From_Server1 | SQL_STORED_PROCEDURE | 2025-08-11 20:38:19.480000 | 2025-08-11 20:38:19.480000 | OK | 256
+usp_Collect_From_Server2 | SQL_STORED_PROCEDURE | 2025-09-01 11:58:16.890000 | 2025-09-01 11:58:16.890000 | OK | 256
+usp_Merge_BatchMaterials_FromLocal | SQL_STORED_PROCEDURE | 2025-08-11 20:37:29.253000 | 2026-06-17 14:14:47.460000 | OK | 4126
+usp_StagePV_FromServer1 | SQL_STORED_PROCEDURE | 2025-08-11 20:30:26.770000 | 2026-06-17 16:36:08.450000 | OK | 2974
+usp_StagePV_FromServer2 | SQL_STORED_PROCEDURE | 2025-09-01 12:31:30.687000 | 2026-06-17 16:54:01.933000 | OK | 2977
+usp_Upsert_BatchCopy_FromPV | SQL_STORED_PROCEDURE | 2025-08-11 20:36:45.530000 | 2026-06-17 14:13:08.557000 | OK | 4482
+OS2_BatchCopy_Compat | VIEW | 2025-09-01 12:27:46.090000 | 2025-09-01 13:49:31.913000 | OK | 2382
+(8 rows)
+
+===== B2.OS2_BatchCopy_Compat_def =====
+
+CREATE   VIEW dbo.OS2_BatchCopy_Compat AS
+WITH VB AS (
+    SELECT
+        ROOTGUID, ROOTOBJID, ROOTOTID, OGUID, OBJID, OTID,
+        Name, Description,
+        Quantity, ActQuantity,
+        ProductName, ProductCode, ProductGUID, UoMId,
+        FormulaCategoryName, FormulaName, FormulaVersion, FormulaGUID, FormulaId,
+        MRecipeName, MRecipeVersion, MRecipeGUID, MRecipeId,
+        PlanStart, PlanEnd, ActStart, ActEnd,
+        StartMode, State, ExState,
+        PCellGUID,
+        CreationDateTime, ModificationDateTime,
+        BatchVersion
+    FROM [FAKIEH_SERVER2].[SimaticBatch].[SIMATIC_BATCH].[vBatch]
+    -- If you want archives too, UNION ALL a second SELECT from vBatchArchive with the same column list
+)
+SELECT
+    VB.ROOTGUID, VB.ROOTOBJID, VB.ROOTOTID, VB.OGUID, VB.OBJID, VB.OTID,
+    CAST(NULL AS datetimeoffset) AS Created,
+    CAST(NULL AS smallint)       AS CreatedTSHostId,
+    CAST(NULL AS datetimeoffset) AS Deleted,
+    CAST(NULL AS smallint)       AS DeletedTSHostId,
+    VB.Name, VB.Description,
+    CAST(NULL AS bit)            AS Withdrawn,
+    VB.ExState, VB.State, VB.Quantity, VB.ActQuantity,
+    VB.ProductName, VB.ProductCode, VB.ProductGUID, VB.UoMId AS ProductUoMId,
+    VB.FormulaCategoryName, VB.FormulaName, VB.FormulaVersion,
+    VB.FormulaGUID, VB.FormulaId,
+    VB.MRecipeName, VB.MRecipeVersion, VB.MRecipeGUID, VB.MRecipeId,
+    CAST(NULL AS int)            AS OrderId,
+    VB.PlanStart, VB.PlanEnd, VB.ActStart, VB.ActEnd,
+    VB.StartMode                 AS [Mode],
+    CAST(NULL AS smallint)       AS [Export],
+    VB.PCellGUID,
+    CAST(NULL AS int)            AS PCellId,
+    CAST(NULL AS int)            AS PartId,
+    CAST(NULL AS int)            AS BatchReleaseGroupId,
+    VB.CreationDateTime, VB.ModificationDateTime,
+    CAST(NULL AS bit)            AS BatchHasNoTags,
+    CAST(NULL AS int)            AS CurrentBatchDataId,
+    CAST(NULL AS int)            AS GapTime,
+    VB.BatchVersion,
+    CAST(NULL AS datetimeoffset) AS LastOSCDateTime,
+    CAST(NULL AS bit)            AS MarkByOSC,
+    CAST(NULL AS datetimeoffset) AS BatchTransferTime,
+    CAST(NULL AS int)            AS PredecessorBatchId,
+    CAST(NULL AS int)            AS ChainMode,
+    CAST(NULL AS bit)            AS ChainIgnorePredecessorState,
+    CAST(NULL AS datetimeoffset) AS ReleaseTime
+FROM VB;
+
+(1 rows)
+
+===== B3.any_proc_referencing_pipeline (full bodies) =====
+CREATE   PROCEDURE dbo.RetrieveAndStoreAllBatchData
+  @StartDate DATETIME = NULL,
+  @EndDate   DATETIME = NULL
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  DECLARE @UseDateRange BIT = CASE WHEN @StartDate IS NOT NULL AND @EndDate IS NOT NULL THEN 1 ELSE 0 END;
+  DECLARE @LastBT_S1 DATETIME;
+  SELECT @LastBT_S1 = LastTimeStamp FROM dbo.DataSyncTracker WHERE [Source Server] = 'Server1';
+
+  IF OBJECT_ID('tempdb..#TempBatchData') IS NOT NULL DROP TABLE #TempBatchData;
+  CREATE TABLE #TempBatchData (
+    [Source Server] NVARCHAR(50), [Batch GUID] UNIQUEIDENTIFIER, ROOTGUID UNIQUEIDENTIFIER, OrderId INT,
+    [Batch Name] NVARCHAR(255), [Product Name] NVARCHAR(255),
+    [Batch Act Start] DATETIME, [Batch Act End] DATETIME, [Batch Transfer Time] DATETIME,
+    Quantity FLOAT, [Material Name] NVARCHAR(255), [Material Code] NVARCHAR(255),
+    sp_prot FLOAT, [SetPoint Float] FLOAT, [Actual Value Float] FLOAT,
+    [TimeStamp] DATETIME, FormulaCategoryName NVARCHAR(255)
+  );
+
+  ;WITH S1 AS (
+    SELECT
+      'Server1' AS [Source Server],
+      BC.OGUID, BC.ROOTGUID, BC.OrderId,
+      BC.Name AS [Batch Name], BC.ProductName AS [Product Name],
+      CONVERT(DATETIME, BC.ActStart) AS [Batch Act Start],
+      CONVERT(DATETIME, BC.ActEnd)   AS [Batch Act End],
+      CONVERT(DATETIME, BC.BatchTransferTime) AS [Batch Transfer Time],
+      BC.Quantity,
+      PV.sp_matname AS [Material Name],
+      PV.sp_matcode AS [Material Code],
+      PV.sp_prot,
+      PV.sp_float   AS [SetPoint Float],
+      PV.av_float   AS [Actual Value Float],
+      PV.TimeStamp,
+      BC.FormulaCategoryName,
+      ROW_NUMBER() OVER (
+        PARTITION BY BC.OGUID, BC.FormulaCategoryName, PV.sp_matcode, PV.sp_matname, PV.sp_prot
+        ORDER BY PV.TimeStamp DESC
+      ) AS rn
+    FROM [FAKIEH_SERVER1].ASMBatchReports.dbo.BatchCopy           AS BC
+    JOIN [FAKIEH_SERVER1].ASMBatchReports.dbo.ParValueOnline_copy AS PV
+      ON BC.OGUID = PV.ROOTGUID
+    WHERE PV.av_float > 0 AND PV.sp_float > 0 AND PV.sp_matname IS NOT NULL
+      AND (
+            (@UseDateRange = 1 AND BC.BatchTransferTime BETWEEN @StartDate AND @EndDate)
+         OR (@UseDateRange = 0 AND (@LastBT_S1 IS NULL OR BC.BatchTransferTime > @LastBT_S1))
+          )
+  )
+  INSERT #TempBatchData
+  SELECT 'Server1', OGUID, ROOTGUID, OrderId, [Batch Name], [Product Name],
+         [Batch Act Start], [Batch Act End], [Batch Transfer Time],
+         Quantity, [Material Name], [Material Code], sp_prot,
+         [SetPoint Float], [Actual Value Float], TimeStamp, FormulaCategoryName
+  FROM S1 WHERE rn = 1;
+
+  ;WITH Agg AS (
+    SELECT
+      [Source Server], [Batch GUID], [Material Name], [Material Code], FormulaCategoryName, sp_prot,
+      MAX(ROOTGUID) AS ROOTGUID, MAX(OrderId) AS OrderId,
+      MAX([Batch Name]) AS [Batch Name], MAX([Product Name]) AS [Product Name],
+      MIN([Batch Act Start]) AS [Batch Act Start], MAX([Batch Act End]) AS [Batch Act End],
+      MAX([Batch Transfer Time]) AS [Batch Transfer Time],
+      MAX(Quantity) AS Quantity,
+      MAX([SetPoint Float]) AS [SetPoint Float],
+      MAX([Actual Value Float]) AS [Actual Value Float]
+    FROM #TempBatchData
+    GROUP BY [Source Server], [Batch GUID], [Material Name], [Material Code], FormulaCategoryName, sp_prot
+  )
+  MERGE dbo.BatchMaterials AS T
+  USING Agg AS S
+    ON  T.[Source Server]     = S.[Source Server]
+    AND T.[Batch GUID]        = S.[Batch GUID]
+    AND T.[Material Name]     = S.[Material Name]
+    AND ((T.[Material Code] IS NULL AND S.[Material Code] IS NULL) OR T.[Material Code] = S.[Material Code])
+    AND T.FormulaCategoryName = S.FormulaCategoryName
+    AND ((T.sp_prot IS NULL AND S.sp_prot IS NULL) OR T.sp_prot = S.sp_prot)
+  WHEN NOT MATCHED THEN
+    INSERT ([Source Server],[Batch GUID],ROOTGUID,OrderId,[Batch Name],[Product Name],
+            [Batch Act Start],[Batch Act End],[Batch Transfer Time],
+            Quantity,[Material Name],[Material Code],sp_prot,[SetPoint Float],[Actual Value Float],FormulaCategoryName)
+    VALUES (S.[Source Server],S.[Batch GUID],S.ROOTGUID,S.OrderId,S.[Batch Name],S.[Product Name],
+            S.[Batch Act Start],S.[Batch Act End],S.[Batch Transfer Time],
+            S.Quantity,S.[Material Name],S.[Material Code],S.sp_prot,S.[SetPoint Float],S.[Actual Value Float],S.FormulaCategoryName)
+  WHEN MATCHED THEN
+    UPDATE SET
+      T.ROOTGUID=S.ROOTGUID, T.OrderId=S.OrderId, T.[Batch Name]=S.[Batch Name], T.[Product Name]=S.[Product Name],
+      T.[Batch Act Start]=S.[Batch Act Start], T.[Batch Act End]=S.[Batch Act End],
+      T.[Batch Transfer Time]=S.[Batch Transfer Time], T.Quantity=S.Quantity,
+      T.[Material Code]=S.[Material Code], T.sp_prot=S.sp_prot,
+      T.[SetPoint Float]=S.[SetPoint Float], T.[Actual Value Float]=S.[Actual Value Float],
+      T.FormulaCategoryName=S.FormulaCategoryName;
+
+  IF @UseDateRange = 0
+  BEGIN
+    DECLARE @MaxBT_S1 DATETIME;
+    SELECT @MaxBT_S1 = MAX([Batch Transfer Time]) FROM #TempBatchData;
+    IF @MaxBT_S1 IS NOT NULL
+      MERGE dbo.DataSyncTracker AS T
+      USING (SELECT 'Server1' AS Src, @MaxBT_S1 AS BT) AS S
+      ON T.[Source Server]=S.Src
+      WHEN MATCHED THEN UPDATE SET LastTimeStamp = S.BT
+      WHEN NOT MATCHED THEN INSERT([Source Server],LastTimeStamp) VALUES(S.Src,S.BT);
+  END
+
+  DROP TABLE #TempBatchData;
+END
+
+CREATE PROCEDURE [dbo].[usp_StagePV_FromServer1]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @LastSync DATETIME;
+    DECLARE @NewMaxTime DATETIME;
+
+    SELECT @LastSync = LastTimeStamp
+    FROM dbo.DataSyncTracker
+    WHERE [Source Server] = 'Server1';
+
+	 ;WITH S AS
+	(
+		SELECT
+			v.ROOTGUID,
+			v.POBJID,
+			v.POTID,
+			v.P2OBJID,
+			v.P2OTID,
+			v.OBJID,
+			v.ActivationCounter,
+			v.EventID,
+			v.[TimeStamp],
+			v.[Name] COLLATE DATABASE_DEFAULT AS [Name],
+			v.EventNotifyType,
+			v.UsageId,
+			v.DataTypeId,
+			v.DataTypeName COLLATE DATABASE_DEFAULT AS DataTypeName,
+			v.UoMId,
+			v.UoMName COLLATE DATABASE_DEFAULT AS UoMName,
+			v.HighValue,
+			v.LowValue,
+			v.RecHighValue,
+			v.RecLowValue,
+			v.sp_float,
+			v.av_float,
+			v.sp_matname COLLATE DATABASE_DEFAULT AS sp_matname,
+			v.sp_matcode COLLATE DATABASE_DEFAULT AS sp_matcode,
+			v.sp_prot,
+			'Server1' AS SourceServer
+		FROM [FAKIEH_SERVER1].SimaticBatch.SIMATIC_BATCH.ParValueOnline v
+		WHERE v.[Name] IS NOT NULL
+		  AND (
+				@LastSync IS NULL
+				OR v.[TimeStamp] > @LastSync
+			  )
+	)
+
+    MERGE dbo.ParValueOnline_copy AS T
+    USING S
+       ON T.ROOTGUID = S.ROOTGUID
+      AND T.[TimeStamp] = S.[TimeStamp]
+      AND T.[Name] = S.[Name]
+
+    WHEN NOT MATCHED THEN
+        INSERT
+        (
+            ROOTGUID,POBJID,POTID,P2OBJID,P2OTID,
+            OBJID,ActivationCounter,EventID,
+            [TimeStamp],[Name],EventNotifyType,
+            UsageId,DataTypeId,DataTypeName,
+            UoMId,UoMName,HighValue,LowValue,
+            RecHighValue,RecLowValue,
+            sp_float,av_float,
+            sp_matname,sp_matcode,sp_prot,
+            SourceServer
+        )
+        VALUES
+        (
+            S.ROOTGUID,S.POBJID,S.POTID,S.P2OBJID,S.P2OTID,
+            S.OBJID,S.ActivationCounter,S.EventID,
+            S.[TimeStamp],S.[Name],S.EventNotifyType,
+            S.UsageId,S.DataTypeId,S.DataTypeName,
+            S.UoMId,S.UoMName,S.HighValue,S.LowValue,
+            S.RecHighValue,S.RecLowValue,
+            S.sp_float,S.av_float,
+            S.sp_matname,S.sp_matcode,S.sp_prot,
+            S.SourceServer
+        );
+
+    SELECT
+        @NewMaxTime = MAX([TimeStamp])
+    FROM dbo.ParValueOnline_copy
+    WHERE SourceServer = 'Server1';
+
+    IF @NewMaxTime IS NOT NULL
+    BEGIN
+        MERGE dbo.DataSyncTracker AS T
+        USING
+        (
+            SELECT
+                'Server1' AS SourceServer,
+                @NewMaxTime AS LastTimeStamp
+        ) AS S
+        ON T.[Source Server] = S.SourceServer
+
+        WHEN MATCHED THEN
+            UPDATE SET
+                LastTimeStamp = S.LastTimeStamp
+
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                [Source Server],
+                LastTimeStamp
+            )
+            VALUES
+            (
+                S.SourceServer,
+                S.LastTimeStamp
+            );
+    END
+END
+
+CREATE PROCEDURE [dbo].[usp_Upsert_BatchCopy_FromPV]
+AS
+BEGIN
+SET NOCOUNT ON;
+
+
+DECLARE @LastSync DATETIME;
+DECLARE @MaxTimeStamp DATETIME;
+
+SELECT @LastSync = LastTimeStamp
+FROM dbo.DataSyncTracker
+WHERE [Source Server] = 'BatchCopy';
+
+;WITH agg AS
+(
+    SELECT
+        ROOTGUID,
+        MAX(SourceServer) AS SourceServer,
+        MIN([TimeStamp]) AS ActStart,
+        MAX([TimeStamp]) AS ActEnd,
+        MAX([TimeStamp]) AS BatchTransferTime
+    FROM dbo.ParValueOnline_copy
+    WHERE @LastSync IS NULL
+       OR [TimeStamp] > @LastSync
+    GROUP BY ROOTGUID
+),
+
+BatchSource AS
+(
+    SELECT
+        OGUID,
+        ROOTGUID,
+        ROOTOBJID,
+        ROOTOTID,
+        OBJID,
+        OTID,
+        Created,
+        OrderId,
+        ProductName,
+        Quantity,
+        FormulaName,
+        FormulaCategoryName,
+        BatchTransferTime,
+        'Server1' AS SourceServer
+    FROM [FAKIEH_SERVER1].SimaticBatch.SIMATIC_BATCH.Batch
+
+    UNION ALL
+
+    SELECT
+        OGUID,
+        ROOTGUID,
+        ROOTOBJID,
+        ROOTOTID,
+        OBJID,
+        OTID,
+        Created,
+        OrderId,
+        ProductName,
+        Quantity,
+        FormulaName,
+        FormulaCategoryName,
+        BatchTransferTime,
+        'Server2' AS SourceServer
+    FROM [FAKIEH_SERVER2].SimaticBatch.SIMATIC_BATCH.Batch
+),
+
+src AS
+(
+    SELECT
+        ISNULL(b.OGUID, a.ROOTGUID) AS BatchOGUID,
+        a.ROOTGUID,
+
+        ISNULL(b.SourceServer, a.SourceServer) AS SourceServer,
+
+        a.ActStart,
+        a.ActEnd,
+
+        COALESCE(b.BatchTransferTime, a.BatchTransferTime) AS BatchTransferTime,
+
+        b.ROOTGUID AS BatchROOTGUID,
+        b.ROOTOBJID,
+        b.ROOTOTID,
+        b.OBJID,
+        b.OTID,
+        b.Created,
+        b.OrderId,
+
+        COALESCE(
+            b.FormulaName,
+            b.ProductName,
+            N'Auto from PV'
+        ) AS [Name],
+
+        b.ProductName,
+        b.Quantity,
+        b.FormulaCategoryName
+
+    FROM agg a
+    LEFT JOIN BatchSource b
+        ON b.OGUID = a.ROOTGUID
+)
+
+MERGE dbo.BatchCopy AS T
+USING src AS S
+    ON T.OGUID = S.BatchOGUID
+
+WHEN NOT MATCHED THEN
+    INSERT
+    (
+        OGUID,
+        ROOTGUID,
+        ROOTOBJID,
+        ROOTOTID,
+        OBJID,
+        OTID,
+        Created,
+        OrderId,
+        [Name],
+        ProductName,
+        ActStart,
+        ActEnd,
+        BatchTransferTime,
+        Quantity,
+        FormulaCategoryName,
+        SourceServer
+    )
+    VALUES
+    (
+        S.BatchOGUID,
+        S.BatchROOTGUID,
+        ISNULL(S.ROOTOBJID, 0),
+        ISNULL(S.ROOTOTID, 0),
+        ISNULL(S.OBJID, 0),
+        ISNULL(S.OTID, 0),
+        ISNULL(S.Created, SYSDATETIMEOFFSET()),
+        ISNULL(S.OrderId, 0),
+        S.[Name],
+        S.ProductName,
+        S.ActStart,
+        S.ActEnd,
+        S.BatchTransferTime,
+        ISNULL(S.Quantity, 0),
+        S.FormulaCategoryName,
+        S.SourceServer
+    )
+
+WHEN MATCHED THEN
+    UPDATE SET
+        T.ROOTGUID            = S.BatchROOTGUID,
+        T.ROOTOBJID           = ISNULL(S.ROOTOBJID, T.ROOTOBJID),
+        T.ROOTOTID            = ISNULL(S.ROOTOTID, T.ROOTOTID),
+        T.OBJID               = ISNULL(S.OBJID, T.OBJID),
+        T.OTID                = ISNULL(S.OTID, T.OTID),
+        T.Created             = ISNULL(S.Created, T.Created),
+        T.OrderId             = ISNULL(S.OrderId, T.OrderId),
+        T.[Name]              = ISNULL(S.[Name], T.[Name]),
+        T.ProductName         = ISNULL(S.ProductName, T.ProductName),
+        T.Quantity            = ISNULL(S.Quantity, T.Quantity),
+        T.FormulaCategoryName = ISNULL(S.FormulaCategoryName, T.FormulaCategoryName),
+        T.ActStart            = S.ActStart,
+        T.ActEnd              = S.ActEnd,
+        T.BatchTransferTime   = S.BatchTransferTime,
+        T.SourceServer        = S.SourceServer;
+
+SELECT @MaxTimeStamp = MAX([TimeStamp])
+FROM dbo.ParValueOnline_copy;
+
+IF @MaxTimeStamp IS NOT NULL
+BEGIN
+    MERGE dbo.DataSyncTracker AS T
+    USING
+    (
+        SELECT
+            'BatchCopy' AS Src,
+            @MaxTimeStamp AS LastTimeStamp
+    ) AS S
+    ON T.[Source Server] = S.Src
+
+    WHEN MATCHED THEN
+        UPDATE SET LastTimeStamp = S.LastTimeStamp
+
+    WHEN NOT MATCHED THEN
+        INSERT ([Source Server], LastTimeStamp)
+        VALUES (S.Src, S.LastTimeStamp);
+END
+
+
+END
+
+CREATE PROCEDURE [dbo].[usp_Merge_BatchMaterials_FromLocal]
+AS
+BEGIN
+SET NOCOUNT ON;
+
+;WITH latest AS
+(
+    SELECT
+        ISNULL(bc.SourceServer,'Unknown') AS [Source Server],
+
+        bc.OGUID                 AS [Batch GUID],
+        bc.ROOTGUID,
+        bc.OrderId,
+        bc.[Name]                AS [Batch Name],
+        bc.ProductName           AS [Product Name],
+        bc.FormulaCategoryName   AS [FormulaCategoryName],
+        bc.ActStart              AS [Batch Act Start],
+        bc.ActEnd                AS [Batch Act End],
+        bc.BatchTransferTime     AS [Batch Transfer Time],
+        bc.Quantity,
+
+        pv.sp_matname            AS [Material Name],
+        pv.sp_matcode            AS [Material Code],
+        pv.sp_prot,
+        pv.sp_float              AS [SetPoint Float],
+        pv.av_float              AS [Actual Value Float],
+        pv.[TimeStamp],
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                ISNULL(bc.SourceServer,'Unknown'),
+                bc.OGUID,
+                pv.sp_matcode,
+                pv.sp_matname,
+                pv.sp_prot
+            ORDER BY pv.[TimeStamp] DESC
+        ) AS rn
+
+    FROM dbo.BatchCopy bc
+    INNER JOIN dbo.ParValueOnline_copy pv
+        ON pv.ROOTGUID = bc.OGUID
+
+    WHERE pv.av_float > 0
+      AND pv.sp_float > 0
+      AND pv.sp_matname IS NOT NULL
+
+      -- Only real batches
+      AND bc.FormulaCategoryName IS NOT NULL
+      AND ISNULL(bc.[Name],'') <> 'Auto from PV'
+),
+
+agg AS
+(
+    SELECT
+        [Source Server],
+        [Batch GUID],
+        ROOTGUID,
+        OrderId,
+        [Batch Name],
+        [Product Name],
+        FormulaCategoryName,
+        [Batch Act Start],
+        [Batch Act End],
+        [Batch Transfer Time],
+        Quantity,
+        [Material Name],
+        [Material Code],
+        sp_prot,
+        [SetPoint Float],
+        [Actual Value Float]
+    FROM latest
+    WHERE rn = 1
+)
+
+MERGE dbo.BatchMaterials AS T
+USING agg AS S
+    ON  T.[Source Server] = S.[Source Server]
+    AND T.[Batch GUID] = S.[Batch GUID]
+    AND T.[Material Name] = S.[Material Name]
+    AND (
+            (T.[Material Code] IS NULL AND S.[Material Code] IS NULL)
+            OR T.[Material Code] = S.[Material Code]
+        )
+    AND (
+            (T.sp_prot IS NULL AND S.sp_prot IS NULL)
+            OR T.sp_prot = S.sp_prot
+        )
+
+WHEN NOT MATCHED THEN
+    INSERT
+    (
+        [Source Server],
+        [Batch GUID],
+        ROOTGUID,
+        OrderId,
+        [Batch Name],
+        [Product Name],
+        FormulaCategoryName,
+        [Batch Act Start],
+        [Batch Act End],
+        [Batch Transfer Time],
+        Quantity,
+        [Material Name],
+        [Material Code],
+        sp_prot,
+        [SetPoint Float],
+        [Actual Value Float]
+    )
+    VALUES
+    (
+        S.[Source Server],
+        S.[Batch GUID],
+        S.ROOTGUID,
+        S.OrderId,
+        S.[Batch Name],
+        S.[Product Name],
+        S.FormulaCategoryName,
+        S.[Batch Act Start],
+        S.[Batch Act End],
+        S.[Batch Transfer Time],
+        S.Quantity,
+        S.[Material Name],
+        S.[Material Code],
+        S.sp_prot,
+        S.[SetPoint Float],
+        S.[Actual Value Float]
+    )
+
+WHEN MATCHED THEN
+    UPDATE SET
+        T.ROOTGUID              = S.ROOTGUID,
+        T.OrderId               = S.OrderId,
+        T.[Batch Name]          = S.[Batch Name],
+        T.[Product Name]        = S.[Product Name],
+        T.[Batch Act Start]     = S.[Batch Act Start],
+        T.[Batch Act End]       = S.[Batch Act End],
+        T.[Batch Transfer Time] = S.[Batch Transfer Time],
+        T.Quantity              = S.Quantity,
+        T.[Material Code]       = S.[Material Code],
+        T.sp_prot               = S.sp_prot,
+        T.[SetPoint Float]      = S.[SetPoint Float],
+        T.[Actual Value Float]  = S.[Actual Value Float],
+        T.[FormulaCategoryName] = S.[FormulaCategoryName],
+        T.[Source Server]       = S.[Source Server];
+
+END
+
+CREATE   PROCEDURE dbo.usp_Collect_From_Server1
+AS
+BEGIN
+  SET NOCOUNT ON;
+  EXEC dbo.usp_StagePV_FromServer1;          -- you already created & tested this
+  EXEC dbo.usp_Upsert_BatchCopy_FromPV;
+  EXEC dbo.usp_Merge_BatchMaterials_FromLocal;
+END
+
+CREATE   PROCEDURE dbo.usp_Collect_From_Server2
+AS
+BEGIN
+  SET NOCOUNT ON;
+  EXEC dbo.usp_StagePV_FromServer2;          -- you already created & tested this
+  EXEC dbo.usp_Upsert_BatchCopy_FromPV;
+  EXEC dbo.usp_Merge_BatchMaterials_FromLocal;
+END
+
+
+CREATE   VIEW dbo.OS2_BatchCopy_Compat AS
+WITH VB AS (
+    SELECT
+        ROOTGUID, ROOTOBJID, ROOTOTID, OGUID, OBJID, OTID,
+        Name, Description,
+        Quantity, ActQuantity,
+        ProductName, ProductCode, ProductGUID, UoMId,
+        FormulaCategoryName, FormulaName, FormulaVersion, FormulaGUID, FormulaId,
+        MRecipeName, MRecipeVersion, MRecipeGUID, MRecipeId,
+        PlanStart, PlanEnd, ActStart, ActEnd,
+        StartMode, State, ExState,
+        PCellGUID,
+        CreationDateTime, ModificationDateTime,
+        BatchVersion
+    FROM [FAKIEH_SERVER2].[SimaticBatch].[SIMATIC_BATCH].[vBatch]
+    -- If you want archives too, UNION ALL a second SELECT from vBatchArchive with the same column list
+)
+SELECT
+    VB.ROOTGUID, VB.ROOTOBJID, VB.ROOTOTID, VB.OGUID, VB.OBJID, VB.OTID,
+    CAST(NULL AS datetimeoffset) AS Created,
+    CAST(NULL AS smallint)       AS CreatedTSHostId,
+    CAST(NULL AS datetimeoffset) AS Deleted,
+    CAST(NULL AS smallint)       AS DeletedTSHostId,
+    VB.Name, VB.Description,
+    CAST(NULL AS bit)            AS Withdrawn,
+    VB.ExState, VB.State, VB.Quantity, VB.ActQuantity,
+    VB.ProductName, VB.ProductCode, VB.ProductGUID, VB.UoMId AS ProductUoMId,
+    VB.FormulaCategoryName, VB.FormulaName, VB.FormulaVersion,
+    VB.FormulaGUID, VB.FormulaId,
+    VB.MRecipeName, VB.MRecipeVersion, VB.MRecipeGUID, VB.MRecipeId,
+    CAST(NULL AS int)            AS OrderId,
+    VB.PlanStart, VB.PlanEnd, VB.ActStart, VB.ActEnd,
+    VB.StartMode                 AS [Mode],
+    CAST(NULL AS smallint)       AS [Export],
+    VB.PCellGUID,
+    CAST(NULL AS int)            AS PCellId,
+    CAST(NULL AS int)            AS PartId,
+    CAST(NULL AS int)            AS BatchReleaseGroupId,
+    VB.CreationDateTime, VB.ModificationDateTime,
+    CAST(NULL AS bit)            AS BatchHasNoTags,
+    CAST(NULL AS int)            AS CurrentBatchDataId,
+    CAST(NULL AS int)            AS GapTime,
+    VB.BatchVersion,
+    CAST(NULL AS datetimeoffset) AS LastOSCDateTime,
+    CAST(NULL AS bit)            AS MarkByOSC,
+    CAST(NULL AS datetimeoffset) AS BatchTransferTime,
+    CAST(NULL AS int)            AS PredecessorBatchId,
+    CAST(NULL AS int)            AS ChainMode,
+    CAST(NULL AS bit)            AS ChainIgnorePredecessorState,
+    CAST(NULL AS datetimeoffset) AS ReleaseTime
+FROM VB;
+
+CREATE PROCEDURE [dbo].[usp_StagePV_FromServer2]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @LastSync DATETIME;
+    DECLARE @NewMaxTime DATETIME;
+
+    SELECT @LastSync = LastTimeStamp
+    FROM dbo.DataSyncTracker
+    WHERE [Source Server] = 'Server2';
+
+   	 ;WITH S AS
+	(
+		SELECT
+			v.ROOTGUID,
+			v.POBJID,
+			v.POTID,
+			v.P2OBJID,
+			v.P2OTID,
+			v.OBJID,
+			v.ActivationCounter,
+			v.EventID,
+			v.[TimeStamp],
+			v.[Name] COLLATE DATABASE_DEFAULT AS [Name],
+			v.EventNotifyType,
+			v.UsageId,
+			v.DataTypeId,
+			v.DataTypeName COLLATE DATABASE_DEFAULT AS DataTypeName,
+			v.UoMId,
+			v.UoMName COLLATE DATABASE_DEFAULT AS UoMName,
+			v.HighValue,
+			v.LowValue,
+			v.RecHighValue,
+			v.RecLowValue,
+			v.sp_float,
+			v.av_float,
+			v.sp_matname COLLATE DATABASE_DEFAULT AS sp_matname,
+			v.sp_matcode COLLATE DATABASE_DEFAULT AS sp_matcode,
+			v.sp_prot,
+			'Server1' AS SourceServer
+		FROM [FAKIEH_SERVER1].SimaticBatch.SIMATIC_BATCH.ParValueOnline v
+		WHERE v.[Name] IS NOT NULL
+		  AND (
+				@LastSync IS NULL
+				OR v.[TimeStamp] > @LastSync
+			  )
+	)
+
+    MERGE dbo.ParValueOnline_copy AS T
+    USING S
+       ON T.ROOTGUID = S.ROOTGUID
+      AND T.[TimeStamp] = S.[TimeStamp]
+      AND T.[Name] = S.[Name]
+
+    WHEN NOT MATCHED THEN
+        INSERT
+        (
+            ROOTGUID,POBJID,POTID,P2OBJID,P2OTID,
+            OBJID,ActivationCounter,EventID,
+            [TimeStamp],[Name],EventNotifyType,
+            UsageId,DataTypeId,DataTypeName,
+            UoMId,UoMName,HighValue,LowValue,
+            RecHighValue,RecLowValue,
+            sp_float,av_float,
+            sp_matname,sp_matcode,sp_prot,
+            SourceServer
+        )
+        VALUES
+        (
+            S.ROOTGUID,S.POBJID,S.POTID,S.P2OBJID,S.P2OTID,
+            S.OBJID,S.ActivationCounter,S.EventID,
+            S.[TimeStamp],S.[Name],S.EventNotifyType,
+            S.UsageId,S.DataTypeId,S.DataTypeName,
+            S.UoMId,S.UoMName,S.HighValue,S.LowValue,
+            S.RecHighValue,S.RecLowValue,
+            S.sp_float,S.av_float,
+            S.sp_matname,S.sp_matcode,S.sp_prot,
+            S.SourceServer
+        );
+
+    SELECT
+        @NewMaxTime = MAX([TimeStamp])
+    FROM dbo.ParValueOnline_copy
+    WHERE SourceServer = 'Server2';
+
+    IF @NewMaxTime IS NOT NULL
+    BEGIN
+        MERGE dbo.DataSyncTracker AS T
+        USING
+        (
+            SELECT
+                'Server2' AS SourceServer,
+                @NewMaxTime AS LastTimeStamp
+        ) AS S
+        ON T.[Source Server] = S.SourceServer
+
+        WHEN MATCHED THEN
+            UPDATE SET
+                LastTimeStamp = S.LastTimeStamp
+
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                [Source Server],
+                LastTimeStamp
+            )
+            VALUES
+            (
+                S.SourceServer,
+                S.LastTimeStamp
+            );
+    END
+END
+
+(8 rows)
+
+===== B4.triggers_in_ASMBatchReports =====
+parent | trig | is_disabled | is_instead_of_trigger | create_date | modify_date
+(0 rows)
+
+===== C1.BatchCopy_header_completeness_by_server =====
+SourceServer | rows_ | null_product | null_fcat | null_name | name_autopv | null_order | null_qty | oguid_eq_root | min_start | max_start
+Server1 | 82 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2026-06-17T09:54:02.663+00:00 | 2026-06-19T16:34:12.857+00:00
+(1 rows)
+
+===== C2.BatchMaterials_by_server =====
+Source Server | rows_ | batches | null_root | name_autopv | null_fcat | min_start | max_start
+Server2 | 23 | 1 | 0 | 23 | 23 | 2026-06-16T11:24:48.940 | 2026-06-16T11:24:48.940
+Unknown | 9412 | 480 | 0 | 9412 | 9412 | 2025-07-23T13:24:12.683 | 2026-06-16T16:23:31.113
+Server1 | 11795 | 640 | 0 | 1709 | 9199 | 2024-11-25T16:01:36.633 | 2026-06-19T16:34:12.857
+(3 rows)
+
+===== C3.BM_multi_server_batches =====
+multi_server_batches
+468
+(1 rows)
+
+===== C4.BM_source_split_by_month =====
+Source Server | ym | batches | rows_
+Server1 | 2024-11 | 6 | 85
+Server1 | 2025-03 | 72 | 915
+Server1 | 2025-07 | 1 | 1
+Unknown | 2025-07 | 1 | 1
+Server1 | 2025-08 | 1 | 1
+Unknown | 2025-08 | 1 | 1
+Server1 | 2025-11 | 1 | 2
+Unknown | 2025-11 | 1 | 2
+Server1 | 2026-05 | 14 | 220
+Unknown | 2026-05 | 14 | 220
+Server1 | 2026-06 | 545 | 10571
+Server2 | 2026-06 | 1 | 23
+Unknown | 2026-06 | 463 | 9188
+(13 rows)
+
+===== C5.PV_copy_by_server =====
+SourceServer | rows_ | distinct_root | min_ts | max_ts
+ | 22793 | 483 | 2024-01-18T09:12:58.210+00:00 | 2026-06-16T16:43:58.640+00:00
+Server1 | 335065 | 96 | 2026-06-17T11:49:11.448+00:00 | 2026-06-19T16:34:12.857+00:00
+Server2 | 45 | 1 | 2026-06-16T11:24:48.939+00:00 | 2026-06-16T11:45:12.226+00:00
+(3 rows)
+
+===== C6.missing_summary =====
+missing_batches | oldest_first_pv | newest_last_pv | qual_rows_waiting
+26 | 2026-06-17T13:13:36.913+00:00 | 2026-06-19T15:49:19.562+00:00 | 812
+(1 rows)
+
+===== C7.missing_guid_list =====
+rootguid | SourceServer | first_pv | last_pv | pv_rows | qual
+E9B1C8C4-B797-42DA-8B87-00E29BE19E77 | Server1 | 2026-06-17T13:13:36.913+00:00 | 2026-06-17T14:40:36.102+00:00 | 3696 | 34
+C9EA50A4-77DE-496C-8B61-BB4CA00D920E | Server1 | 2026-06-17T13:13:45.108+00:00 | 2026-06-17T15:06:28.903+00:00 | 3797 | 31
+825D1A9E-186E-4A7A-993C-88CF8D431E1C | Server1 | 2026-06-17T14:46:12.866+00:00 | 2026-06-17T15:45:05.713+00:00 | 3771 | 31
+0C27FCC7-11D6-4E49-950F-DE29E2A96475 | Server1 | 2026-06-17T15:28:01.205+00:00 | 2026-06-17T16:12:26.906+00:00 | 3695 | 26
+61EE3DC3-DC48-4D5D-9204-ACAD3C37F8E4 | Server1 | 2026-06-18T08:27:24.764+00:00 | 2026-06-18T08:52:56.510+00:00 | 3691 | 32
+230E2754-7562-4F51-8DC5-A744F2820E03 | Server1 | 2026-06-18T08:27:35.020+00:00 | 2026-06-18T09:15:16.135+00:00 | 3667 | 34
+3EA335E0-092E-449C-AA6B-234B85D79F85 | Server1 | 2026-06-18T09:24:14.929+00:00 | 2026-06-18T10:07:52.694+00:00 | 3594 | 36
+11FFDE0E-E521-4C28-A06D-C5CDDBA7FBB8 | Server1 | 2026-06-18T09:24:21.016+00:00 | 2026-06-18T10:13:49.500+00:00 | 3586 | 25
+61C62215-C161-41E4-8A41-6DB0D1FDDC0E | Server1 | 2026-06-18T10:04:37.842+00:00 | 2026-06-18T10:45:51.122+00:00 | 3686 | 32
+169B7C35-6BC8-411C-BE5E-D2D657D2E593 | Server1 | 2026-06-18T10:04:47.881+00:00 | 2026-06-18T11:34:07.626+00:00 | 3708 | 33
+D327186B-6D08-4A14-BC54-A48AC3CC166E | Server1 | 2026-06-18T12:03:52.096+00:00 | 2026-06-18T12:52:49.886+00:00 | 3680 | 37
+721CFFEF-6654-428B-98BB-BE0219B558FC | Server1 | 2026-06-18T12:04:06.389+00:00 | 2026-06-18T13:26:12.633+00:00 | 3700 | 32
+DA7EC133-825D-4F7B-836C-780D6614D0FB | Server1 | 2026-06-18T13:13:16.614+00:00 | 2026-06-18T13:42:12.405+00:00 | 3702 | 31
+DDDB4502-6BF0-491C-A48B-EF6CC2819CC6 | Server1 | 2026-06-18T15:10:49.063+00:00 | 2026-06-18T16:26:45.705+00:00 | 3616 | 32
+924C1176-37FA-4873-A7AD-16882C0FCD12 | Server1 | 2026-06-19T06:09:17.298+00:00 | 2026-06-19T06:39:38.879+00:00 | 3908 | 37
+674691B9-1C4E-4A44-87D3-703F398D6EDA | Server1 | 2026-06-19T06:38:51.075+00:00 | 2026-06-19T07:51:42.263+00:00 | 3614 | 34
+482BA306-230E-478B-9829-59A0BF398330 | Server1 | 2026-06-19T07:53:43.365+00:00 | 2026-06-19T08:55:46.512+00:00 | 3592 | 28
+8A784E4D-B38B-4B59-9C93-FA961E715868 | Server1 | 2026-06-19T09:04:02.824+00:00 | 2026-06-19T11:08:04.442+00:00 | 3612 | 29
+6FA52756-8EEE-41C5-B3ED-644F855C1C29 | Server1 | 2026-06-19T10:43:47.172+00:00 | 2026-06-19T11:20:21.290+00:00 | 3594 | 27
+FF3E6C59-AD25-4AEE-956B-24E7D67D2934 | Server1 | 2026-06-19T11:40:21.161+00:00 | 2026-06-19T12:05:59.983+00:00 | 3618 | 28
+DFD3060E-B22E-4761-99C1-949618F6FD8B | Server1 | 2026-06-19T11:41:05.888+00:00 | 2026-06-19T12:44:23.343+00:00 | 3592 | 30
+B7E12D85-3607-47F5-9991-1EDE92D4594A | Server1 | 2026-06-19T11:41:15.887+00:00 | 2026-06-19T13:10:55.369+00:00 | 3578 | 29
+73069163-2006-4207-BB50-4EC4F16514A9 | Server1 | 2026-06-19T12:09:44.311+00:00 | 2026-06-19T13:40:38.872+00:00 | 3594 | 31
+61A74053-64A3-422F-A5F7-39F843F770F6 | Server1 | 2026-06-19T12:09:50.389+00:00 | 2026-06-19T13:58:49.980+00:00 | 3610 | 34
+F238A5E1-14F9-4ED4-A30B-B2C894D98FF2 | Server1 | 2026-06-19T14:53:29.175+00:00 | 2026-06-19T15:23:48.460+00:00 | 3602 | 32
+504BD727-893D-41B5-AC4C-9767D586CF28 | Server1 | 2026-06-19T14:53:49.080+00:00 | 2026-06-19T15:49:19.562+00:00 | 3602 | 27
+(26 rows)
+
+===== C8.PV_rootguid_multi_server =====
+roots_on_multiple_servers
+0
+(1 rows)
+
+===== D1.BatchCopy_AutoPV_Backup_20260605 =====
+rows_total | distinct_oguid | rootguid_eq_oguid | name_autopv | null_fcat | null_product
+90 | 90 | 90 | 90 | 90 | 90
+(1 rows)
+
+===== D2.BatchMaterials_BeforeCleanup_20260617 =====
+rows_total | distinct_batches
+19593 | 559
+(1 rows)
+
+===== D3.BeforeCleanup_dups =====
+Source Server | Batch GUID | Material Name | Material Code | sp_prot | dup
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Soya Oil | 210 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | SOYA- | 105 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | SOUDIOM Bicarbon | 35 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | SENITHETIC LYSIN | 8 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Salt | 202 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Rovabio Advance | 74 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Provi Oxi Stop | 21 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Monocalcium Phos | 204 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Methionine | 12 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Maize | 100 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | LYSOFORTE DRY | 30 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | L-VALINE 98% | 72 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Limestone | 113 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | L Threonine | 60 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | L Isoleucine | 73 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | KENZYME PRO | 77 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | HY-Bond | 111 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Choline Chloride 60% | 26 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Broiler Starter PX | 69 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | Broiler Mineral Mix | 31 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | BIOSTRONG 510 | 140 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | BETAIN HCL | 142 | 100.0 | 2
+Server2 | 511029B0-D40D-4937-9D2C-0F908966D80D | *MIXED MEALE* | 199 | 100.0 | 2
+(23 rows)
+
+===== D4.BeforeCleanup_dup_summary =====
+dup_groups | extra_rows
+23 | 23
+(1 rows)
+
+===== D5.Phase1_Backup_profile =====
+rows_total | distinct_batches | b_null_fcat | b_autopv
+19593 | 559 | 481 | 481
+(1 rows)
+
+===== D6.BeforeCleanup_columns =====
+col | dtype
+Source Server | nvarchar
+Batch GUID | uniqueidentifier
+ROOTGUID | uniqueidentifier
+OrderId | int
+Batch Name | nvarchar
+Product Name | nvarchar
+Batch Act Start | datetime
+Batch Act End | datetime
+Batch Transfer Time | datetime
+Quantity | float
+Material Name | nvarchar
+Material Code | nvarchar
+sp_prot | float
+SetPoint Float | float
+Actual Value Float | float
+FormulaCategoryName | nvarchar
+(16 rows)
+
+===== E1.default_trace =====
+StartTime | event_name | DatabaseName | ObjectName | LoginName | ApplicationName | HostName | TextData
+2026-06-16T15:24:15.363 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-16T15:24:15.363 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-16T15:27:51.367 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-16T15:27:51.367 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T07:58:02.173 | Object:Altered | ASMBatchReports | ParValueOnline_copy | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T07:58:02.190 | Object:Altered | ASMBatchReports | ParValueOnline_copy | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T07:58:02.190 | Object:Altered | ASMBatchReports | BatchCopy | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T07:58:02.203 | Object:Altered | ASMBatchReports | BatchCopy | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:01:46.603 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:01:46.603 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:01:57.630 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:01:57.653 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:03:19.733 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer2 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:03:19.737 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer2 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:03:34.663 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer2 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:03:34.663 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer2 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:25:14.560 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:25:14.560 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:48:41.853 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:48:41.853 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:55:32.690 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T08:55:32.690 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:24:20.550 | Object:Created | ASMBatchReports | BatchCopy_Phase1_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:24:20.550 | Object:Created | ASMBatchReports | BatchCopy_Phase1_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:24:20.563 | Object:Created | ASMBatchReports | BatchMaterials_Phase1_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:24:20.563 | Object:Created | ASMBatchReports | BatchMaterials_Phase1_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:24:20.603 | Object:Created | ASMBatchReports | ParValueOnline_Phase1_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:24:20.603 | Object:Created | ASMBatchReports | ParValueOnline_Phase1_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:33:40.427 | Object:Created | ASMBatchReports | IX_ParValueOnline_ROOTGUID | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:33:40.447 | Object:Created | ASMBatchReports | IX_ParValueOnline_ROOTGUID | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:33:47.787 | Object:Created | ASMBatchReports | IX_ParValueOnline_TimeStamp | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:33:47.787 | Object:Created | ASMBatchReports | IX_ParValueOnline_TimeStamp | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:33:53.897 | Object:Created | ASMBatchReports | IX_ParValueOnline_Source | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:33:53.897 | Object:Created | ASMBatchReports | IX_ParValueOnline_Source | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:35:09.937 | Object:Created | ASMBatchReports | IX_BatchCopy_OGUID | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:35:09.950 | Object:Created | ASMBatchReports | IX_BatchCopy_OGUID | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:35:17.867 | Object:Created | ASMBatchReports | IX_BatchCopy_SourceServer | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:35:17.880 | Object:Created | ASMBatchReports | IX_BatchCopy_SourceServer | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:35:39.507 | Object:Created | ASMBatchReports | IX_BatchCopy_TransferTime | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:35:39.520 | Object:Created | ASMBatchReports | IX_BatchCopy_TransferTime | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:37:19.893 | Object:Created | ASMBatchReports | IX_BatchMaterials_BatchGUID | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:37:19.897 | Object:Created | ASMBatchReports | IX_BatchMaterials_BatchGUID | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:37:26.037 | Object:Created | ASMBatchReports | IX_BatchMaterials_SourceServer | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:37:26.040 | Object:Created | ASMBatchReports | IX_BatchMaterials_SourceServer | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:37:31.607 | Object:Created | ASMBatchReports | IX_BatchMaterials_BatchGUID_Source | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:37:31.607 | Object:Created | ASMBatchReports | IX_BatchMaterials_BatchGUID_Source | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:48:37.530 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:48:37.530 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:49:19.860 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer2 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:49:19.863 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer2 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:56:23.320 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:56:23.323 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:57:54.693 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T09:57:54.693 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:01:49.803 | Object:Created | ASMBatchReports | BatchMaterials_BeforeCleanup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:01:49.813 | Object:Created | ASMBatchReports | BatchMaterials_BeforeCleanup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:12:54.110 | Object:Created | ASMBatchReports | UX_BatchMaterials_Final | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:12:54.120 | Object:Created | ASMBatchReports | UX_BatchMaterials_Final | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:15:55.157 | Object:Created | ASMBatchReports | UX_BatchCopy_OGUID_SourceServer | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:15:55.157 | Object:Created | ASMBatchReports | UX_BatchCopy_OGUID_SourceServer | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:16:15.197 | Object:Created | ASMBatchReports | UX_BatchMaterials_Unique | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:16:15.197 | Object:Created | ASMBatchReports | UX_BatchMaterials_Unique | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:50:21.610 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T10:50:21.610 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T11:41:52.173 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T11:41:52.173 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T11:58:44.167 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T11:58:44.167 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T11:59:11.563 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T11:59:11.563 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T12:36:07.963 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T12:36:07.963 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T12:37:13.147 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T12:37:13.147 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T13:05:52.560 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T13:05:52.563 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T14:13:08.557 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T14:13:08.557 | Object:Altered | ASMBatchReports | usp_Upsert_BatchCopy_FromPV | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T14:14:47.533 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T14:14:47.540 | Object:Altered | ASMBatchReports | usp_Merge_BatchMaterials_FromLocal | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T15:55:19.207 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T15:55:19.210 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:22:11.450 | Object:Created | ASMBatchReports | ParValueOnline_Server1_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:22:11.450 | Object:Created | ASMBatchReports | ParValueOnline_Server1_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:29:01.080 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:29:01.080 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:29:34.893 | Object:Created | ASMBatchReports | ParValueOnline_copy_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:29:34.893 | Object:Created | ASMBatchReports | ParValueOnline_copy_Backup_20260617 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:36:08.450 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:36:08.453 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer1 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:54:01.937 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer2 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+2026-06-17T16:54:01.937 | Object:Altered | ASMBatchReports | usp_StagePV_FromServer2 | DESKTOP-N8PGI9S\Hercu | Microsoft SQL Server Management Studio - Query | DESKTOP-N8PGI9S | 
+(92 rows)
+
+DONE FULL

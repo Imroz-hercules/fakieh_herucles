@@ -1,4 +1,5 @@
-"""SQL Server BatchMaterials view for batch reporting (ASMBatchReports)."""
+"""SQL Server batch materials table for batch reporting (ASMBatchReports)."""
+from config import SQLSERVER_BATCH_MATERIALS_TABLE
 from models import db
 from sqlalchemy import PrimaryKeyConstraint
 from sqlalchemy.dialects.mssql import UNIQUEIDENTIFIER
@@ -6,7 +7,7 @@ from sqlalchemy.dialects.mssql import UNIQUEIDENTIFIER
 
 class KPIMaterial(db.Model):
     __bind_key__ = "sqlserver"
-    __tablename__ = "BatchMaterials"
+    __tablename__ = SQLSERVER_BATCH_MATERIALS_TABLE
     __table_args__ = (
         PrimaryKeyConstraint("Batch GUID", "OrderId", "Material Name", "Batch Act Start"),
         {"schema": "dbo"},

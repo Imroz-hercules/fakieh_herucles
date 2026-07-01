@@ -1,0 +1,223 @@
+REGRESSION DIAGNOSTIC @ 2026-06-21T19:03:05.970549 (READ-ONLY)
+
+===== identity =====
+s | db | lg | sa | now
+DESKTOP-N8PGI9S\FAKIEH_REPORTING | ASMBatchReports | DESKTOP-N8PGI9S\Hercu | 1 | 2026-06-21 19:03:05.9715575 +03:00
+(1 rows)
+
+===== 0.1 objects changed last 21d =====
+name | type_desc | cre | mod
+usp_Merge_BatchMaterials_FromLocal | SQL_STORED_PROCEDURE | 2025-08-11 20:37:29 | 2026-06-21 18:11:04
+usp_StagePV_FromServer2 | SQL_STORED_PROCEDURE | 2025-09-01 12:31:30 | 2026-06-20 08:15:01
+usp_Upsert_BatchCopy_FromPV | SQL_STORED_PROCEDURE | 2025-08-11 20:36:45 | 2026-06-20 08:15:01
+usp_StagePV_FromServer1 | SQL_STORED_PROCEDURE | 2025-08-11 20:30:26 | 2026-06-17 16:36:08
+RetrieveAndStoreAllBatchData_OLD | SQL_STORED_PROCEDURE | 2025-08-11 18:10:20 | 2026-06-17 10:16:53
+(5 rows)
+
+===== 0.2 recent/backup/capture tables =====
+sch | tbl | cre | mod | rows_
+dbo | _FixBackup_JobState | 2026-06-20 08:02:05 | 2026-06-20 08:02:05 | 2
+dbo | _FixBackup_ProcBodies | 2026-06-20 08:02:05 | 2026-06-20 08:02:05 | 6
+dbo | ParValueOnline_copy_Backup_20260617 | 2026-06-17 16:29:34 | 2026-06-17 16:29:34 | 24423
+dbo | ParValueOnline_Server1_Backup_20260617 | 2026-06-17 16:22:11 | 2026-06-17 16:22:11 | 2286
+dbo | BatchMaterials_BeforeCleanup_20260617 | 2026-06-17 10:01:49 | 2026-06-17 10:01:49 | 19593
+dbo | ParValueOnline_Phase1_Backup_20260617 | 2026-06-17 09:24:20 | 2026-06-17 09:24:20 | 22838
+dbo | BatchMaterials_Phase1_Backup_20260617 | 2026-06-17 09:24:20 | 2026-06-17 09:24:20 | 19593
+dbo | BatchCopy_Phase1_Backup_20260617 | 2026-06-17 09:24:20 | 2026-06-17 09:24:20 | 485
+dbo | BatchCopy_AutoPV_Backup_20260605 | 2026-06-05 13:53:57 | 2026-06-05 13:53:57 | 90
+(9 rows)
+
+===== 0.4 HOTFIX present? (actual current bodies) =====
+upsert modify_date=2026-06-20 08:15:01.800000  INSERT-fallback=PRESENT  UPDATE-fallback=PRESENT
+merge  modify_date=2026-06-21 18:11:04.050000  category_filter=removed  autopv_filter=removed
+stage1 modify_date=2026-06-17 16:36:08.450000  reads_SERVER1=True  tags_Server1=True
+stage2 modify_date=2026-06-20 08:15:01.827000  EXEC reads_SERVER2=True reads_SERVER1=False  tags_Server2=True tags_Server1=False
+
+===== 0.5a jobs =====
+job | enabled | owner
+Collect Server1 ? BatchMaterials | 1 | DESKTOP-N8PGI9S\Hercu
+Collect Server2 — Batch | 1 | DESKTOP-N8PGI9S\Hercu
+(2 rows)
+
+===== 0.5b schedules =====
+job | sched | sched_en | mins
+Collect Server1 ? BatchMaterials | Collect S1 – Every 10 minutes | 1 | 10
+Collect Server2 — Batch | Collect S2 — Every 10 minutes | 1 | 10
+(2 rows)
+
+===== 0.5c running now =====
+job | start_execution_date
+Collect Server1 ? BatchMaterials | 2026-01-14 15:20:00
+Collect Server2 — Batch | 2026-01-14 15:20:00
+(2 rows)
+
+===== 0.5d last 40 outcomes =====
+job | step_id | run_date | rtime | run_status | msg
+Collect Server2 — Batch | 0 | 20260621 | 190000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 190000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 190000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 190000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 185000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 185000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 185000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 185000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 184000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 184000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 184000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 184000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 183000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 183000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 183000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 183000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 182000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 182000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 182000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 182000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 181000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 181000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 181000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 181000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 180001 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 180001 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 180000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 180001 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 175000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 175000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 175000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 175000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 174000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 174000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 174000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 174000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server2 — Batch | 0 | 20260621 | 173000 | 1 | The job succeeded.  The Job was invoked by Schedule 11 (Collect S2 — Every 10 minutes).  T
+Collect Server2 — Batch | 1 | 20260621 | 173000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+Collect Server1 ? BatchMaterials | 0 | 20260621 | 173000 | 1 | The job succeeded.  The Job was invoked by Schedule 10 (Collect S1 – Every 10 minutes).  T
+Collect Server1 ? BatchMaterials | 1 | 20260621 | 173000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+(40 rows)
+
+===== 0.5e failures only (step>0) =====
+job | run_date | rtime | msg
+(0 rows)
+
+===== 0.6 watermarks =====
+Source Server | LastTimeStamp
+BatchCopy | 2026-06-21 12:43:56.517
+Server1 | 2026-06-21 12:43:56.517
+Server2 | 2026-06-16 11:45:12.227
+(3 rows)
+
+===== 1.1 STAGING freshness per server =====
+SourceServer | pv_rows | min_ts | max_ts | staging_lag_min
+ | 22793 | 2024-01-18 09:12:58.210 +00:00 | 2026-06-16 16:43:58.640 +00:00 | 7340
+Server1 | 361547 | 2026-06-17 11:49:11.448 +00:00 | 2026-06-21 12:43:56.516 +00:00 | 380
+Server2 | 45 | 2026-06-16 11:24:48.939 +00:00 | 2026-06-16 11:45:12.226 +00:00 | 7638
+(3 rows)
+
+===== 1.2 REPORT freshness per server =====
+Source Server | material_rows | batches | max_act_start | report_lag_min
+Server1 | 18047 | 702 | 2026-06-21 12:30:09 | 393
+Server2 | 23 | 1 | 2026-06-16 11:24:48 | 7659
+Unknown | 9412 | 480 | 2026-06-16 16:23:31 | 7360
+(3 rows)
+
+===== 1.3 per-day captured-qualifying vs reported (30d) =====
+d | captured_qual | reported | gap
+2026-05-23 | 2 | 2 | 0
+2026-05-24 | 1 | 1 | 0
+2026-05-25 | 1 | 1 | 0
+2026-05-29 | 2 | 2 | 0
+2026-05-30 | 1 | 1 | 0
+2026-05-31 | 5 | 5 | 0
+2026-06-01 | 1 | 1 | 0
+2026-06-02 | 5 | 5 | 0
+2026-06-03 | 26 | 26 | 0
+2026-06-04 | 29 | 29 | 0
+2026-06-05 | 25 | 25 | 0
+2026-06-06 | 29 | 29 | 0
+2026-06-07 | 29 | 29 | 0
+2026-06-08 | 42 | 42 | 0
+2026-06-09 | 26 | 26 | 0
+2026-06-10 | 35 | 35 | 0
+2026-06-11 | 34 | 34 | 0
+2026-06-12 | 35 | 35 | 0
+2026-06-13 | 39 | 39 | 0
+2026-06-14 | 31 | 31 | 0
+2026-06-15 | 44 | 44 | 0
+2026-06-16 | 34 | 34 | 0
+2026-06-17 | 15 | 43 | -28
+2026-06-18 | 35 | 37 | -2
+2026-06-19 | 42 | 43 | -1
+2026-06-20 | 33 | 26 | 7
+2026-06-21 | 8 | 7 | 1
+(27 rows)
+
+===== 1.5 missing categorized A/B/C per server (30d) =====
+ERROR: ('42000', '[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot perform an aggregate function on an expression containing an aggregate or a subquery. (130) (SQLExecDirectW); [42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot perform an aggregate function on an expression containing an aggregate or a subquery. (130); [42000] [Microsoft][ODBC Driver 17 for SQL Serve
+
+===== 1.4 missing batch detail (top 40 newest) =====
+rootguid | SourceServer | first_ts | last_ts | pv_rows | qual_rows | category
+F87B2842-43EC-4B06-9164-B1E60C1C8853 | Server1 | 2026-06-21 12:16:53 | 2026-06-21 12:21:55 | 265 | 1 | A_no_batchcopy
+92BCFF49-F7E3-447D-9178-2A0F6B5341C9 | Server1 | 2026-06-20 16:02:08 | 2026-06-20 16:18:17 | 1084 | 13 | A_no_batchcopy
+750BDFA8-0A54-442D-9316-96FC732A00C2 | Server1 | 2026-06-20 14:17:10 | 2026-06-20 14:34:23 | 333 | 1 | A_no_batchcopy
+9C1E8C80-B2A1-4623-9C2A-674BB5DF6AD2 | Server1 | 2026-06-20 12:50:15 | 2026-06-20 13:16:01 | 641 | 7 | A_no_batchcopy
+C521048D-88E6-4433-9A39-EC8B9B2A6FA3 | Server1 | 2026-06-20 11:25:06 | 2026-06-20 11:36:34 | 330 | 1 | A_no_batchcopy
+C598C68C-C04F-4772-842D-D0C384A06CB7 | Server1 | 2026-06-20 11:13:40 | 2026-06-20 11:25:05 | 331 | 1 | A_no_batchcopy
+E5E8DF0F-8690-47CB-AD7B-E987D9D4B989 | Server1 | 2026-06-20 09:06:47 | 2026-06-20 09:15:37 | 311 | 1 | A_no_batchcopy
+F9FBD1EB-787B-4D72-B7F6-5F426EAAD29C | Server1 | 2026-06-20 08:57:17 | 2026-06-20 09:06:42 | 309 | 1 | A_no_batchcopy
+(8 rows)
+
+===== 1.6 dups now =====
+dup_groups
+0
+(1 rows)
+
+===== 1.7 totals (deletion check) =====
+t | rows_ | batches
+BatchMaterials | 27482 | 715
+BatchCopy | 141 | 141
+PV_copy | 384385 | 622
+(3 rows)
+
+===== 1.1b BatchCopy freshness per server =====
+SourceServer | rows_ | batches | autopv | null_fcat | max_actstart | max_xfer
+Server1 | 141 | 141 | 46 | 26 | 2026-06-21 12:30:09 | 2026-06-21 12:45:01
+(1 rows)
+
+===== 4.1 linked servers =====
+name | data_source | is_data_access_enabled | is_rpc_out_enabled
+FAKIEH_SERVER1 | 192.168.1.50\INFSERVER | True | True
+FAKIEH_SERVER2 | 192.168.0.51,1433 | True | True
+OS1_SQL | 192.168.1.50,1433 | True | True
+(3 rows)
+
+===== 4.2 FAKIEH_SERVER1 live SIMATIC ParValueOnline =====
+s | pv_rows | d_root | max_ts
+OS1\INFSERVER | 3581 | 1 | 2026-06-21 12:43:56.516 +00:00
+(1 rows)
+
+===== 4.2b FAKIEH_SERVER1 live SIMATIC Batch =====
+batch_rows | max_created | max_xfer
+1 | 2026-06-21 12:45:01.071 +00:00 | 2026-06-21 12:45:01.071 +00:00
+(1 rows)
+
+===== 4.2 FAKIEH_SERVER2 live SIMATIC ParValueOnline =====
+s | pv_rows | d_root | max_ts
+OS2\INFSERVER | 0 | 0 | 
+(1 rows)
+
+===== 4.2b FAKIEH_SERVER2 live SIMATIC Batch =====
+batch_rows | max_created | max_xfer
+0 |  | 
+(1 rows)
+
+===== 4.2 OS1_SQL live SIMATIC ParValueOnline =====
+s | pv_rows | d_root | max_ts
+OS1\INFSERVER | 3581 | 1 | 2026-06-21 12:43:56.516 +00:00
+(1 rows)
+
+===== 4.2b OS1_SQL live SIMATIC Batch =====
+batch_rows | max_created | max_xfer
+1 | 2026-06-21 12:45:01.071 +00:00 | 2026-06-21 12:45:01.071 +00:00
+(1 rows)
+
+DONE

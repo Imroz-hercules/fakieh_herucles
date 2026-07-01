@@ -1,0 +1,833 @@
+PHASE 2 SIMATIC CAPTURE @ local 2026-06-20T05:33:34.516265 (read-only via linked servers)
+
+================= FAKIEH_SERVER1 =================
+
+----- [FAKIEH_SERVER1] identity -----
+s | db | lg | ed | ver | sa | now
+OS1\INFSERVER | master | LinkUser | Standard Edition (64-bit) | 14.0.1000.169 | 0 | 2026-06-20 05:33:02.6751673 +03:0
+(1 rows)
+
+----- [FAKIEH_SERVER1] databases -----
+name
+ASMBatchReports
+master
+model
+msdb
+ReportServer
+ReportServerTempDB
+SimaticBatch
+tempdb
+(8 rows)
+
+================= FAKIEH_SERVER2 =================
+
+----- [FAKIEH_SERVER2] identity -----
+s | db | lg | ed | ver | sa | now
+OS2\INFSERVER | master | fakieh_login | Standard Edition (64-bit) | 14.0.1000.169 | 1 | 2026-06-20 05:33:17.5615287 +03:0
+(1 rows)
+
+----- [FAKIEH_SERVER2] databases -----
+name
+master
+model
+msdb
+ReportServer
+ReportServerTempDB
+SimaticBatch
+tempdb
+(7 rows)
+
+================= OS1_SQL =================
+
+----- [OS1_SQL] identity -----
+s | db | lg | ed | ver | sa | now
+OS1\INFSERVER | master | sa | Standard Edition (64-bit) | 14.0.1000.169 | 1 | 2026-06-20 05:33:02.7334565 +03:0
+(1 rows)
+
+----- [OS1_SQL] databases -----
+name
+ASMBatchReports
+master
+model
+msdb
+ReportServer
+ReportServerTempDB
+SimaticBatch
+tempdb
+(8 rows)
+
+================= FAKIEH_SERVER1 : SimaticBatch deep dive =================
+
+----- [FAKIEH_SERVER1] tables+rowcounts (top 60 by rows) -----
+sch | tbl | rows_
+SIMATIC_BATCH | ParValue | 22669
+SIMATIC_BATCH | ParameterDescription | 12483
+SIMATIC_BATCH | DataTypeValue | 11655
+SIMATIC_BATCH | PAInstance | 6665
+SIMATIC_BATCH | ParValueOnline | 3608
+SIMATIC_BATCH | ModeOfOP | 2967
+SIMATIC_BATCH | Event | 2769
+SIMATIC_BATCH | DataType | 2370
+SIMATIC_BATCH | Category | 1720
+SIMATIC_BATCH | UnitEqu | 552
+SIMATIC_BATCH | AllocationOnline | 380
+SIMATIC_BATCH | TermTransOnline | 363
+SIMATIC_BATCH | ConditionOnline | 313
+SIMATIC_BATCH | CDVMessage | 281
+SIMATIC_BATCH | Modification | 208
+SIMATIC_BATCH | TermTrans | 176
+SIMATIC_BATCH | Material | 164
+SIMATIC_BATCH | ConditionGate | 144
+SIMATIC_BATCH | Event4Action | 138
+SIMATIC_BATCH | AllocationCandidate | 95
+SIMATIC_BATCH | ContainerOnline | 72
+SIMATIC_BATCH | Action | 47
+SIMATIC_BATCH | Container | 34
+SIMATIC_BATCH | Allocation | 34
+SIMATIC_BATCH | RecRef | 33
+SIMATIC_BATCH | BatchChanges | 31
+SIMATIC_BATCH | ExtendedErrorState | 30
+SIMATIC_BATCH | PCell | 24
+SIMATIC_BATCH | BatchUserGroup | 11
+SIMATIC_BATCH | ExtendedError | 10
+SIMATIC_BATCH | RecModel | 7
+SIMATIC_BATCH | OrderCategory | 3
+SIMATIC_BATCH | Order | 3
+SIMATIC_BATCH | ScaleFunc | 2
+SIMATIC_BATCH | Batch | 1
+SIMATIC_BATCH | Procedure | 1
+SIMATIC_BATCH | UARef | 0
+SIMATIC_BATCH | ProjectConfiguration | 0
+SIMATIC_BATCH | TAG | 0
+SIMATIC_BATCH | SubType | 0
+SIMATIC_BATCH | PHTagInfos | 0
+SIMATIC_BATCH | FormulaCategory | 0
+SIMATIC_BATCH | Formula | 0
+SIMATIC_BATCH | ExecutedSignature | 0
+SIMATIC_BATCH | EventGlobal | 0
+SIMATIC_BATCH | Event4ManualExecution | 0
+SIMATIC_BATCH | Event4Esig | 0
+SIMATIC_BATCH | Event4Comment | 0
+SIMATIC_BATCH | EsigSignature | 0
+SIMATIC_BATCH | EsigFixData | 0
+SIMATIC_BATCH | EsigDynData | 0
+SIMATIC_BATCH | EsigCollectionAndTypeInfo | 0
+SIMATIC_BATCH | Comment | 0
+SIMATIC_BATCH | ChangedItem | 0
+SIMATIC_BATCH | CDVTagValue | 0
+SIMATIC_BATCH | CDVTagRange | 0
+SIMATIC_BATCH | CDVTag | 0
+SIMATIC_BATCH | BatchTags | 0
+SIMATIC_BATCH | BatchArchive | 0
+SIMATIC_BATCH | AS | 0
+(60 rows)
+
+----- [FAKIEH_SERVER1] Batch/BatchArchive/Order schema -----
+TABLE_NAME | ORDINAL_POSITION | COLUMN_NAME | DATA_TYPE | IS_NULLABLE
+Batch | 1 | ROOTGUID | uniqueidentifier | NO
+Batch | 2 | ROOTOBJID | int | NO
+Batch | 3 | ROOTOTID | int | NO
+Batch | 4 | OGUID | uniqueidentifier | NO
+Batch | 5 | OBJID | int | NO
+Batch | 6 | OTID | int | NO
+Batch | 7 | Created | datetimeoffset | NO
+Batch | 8 | ExAttribute | nvarchar | YES
+Batch | 9 | Quantity | float | YES
+Batch | 10 | ProductName | nvarchar | YES
+Batch | 11 | ProductCode | nvarchar | YES
+Batch | 12 | ProductGUID | uniqueidentifier | YES
+Batch | 13 | ProductUoMId | int | YES
+Batch | 14 | FormulaCategoryName | nvarchar | YES
+Batch | 15 | FormulaName | nvarchar | YES
+Batch | 16 | FormulaVersion | nvarchar | YES
+Batch | 17 | FormulaGUID | uniqueidentifier | YES
+Batch | 18 | FormulaId | int | YES
+Batch | 19 | MRecipeName | nvarchar | YES
+Batch | 20 | MRecipeVersion | nvarchar | YES
+Batch | 21 | MRecipeGUID | uniqueidentifier | YES
+Batch | 22 | MRecipeId | int | YES
+Batch | 23 | OrderId | int | YES
+Batch | 24 | PlanEnd | datetimeoffset | YES
+Batch | 25 | PCellGUID | uniqueidentifier | YES
+Batch | 26 | PCellId | int | YES
+Batch | 27 | PartId | int | YES
+Batch | 28 | BatchReleaseGroupId | int | YES
+Batch | 29 | CreationDateTime | datetimeoffset | YES
+Batch | 30 | BatchHasNoTags | bit | YES
+Batch | 31 | BatchVersion | nvarchar | YES
+Batch | 32 | LastOSCDateTime | datetimeoffset | YES
+Batch | 33 | MarkByOSC | bit | YES
+Batch | 34 | BatchTransferTime | datetimeoffset | YES
+Batch | 35 | InternalSettings | nvarchar | YES
+BatchArchive | 1 | AutoValueID | timestamp | NO
+BatchArchive | 2 | BatchGUID | uniqueidentifier | YES
+BatchArchive | 3 | BatchName | nvarchar | YES
+BatchArchive | 4 | BatchID | int | YES
+BatchArchive | 5 | BatchDescription | nvarchar | YES
+BatchArchive | 6 | BatchVersion | nvarchar | YES
+BatchArchive | 7 | BatchStartTime | datetimeoffset | YES
+BatchArchive | 8 | BatchEndTime | datetimeoffset | YES
+BatchArchive | 9 | RuntimeDBIdent | nvarchar | YES
+BatchArchive | 10 | PCS7ProjectName | nvarchar | YES
+BatchArchive | 11 | PCellName | nvarchar | YES
+BatchArchive | 12 | ProductName | nvarchar | YES
+BatchArchive | 13 | MasterRecipeName | nvarchar | YES
+BatchArchive | 14 | MasterRecipeVersion | nvarchar | YES
+BatchArchive | 15 | FormulaName | nvarchar | YES
+BatchArchive | 16 | FormulaVersion | nvarchar | YES
+BatchArchive | 17 | FormulaCategoryName | nvarchar | YES
+BatchArchive | 18 | OrderName | nvarchar | YES
+BatchArchive | 19 | OrderCategoryName | nvarchar | YES
+BatchArchive | 20 | ArchiveVersion | nvarchar | YES
+BatchArchive | 21 | ArchiveTimeStamp | datetimeoffset | YES
+BatchArchive | 22 | ArchiveDataType | nvarchar | YES
+BatchArchive | 23 | ArchiveData | varbinary | YES
+Order | 1 | ROOTGUID | uniqueidentifier | NO
+Order | 2 | ROOTOBJID | int | NO
+Order | 3 | ROOTOTID | int | NO
+Order | 4 | OGUID | uniqueidentifier | NO
+Order | 5 | OBJID | int | NO
+Order | 6 | OTID | int | NO
+Order | 7 | Name | nvarchar | NO
+Order | 8 | CreationDateTime | datetimeoffset | NO
+Order | 9 | EarliestDateTime | datetimeoffset | NO
+Order | 10 | LatestDateTime | datetimeoffset | NO
+Order | 11 | Quantity | float | NO
+Order | 12 | Description | nvarchar | YES
+(70 rows)
+
+----- [FAKIEH_SERVER1] PK/unique keys on Batch/BatchArchive -----
+tbl | idx | is_primary_key | is_unique | col | key_ordinal
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTGUID | 1
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOBJID | 2
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOTID | 3
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OGUID | 4
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OBJID | 5
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OTID | 6
+(6 rows)
+
+----- [FAKIEH_SERVER1] triggers on Batch/ParValue/Action (+bodies) -----
+parent | trig | is_disabled | is_instead_of_trigger | body
+Batch | tr_BatchMerger | False | True | 
+ParValue | tr_ParValueMerger | False | True | 
+Action | tr_ActionMerger | False | True | 
+Order | tr_Order | False | True | 
+(4 rows)
+
+----- [FAKIEH_SERVER1] where descriptive header fields live -----
+tbl | col
+ | ActEnd
+ | ActEnd
+ | ActStart
+ | ActStart
+ | BatchTransferTime
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | FormulaCategoryName
+ | FormulaCategoryName
+ | FormulaCategoryName
+ | FormulaCategoryName
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | NAME
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OrderId
+ | ProductName
+ | ProductName
+ | ProductName
+ | ProductName
+ | ProductName
+ | Quantity
+ | Quantity
+ | Quantity
+ | Quantity
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+(219 rows)
+
+----- [FAKIEH_SERVER1] Batch live count + distinct guids -----
+batch_rows | d_oguid | d_root
+1 | 1 | 1
+(1 rows)
+
+----- [FAKIEH_SERVER1] Batch sample (key header fields) -----
+OGUID | ROOTGUID | ProductName | FormulaCategoryName | FormulaName | OrderId | Quantity | Created | Xfer
+A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | BROILER GROWER 1 | Production Recipes | BROILER GROWER | 4 | 4000.0 | 2026-06-19T16:35:16.898+00:00 | 2026-06-19T16:35:16.898+00:00
+(1 rows)
+
+----- [FAKIEH_SERVER1] BatchArchive count + date span (does it RETAIN purged headers?) -----
+ERROR: ('42S22', '[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'Created\'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'Created\'. (207); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invali
+
+----- [FAKIEH_SERVER1] BatchArchive sample (header completeness) -----
+ERROR: ('42S22', '[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'Created\'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'Quantity\'. (207); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Inval
+
+----- [FAKIEH_SERVER1] join test Batch.OGUID = PV.ROOTGUID -----
+batch_oguid | pv_rows
+A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 3608
+(1 rows)
+
+----- [FAKIEH_SERVER1] ParValueOnline live count + latest ts -----
+pv_rows | d_root | max_ts
+3608 | 1 | 2026-06-19T16:34:12.857+00:00
+(1 rows)
+
+================= FAKIEH_SERVER2 : SimaticBatch deep dive =================
+
+----- [FAKIEH_SERVER2] tables+rowcounts (top 60 by rows) -----
+sch | tbl | rows_
+SIMATIC_BATCH | ParValue | 7236
+SIMATIC_BATCH | ParameterDescription | 4112
+SIMATIC_BATCH | DataTypeValue | 3880
+SIMATIC_BATCH | PAInstance | 2192
+SIMATIC_BATCH | ModeOfOP | 984
+SIMATIC_BATCH | DataType | 788
+SIMATIC_BATCH | Category | 568
+SIMATIC_BATCH | Modification | 199
+SIMATIC_BATCH | UnitEqu | 184
+SIMATIC_BATCH | Material | 164
+SIMATIC_BATCH | PCell | 8
+SIMATIC_BATCH | RecModel | 8
+SIMATIC_BATCH | OrderCategory | 4
+SIMATIC_BATCH | Order | 4
+SIMATIC_BATCH | ScaleFunc | 2
+SIMATIC_BATCH | UARef | 0
+SIMATIC_BATCH | TermTransOnline | 0
+SIMATIC_BATCH | TermTrans | 0
+SIMATIC_BATCH | TAG | 0
+SIMATIC_BATCH | SubType | 0
+SIMATIC_BATCH | RecRef | 0
+SIMATIC_BATCH | ParValueOnline | 0
+SIMATIC_BATCH | ProjectConfiguration | 0
+SIMATIC_BATCH | Procedure | 0
+SIMATIC_BATCH | PHTagInfos | 0
+SIMATIC_BATCH | FormulaCategory | 0
+SIMATIC_BATCH | Formula | 0
+SIMATIC_BATCH | ExtendedErrorState | 0
+SIMATIC_BATCH | ExtendedError | 0
+SIMATIC_BATCH | ExecutedSignature | 0
+SIMATIC_BATCH | EventGlobal | 0
+SIMATIC_BATCH | Event4ManualExecution | 0
+SIMATIC_BATCH | Event4Esig | 0
+SIMATIC_BATCH | Event4Comment | 0
+SIMATIC_BATCH | Event4Action | 0
+SIMATIC_BATCH | Event | 0
+SIMATIC_BATCH | EsigSignature | 0
+SIMATIC_BATCH | EsigFixData | 0
+SIMATIC_BATCH | EsigDynData | 0
+SIMATIC_BATCH | EsigCollectionAndTypeInfo | 0
+SIMATIC_BATCH | ContainerOnline | 0
+SIMATIC_BATCH | Container | 0
+SIMATIC_BATCH | ConditionOnline | 0
+SIMATIC_BATCH | ConditionGate | 0
+SIMATIC_BATCH | Comment | 0
+SIMATIC_BATCH | ChangedItem | 0
+SIMATIC_BATCH | CDVTagValue | 0
+SIMATIC_BATCH | CDVTagRange | 0
+SIMATIC_BATCH | CDVTag | 0
+SIMATIC_BATCH | CDVMessage | 0
+SIMATIC_BATCH | BatchUserGroup | 0
+SIMATIC_BATCH | BatchTags | 0
+SIMATIC_BATCH | BatchChanges | 0
+SIMATIC_BATCH | BatchArchive | 0
+SIMATIC_BATCH | Batch | 0
+SIMATIC_BATCH | AS | 0
+SIMATIC_BATCH | AllocationOnline | 0
+SIMATIC_BATCH | AllocationCandidate | 0
+SIMATIC_BATCH | Allocation | 0
+SIMATIC_BATCH | Action | 0
+(60 rows)
+
+----- [FAKIEH_SERVER2] Batch/BatchArchive/Order schema -----
+TABLE_NAME | ORDINAL_POSITION | COLUMN_NAME | DATA_TYPE | IS_NULLABLE
+Batch | 1 | ROOTGUID | uniqueidentifier | NO
+Batch | 2 | ROOTOBJID | int | NO
+Batch | 3 | ROOTOTID | int | NO
+Batch | 4 | OGUID | uniqueidentifier | NO
+Batch | 5 | OBJID | int | NO
+Batch | 6 | OTID | int | NO
+Batch | 7 | Created | datetimeoffset | NO
+Batch | 8 | ExAttribute | nvarchar | YES
+Batch | 9 | Quantity | float | YES
+Batch | 10 | ProductName | nvarchar | YES
+Batch | 11 | ProductCode | nvarchar | YES
+Batch | 12 | ProductGUID | uniqueidentifier | YES
+Batch | 13 | ProductUoMId | int | YES
+Batch | 14 | FormulaCategoryName | nvarchar | YES
+Batch | 15 | FormulaName | nvarchar | YES
+Batch | 16 | FormulaVersion | nvarchar | YES
+Batch | 17 | FormulaGUID | uniqueidentifier | YES
+Batch | 18 | FormulaId | int | YES
+Batch | 19 | MRecipeName | nvarchar | YES
+Batch | 20 | MRecipeVersion | nvarchar | YES
+Batch | 21 | MRecipeGUID | uniqueidentifier | YES
+Batch | 22 | MRecipeId | int | YES
+Batch | 23 | OrderId | int | YES
+Batch | 24 | PlanEnd | datetimeoffset | YES
+Batch | 25 | PCellGUID | uniqueidentifier | YES
+Batch | 26 | PCellId | int | YES
+Batch | 27 | PartId | int | YES
+Batch | 28 | BatchReleaseGroupId | int | YES
+Batch | 29 | CreationDateTime | datetimeoffset | YES
+Batch | 30 | BatchHasNoTags | bit | YES
+Batch | 31 | BatchVersion | nvarchar | YES
+Batch | 32 | LastOSCDateTime | datetimeoffset | YES
+Batch | 33 | MarkByOSC | bit | YES
+Batch | 34 | BatchTransferTime | datetimeoffset | YES
+Batch | 35 | InternalSettings | nvarchar | YES
+BatchArchive | 1 | AutoValueID | timestamp | NO
+BatchArchive | 2 | BatchGUID | uniqueidentifier | YES
+BatchArchive | 3 | BatchName | nvarchar | YES
+BatchArchive | 4 | BatchID | int | YES
+BatchArchive | 5 | BatchDescription | nvarchar | YES
+BatchArchive | 6 | BatchVersion | nvarchar | YES
+BatchArchive | 7 | BatchStartTime | datetimeoffset | YES
+BatchArchive | 8 | BatchEndTime | datetimeoffset | YES
+BatchArchive | 9 | RuntimeDBIdent | nvarchar | YES
+BatchArchive | 10 | PCS7ProjectName | nvarchar | YES
+BatchArchive | 11 | PCellName | nvarchar | YES
+BatchArchive | 12 | ProductName | nvarchar | YES
+BatchArchive | 13 | MasterRecipeName | nvarchar | YES
+BatchArchive | 14 | MasterRecipeVersion | nvarchar | YES
+BatchArchive | 15 | FormulaName | nvarchar | YES
+BatchArchive | 16 | FormulaVersion | nvarchar | YES
+BatchArchive | 17 | FormulaCategoryName | nvarchar | YES
+BatchArchive | 18 | OrderName | nvarchar | YES
+BatchArchive | 19 | OrderCategoryName | nvarchar | YES
+BatchArchive | 20 | ArchiveVersion | nvarchar | YES
+BatchArchive | 21 | ArchiveTimeStamp | datetimeoffset | YES
+BatchArchive | 22 | ArchiveDataType | nvarchar | YES
+BatchArchive | 23 | ArchiveData | varbinary | YES
+Order | 1 | ROOTGUID | uniqueidentifier | NO
+Order | 2 | ROOTOBJID | int | NO
+Order | 3 | ROOTOTID | int | NO
+Order | 4 | OGUID | uniqueidentifier | NO
+Order | 5 | OBJID | int | NO
+Order | 6 | OTID | int | NO
+Order | 7 | Name | nvarchar | NO
+Order | 8 | CreationDateTime | datetimeoffset | NO
+Order | 9 | EarliestDateTime | datetimeoffset | NO
+Order | 10 | LatestDateTime | datetimeoffset | NO
+Order | 11 | Quantity | float | NO
+Order | 12 | Description | nvarchar | YES
+(70 rows)
+
+----- [FAKIEH_SERVER2] PK/unique keys on Batch/BatchArchive -----
+tbl | idx | is_primary_key | is_unique | col | key_ordinal
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTGUID | 1
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOBJID | 2
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOTID | 3
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OGUID | 4
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OBJID | 5
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OTID | 6
+(6 rows)
+
+----- [FAKIEH_SERVER2] triggers on Batch/ParValue/Action (+bodies) -----
+parent | trig | is_disabled | is_instead_of_trigger | body
+Batch | tr_BatchMerger | False | True | 
+ParValue | tr_ParValueMerger | False | True | 
+Action | tr_ActionMerger | False | True | 
+Order | tr_Order | False | True | 
+(4 rows)
+
+----- [FAKIEH_SERVER2] where descriptive header fields live -----
+tbl | col
+ | ActEnd
+ | ActEnd
+ | ActStart
+ | ActStart
+ | BatchTransferTime
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | Created
+ | FormulaCategoryName
+ | FormulaCategoryName
+ | FormulaCategoryName
+ | FormulaCategoryName
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | NAME
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | Name
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OGUID
+ | OrderId
+ | ProductName
+ | ProductName
+ | ProductName
+ | ProductName
+ | ProductName
+ | Quantity
+ | Quantity
+ | Quantity
+ | Quantity
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+ | ROOTGUID
+(258 rows)
+
+----- [FAKIEH_SERVER2] Batch live count + distinct guids -----
+batch_rows | d_oguid | d_root
+0 | 0 | 0
+(1 rows)
+
+----- [FAKIEH_SERVER2] Batch sample (key header fields) -----
+OGUID | ROOTGUID | ProductName | FormulaCategoryName | FormulaName | OrderId | Quantity | Created | Xfer
+(0 rows)
+
+----- [FAKIEH_SERVER2] BatchArchive count + date span (does it RETAIN purged headers?) -----
+ERROR: ('42S22', '[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'Created\'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'Created\'. (207); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invali
+
+----- [FAKIEH_SERVER2] BatchArchive sample (header completeness) -----
+ERROR: ('42S22', '[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'Created\'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'Quantity\'. (207); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Inval
+
+----- [FAKIEH_SERVER2] join test Batch.OGUID = PV.ROOTGUID -----
+batch_oguid | pv_rows
+(0 rows)
+
+----- [FAKIEH_SERVER2] ParValueOnline live count + latest ts -----
+pv_rows | d_root | max_ts
+0 | 0 | 
+(1 rows)
+
+DONE PHASE2

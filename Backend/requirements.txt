@@ -9,4 +9,6 @@ pyodbc
 APScheduler
 openpyxl
 xhtml2pdf
+reportlab
+Pillow
 resend

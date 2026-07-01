@@ -1,0 +1,349 @@
+PHASE 3 OS-LOCAL-COPY CAPTURE @ local 2026-06-20T06:30:03.739899 (read-only)
+
+================= OS1 via [OS1_SQL] =================
+
+----- [OS1_SQL] databases -----
+name | created | state_desc
+ASMBatchReports | 2025-08-11 16:51:32 | ONLINE
+master | 2003-04-08 09:13:36 | ONLINE
+model | 2003-04-08 09:13:36 | ONLINE
+msdb | 2017-08-22 19:39:22 | ONLINE
+ReportServer | 2024-01-14 06:08:22 | ONLINE
+ReportServerTempDB | 2024-01-14 06:08:22 | ONLINE
+SimaticBatch | 2024-01-15 00:26:52 | ONLINE
+tempdb | 2026-06-19 01:10:15 | ONLINE
+(8 rows)
+
+----- [OS1_SQL] ASMBatchReports exists? object inventory -----
+type_desc | sch | name | cre | mod
+SQL_STORED_PROCEDURE |  | RetrieveAndStoreAllBatchData_S1 | 2025-08-11 17:43:28 | 2025-08-11 17:43:28
+USER_TABLE |  | BatchCopy | 2025-08-11 16:51:32 | 2025-08-11 16:51:32
+USER_TABLE |  | BatchMaterials | 2025-08-11 17:43:28 | 2025-08-11 17:43:28
+USER_TABLE |  | DataSyncTracker | 2025-08-11 17:43:28 | 2025-08-11 17:43:28
+USER_TABLE |  | OrderDetails | 2025-08-11 16:51:32 | 2025-08-11 16:51:32
+USER_TABLE |  | ParValueOnline_copy | 2025-08-11 16:51:32 | 2025-08-11 16:51:32
+(6 rows)
+
+----- [OS1_SQL] ASMBatchReports table rowcounts -----
+tbl | rows_ | modi
+DataSyncTracker | 1 | 2025-08-11 17:43:28
+BatchCopy | 0 | 2025-08-11 16:51:32
+OrderDetails | 0 | 2025-08-11 16:51:32
+ParValueOnline_copy | 0 | 2025-08-11 16:51:32
+BatchMaterials | 0 | 2025-08-11 17:43:28
+(5 rows)
+
+----- [OS1_SQL] HerculesCapture exists? object inventory -----
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'HerculesCapture.sys.objects\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC
+
+----- [OS1_SQL] HerculesCapture table rowcounts -----
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'HerculesCapture.sys.tables\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC 
+
+----- [OS1_SQL] SimaticBatch modules referencing copy/ASM/BatchCopy -----
+type_desc | sch | name
+(0 rows)
+
+----- [OS1_SQL] ALL SimaticBatch triggers -----
+parent | trig | is_disabled | is_instead_of_trigger | cre | mod
+Action | tr_ActionMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Allocation | tr_AllocMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+AllocationCandidate | tr_AllocCandMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+AS | tr_ASMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Batch | tr_BatchMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+BatchChanges | tr_BatchChangesMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+BatchTags | tr_BatchTagsMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+BatchUserGroup | tr_BatchUserGroupMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Category | tr_CategoryMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+CDVMessage | tr_CDVMessageMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+CDVTag | tr_CDVTagMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+CDVTagRange | tr_CDVTagRangeMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+CDVTagValue | tr_CDVTagValueMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ChangedItem | tr_ChangedItemMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Comment | tr_CommentMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ConditionGate | tr_CondGateMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Container | tr_ContainerMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ContainerOnline | tr_ContainerOnlineMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+DataType | tr_DataTypeMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+DataTypeValue | tr_DataTypeValueMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+EsigCollectionAndTypeInfo | tr_EsigCltnMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+EsigDynData | tr_EsigDynDataMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+EsigFixData | tr_EsigFixDataMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+EsigSignature | tr_EsigSignatureMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ExecutedSignature | tr_ExecutedEsigMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ExtendedError | tr_ExtendedError | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ExtendedErrorState | tr_ExtendedErrorState | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Formula | tr_FormulaMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+FormulaCategory | tr_FormCatMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Material | tr_MaterialMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ModeOfOP | tr_ModeOfOPMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Modification | tr_ModifMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Order | tr_Order | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+OrderCategory | tr_OrderCategory | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+PAInstance | tr_InstanceMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ParameterDescription | tr_ParamDescMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ParValue | tr_ParValueMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+PCell | tr_PCellMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+PHTagInfos | tr_PHTagInfosMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+Procedure | tr_ProcedureMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+RecRef | tr_RecRefMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+ScaleFunc | tr_ScaleFuncMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+SubType | tr_SubTypeMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+TAG | tr_TAGMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+TermTrans | tr_TermTransMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+TermTransOnline | tr_TermTransOnlineMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+UARef | tr_UARefMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+UnitEqu | tr_UnitEquMerger | False | True | 2024-01-15 00:26:53 | 2024-01-15 00:26:53
+(48 rows)
+
+----- [OS1_SQL] Modification table recent (source UPDATE evidence) -----
+ROOTGUID | ROOTOBJID | ROOTOTID | OGUID | OBJID | OTID | POBJID | POTID | TimeStamp | TimeStampHostId | DeletedTimeStamp | DeletedTimeStampHostId | Name | Description | Withdrawn | ExAttribute | Action | UserLogin | UserNameLong | ComputerName | ModiTime
+B70E61FE-2AC1-43EF-86A6-FFA7246A2E25 | 14 | 64 | 0AF44692-2B44-4A59-ABD3-E1DAEC2CBFCF | 3 | 11 | -1 | -1 | 2026-06-19 16:35:16+00:00 |  |  |  |  | Code changed from '012' to '12' | False |  | 2 | OS1\Administrator | Administrator | CLIENT1 | 2026-05-20 17:14:51+00:00
+B70E61FE-2AC1-43EF-86A6-FFA7246A2E25 | 14 | 64 | 4F4ABFFE-9508-4A9B-9CCD-3394E0A766F4 | 1 | 11 | -1 | -1 | 2026-06-19 16:35:16+00:00 |  |  |  |  | created, Name:DL Methionine, Code:012, Id:14 | False |  | 1 | WINDOWS-MKK6K8O\Administrator | Administrator | WINDOWS-MKK6K8O | 2023-11-05 12:40:43+00:00
+B70E61FE-2AC1-43EF-86A6-FFA7246A2E25 | 14 | 64 | ECF2D474-B0F2-4F52-9B03-14E88F8D9D3C | 2 | 11 | -1 | -1 | 2026-06-19 16:35:16+00:00 |  |  |  |  | Name changed from 'DL Methionine' to 'Methionine' | False |  | 2 | OS1\Administrator | Administrator | CLIENT1 | 2026-05-20 17:14:43+00:00
+EE34C982-7039-41E2-8E85-FF661EA4D0F4 | 134 | 64 | 252FC852-9694-49EB-94A6-621850BA07A3 | 1 | 11 | -1 | -1 | 2026-06-19 16:35:16+00:00 |  |  |  |  | created, Name:INTEGRAL-LR, Code:139, Id:134 | False |  | 1 | OS1\Administrator | Administrator | CLIENT1 | 2026-05-20 20:06:20+00:00
+F415BDA3-AD12-46A9-BB5B-FF2631E9B884 | 59 | 64 | 27FD8A5B-6981-4684-88FC-872F8A31C9DE | 1 | 11 | -1 | -1 | 2026-06-19 16:35:16+00:00 |  |  |  |  | created, Name:CYCOSTAT *66 G, Code:36, Id:59 | False |  | 1 | OS1\Administrator | Administrator | CLIENT1 | 2026-05-20 19:38:21+00:00
+(5 rows)
+
+----- [OS1_SQL] OS jobs -----
+name | enabled | cre | mod
+RetrieveAndStoreAllBatchData_S1 | 1 | 2025-08-11 17:52:22 | 2025-08-11 17:52:22
+syspolicy_purge_history | 1 | 2024-01-14 05:15:56 | 2024-01-14 05:15:56
+(2 rows)
+
+----- [OS1_SQL] OS job steps referencing copy/ASM/Batch -----
+job | step_id | subsystem | database_name | cmd
+RetrieveAndStoreAllBatchData_S1 | 1 | TSQL | ASMBatchReports | EXEC dbo.RetrieveAndStoreAllBatchData_S1;
+(1 rows)
+
+================= OS2 via [FAKIEH_SERVER2] =================
+
+----- [FAKIEH_SERVER2] databases -----
+name | created | state_desc
+master | 2003-04-08 09:13:36 | ONLINE
+model | 2003-04-08 09:13:36 | ONLINE
+msdb | 2017-08-22 19:39:22 | ONLINE
+ReportServer | 2024-01-13 23:06:05 | ONLINE
+ReportServerTempDB | 2024-01-13 23:06:05 | ONLINE
+SimaticBatch | 2024-01-13 23:14:51 | ONLINE
+tempdb | 2026-06-19 01:17:23 | ONLINE
+(7 rows)
+
+----- [FAKIEH_SERVER2] ASMBatchReports exists? object inventory -----
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'ASMBatchReports.sys.objects\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC
+
+----- [FAKIEH_SERVER2] ASMBatchReports table rowcounts -----
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'ASMBatchReports.sys.tables\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC 
+
+----- [FAKIEH_SERVER2] HerculesCapture exists? object inventory -----
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'HerculesCapture.sys.objects\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC
+
+----- [FAKIEH_SERVER2] HerculesCapture table rowcounts -----
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'HerculesCapture.sys.tables\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC 
+
+----- [FAKIEH_SERVER2] SimaticBatch modules referencing copy/ASM/BatchCopy -----
+type_desc | sch | name
+(0 rows)
+
+----- [FAKIEH_SERVER2] ALL SimaticBatch triggers -----
+parent | trig | is_disabled | is_instead_of_trigger | cre | mod
+Action | tr_ActionMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Allocation | tr_AllocMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+AllocationCandidate | tr_AllocCandMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+AS | tr_ASMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Batch | tr_BatchMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+BatchChanges | tr_BatchChangesMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+BatchTags | tr_BatchTagsMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+BatchUserGroup | tr_BatchUserGroupMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Category | tr_CategoryMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+CDVMessage | tr_CDVMessageMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+CDVTag | tr_CDVTagMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+CDVTagRange | tr_CDVTagRangeMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+CDVTagValue | tr_CDVTagValueMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ChangedItem | tr_ChangedItemMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Comment | tr_CommentMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ConditionGate | tr_CondGateMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Container | tr_ContainerMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ContainerOnline | tr_ContainerOnlineMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+DataType | tr_DataTypeMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+DataTypeValue | tr_DataTypeValueMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+EsigCollectionAndTypeInfo | tr_EsigCltnMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+EsigDynData | tr_EsigDynDataMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+EsigFixData | tr_EsigFixDataMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+EsigSignature | tr_EsigSignatureMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ExecutedSignature | tr_ExecutedEsigMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ExtendedError | tr_ExtendedError | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ExtendedErrorState | tr_ExtendedErrorState | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Formula | tr_FormulaMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+FormulaCategory | tr_FormCatMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Material | tr_MaterialMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ModeOfOP | tr_ModeOfOPMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Modification | tr_ModifMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Order | tr_Order | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+OrderCategory | tr_OrderCategory | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+PAInstance | tr_InstanceMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ParameterDescription | tr_ParamDescMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ParValue | tr_ParValueMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+PCell | tr_PCellMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+PHTagInfos | tr_PHTagInfosMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+Procedure | tr_ProcedureMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+RecRef | tr_RecRefMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+ScaleFunc | tr_ScaleFuncMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+SubType | tr_SubTypeMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+TAG | tr_TAGMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+TermTrans | tr_TermTransMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+TermTransOnline | tr_TermTransOnlineMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+UARef | tr_UARefMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+UnitEqu | tr_UnitEquMerger | False | True | 2024-01-13 23:14:52 | 2024-01-13 23:14:52
+(48 rows)
+
+----- [FAKIEH_SERVER2] Modification table recent (source UPDATE evidence) -----
+ROOTGUID | ROOTOBJID | ROOTOTID | OGUID | OBJID | OTID | POBJID | POTID | TimeStamp | TimeStampHostId | DeletedTimeStamp | DeletedTimeStampHostId | Name | Description | Withdrawn | ExAttribute | Action | UserLogin | UserNameLong | ComputerName | ModiTime
+B70E61FE-2AC1-43EF-86A6-FFA7246A2E25 | 14 | 64 | 0AF44692-2B44-4A59-ABD3-E1DAEC2CBFCF | 3 | 11 | -1 | -1 | 2026-06-16 11:48:46+00:00 |  |  |  |  | Code changed from '012' to '12' | False |  | 2 | OS1\Administrator | Administrator | CLIENT1 | 2026-05-20 17:14:51+00:00
+B70E61FE-2AC1-43EF-86A6-FFA7246A2E25 | 14 | 64 | 4F4ABFFE-9508-4A9B-9CCD-3394E0A766F4 | 1 | 11 | -1 | -1 | 2026-06-16 11:48:46+00:00 |  |  |  |  | created, Name:DL Methionine, Code:012, Id:14 | False |  | 1 | WINDOWS-MKK6K8O\Administrator | Administrator | WINDOWS-MKK6K8O | 2023-11-05 12:40:43+00:00
+B70E61FE-2AC1-43EF-86A6-FFA7246A2E25 | 14 | 64 | ECF2D474-B0F2-4F52-9B03-14E88F8D9D3C | 2 | 11 | -1 | -1 | 2026-06-16 11:48:46+00:00 |  |  |  |  | Name changed from 'DL Methionine' to 'Methionine' | False |  | 2 | OS1\Administrator | Administrator | CLIENT1 | 2026-05-20 17:14:43+00:00
+EE34C982-7039-41E2-8E85-FF661EA4D0F4 | 134 | 64 | 252FC852-9694-49EB-94A6-621850BA07A3 | 1 | 11 | -1 | -1 | 2026-06-16 11:48:46+00:00 |  |  |  |  | created, Name:INTEGRAL-LR, Code:139, Id:134 | False |  | 1 | OS1\Administrator | Administrator | CLIENT1 | 2026-05-20 20:06:20+00:00
+F415BDA3-AD12-46A9-BB5B-FF2631E9B884 | 59 | 64 | 27FD8A5B-6981-4684-88FC-872F8A31C9DE | 1 | 11 | -1 | -1 | 2026-06-16 11:48:46+00:00 |  |  |  |  | created, Name:CYCOSTAT *66 G, Code:36, Id:59 | False |  | 1 | OS1\Administrator | Administrator | CLIENT1 | 2026-05-20 19:38:21+00:00
+(5 rows)
+
+----- [FAKIEH_SERVER2] OS jobs -----
+name | enabled | cre | mod
+syspolicy_purge_history | 1 | 2024-01-13 22:59:00 | 2024-01-13 22:59:00
+(1 rows)
+
+----- [FAKIEH_SERVER2] OS job steps referencing copy/ASM/Batch -----
+job | step_id | subsystem | database_name | cmd
+(0 rows)
+
+================= OS1.ASMBatchReports local-copy detail via [OS1_SQL] =================
+
+----- [OS1_SQL] OS1 ASMBatchReports columns of BatchCopy/ParValueOnline_copy/Order* -----
+TABLE_NAME | COLUMN_NAME | DATA_TYPE
+BatchCopy | ROOTGUID | uniqueidentifier
+BatchCopy | ROOTOBJID | int
+BatchCopy | ROOTOTID | int
+BatchCopy | OGUID | uniqueidentifier
+BatchCopy | OBJID | int
+BatchCopy | OTID | int
+BatchCopy | Created | datetimeoffset
+BatchCopy | CreatedTSHostId | smallint
+BatchCopy | Deleted | datetimeoffset
+BatchCopy | DeletedTSHostId | smallint
+BatchCopy | Name | nvarchar
+BatchCopy | Description | nvarchar
+BatchCopy | Withdrawn | bit
+BatchCopy | ExAttribute | nvarchar
+BatchCopy | PredecessorBatchId | int
+BatchCopy | ChainMode | int
+BatchCopy | ChainIgnorePredecessorState | bit
+BatchCopy | Quantity | float
+BatchCopy | ActQuantity | float
+BatchCopy | ProductName | nvarchar
+BatchCopy | ProductCode | nvarchar
+BatchCopy | ProductGUID | uniqueidentifier
+BatchCopy | ProductUoMId | int
+BatchCopy | FormulaCategoryName | nvarchar
+BatchCopy | FormulaName | nvarchar
+BatchCopy | FormulaVersion | nvarchar
+BatchCopy | FormulaGUID | uniqueidentifier
+BatchCopy | FormulaId | int
+BatchCopy | MRecipeName | nvarchar
+BatchCopy | MRecipeVersion | nvarchar
+BatchCopy | MRecipeGUID | uniqueidentifier
+BatchCopy | MRecipeId | int
+BatchCopy | OrderId | int
+BatchCopy | ReleaseTime | datetimeoffset
+BatchCopy | PlanStart | datetimeoffset
+BatchCopy | PlanEnd | datetimeoffset
+BatchCopy | ActStart | datetimeoffset
+BatchCopy | ActEnd | datetimeoffset
+BatchCopy | Mode | int
+BatchCopy | Export | smallint
+BatchCopy | State | int
+BatchCopy | ExState | int
+BatchCopy | ModifiedBits | int
+BatchCopy | PCellGUID | uniqueidentifier
+BatchCopy | PCellId | int
+BatchCopy | PartId | int
+BatchCopy | BatchReleaseGroupId | int
+BatchCopy | CreationDateTime | datetimeoffset
+BatchCopy | ModificationDateTime | datetimeoffset
+BatchCopy | BatchHasNoTags | bit
+BatchCopy | CurrentBatchDataId | int
+BatchCopy | GapTime | int
+BatchCopy | BatchVersion | nvarchar
+BatchCopy | LastOSCDateTime | datetimeoffset
+BatchCopy | MarkByOSC | bit
+BatchCopy | BatchTransferTime | datetimeoffset
+OrderDetails | ROOTGUID | uniqueidentifier
+OrderDetails | OrderId | int
+OrderDetails | OrderName | nvarchar
+OrderDetails | OrderCategory | nvarchar
+OrderDetails | CreationDateTime | datetimeoffset
+OrderDetails | Quantity | float
+OrderDetails | Description | nvarchar
+ParValueOnline_copy | ROOTGUID | uniqueidentifier
+ParValueOnline_copy | POBJID | int
+ParValueOnline_copy | POTID | int
+ParValueOnline_copy | P2OBJID | int
+ParValueOnline_copy | P2OTID | int
+ParValueOnline_copy | OBJID | int
+ParValueOnline_copy | ActivationCounter | int
+ParValueOnline_copy | EventID | bigint
+ParValueOnline_copy | TimeStamp | datetimeoffset
+ParValueOnline_copy | Name | nvarchar
+ParValueOnline_copy | EventNotifyType | int
+ParValueOnline_copy | UsageId | int
+ParValueOnline_copy | DataTypeId | int
+ParValueOnline_copy | DataTypeName | nvarchar
+ParValueOnline_copy | UoMId | int
+ParValueOnline_copy | UoMName | nvarchar
+ParValueOnline_copy | HighValue | float
+ParValueOnline_copy | LowValue | float
+ParValueOnline_copy | RecHighValue | float
+ParValueOnline_copy | RecLowValue | float
+ParValueOnline_copy | sp_float | float
+ParValueOnline_copy | asp_float | float
+ParValueOnline_copy | av_float | float
+ParValueOnline_copy | sp_int | int
+ParValueOnline_copy | asp_int | int
+ParValueOnline_copy | av_int | int
+ParValueOnline_copy | sp_string | nvarchar
+ParValueOnline_copy | asp_string | nvarchar
+ParValueOnline_copy | av_string | nvarchar
+ParValueOnline_copy | loc_unitallocname | nvarchar
+ParValueOnline_copy | loc_unitname | nvarchar
+ParValueOnline_copy | sp_locname | nvarchar
+ParValueOnline_copy | asp_locname | nvarchar
+ParValueOnline_copy | av_locname | nvarchar
+ParValueOnline_copy | sp_matname | nvarchar
+ParValueOnline_copy | sp_matcode | nvarchar
+ParValueOnline_copy | asp_matname | nvarchar
+ParValueOnline_copy | asp_matcode | nvarchar
+ParValueOnline_copy | av_matname | nvarchar
+ParValueOnline_copy | av_matcode | nvarchar
+ParValueOnline_copy | sp_EnumValue | nvarchar
+ParValueOnline_copy | asp_EnumValue | nvarchar
+ParValueOnline_copy | av_EnumValue | nvarchar
+ParValueOnline_copy | sp_Unit | nvarchar
+ParValueOnline_copy | asp_Unit | nvarchar
+ParValueOnline_copy | av_Unit | nvarchar
+ParValueOnline_copy | sp_prot | int
+ParValueOnline_copy | asp_prot | int
+ParValueOnline_copy | av_prot | int
+(112 rows)
+
+----- [OS1_SQL] OS1 ASMBatchReports.BatchCopy populate state -----
+rows_ | d_oguid | max_xfer | max_created
+0 | 0 |  | 
+(1 rows)
+
+----- [OS1_SQL] OS1 ASMBatchReports.ParValueOnline_copy populate state -----
+rows_ | d_root | max_ts
+0 | 0 | 
+(1 rows)
+
+----- [OS1_SQL] OS1 ASMBatchReports.BatchCopy TOP5 latest -----
+OGUID | ROOTGUID | ProductName | FormulaCategoryName | OrderId | Quantity | Created
+(0 rows)
+
+DONE PHASE3

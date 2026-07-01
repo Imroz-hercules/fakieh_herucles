@@ -1,8 +1,12 @@
+from datetime import datetime
+
 from flask import Blueprint, jsonify, request
 from sqlalchemy import text
 import logging
 
+from config import SQLSERVER_BATCH_MATERIALS_TABLE, SQLSERVER_DATABASE
 from models import db
+from utils.timezone import format_db_datetime_utc_iso, parse_request_datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,7 +23,10 @@ def _row_to_dict(row, columns):
     for i, column in enumerate(columns):
         value = row[i]
         if hasattr(value, "isoformat"):
-            value = value.isoformat()
+            if column in ("Batch Act Start", "Batch Act End", "Batch Transfer Time"):
+                value = format_db_datetime_utc_iso(value) if value is not None else None
+            else:
+                value = value.isoformat()
         d[column] = value
     return d
 
@@ -66,6 +73,8 @@ def get_batch_materials():
         batch_name = request.args.get("batch_name")
         product_name = request.args.get("product_name")
         material_name = request.args.get("material_name")
+        start_date_str = request.args.get("startDate")
+        end_date_str = request.args.get("endDate")
 
         if limit > 1000:
             limit = 1000
@@ -74,7 +83,8 @@ def get_batch_materials():
         if offset < 0:
             offset = 0
 
-        sql = """
+        tbl = SQLSERVER_BATCH_MATERIALS_TABLE
+        sql = f"""
             SELECT
                 [Source Server],
                 [Batch GUID],
@@ -92,7 +102,7 @@ def get_batch_materials():
                 [SetPoint Float],
                 [Actual Value Float],
                 [FormulaCategoryName]
-            FROM [ASMBatchReports].[dbo].[BatchMaterials]
+            FROM [{SQLSERVER_DATABASE}].[dbo].[{tbl}]
             WHERE 1=1
         """
         params = {}
@@ -108,6 +118,14 @@ def get_batch_materials():
         if material_name:
             sql += " AND [Material Name] LIKE :material_name"
             params["material_name"] = f"%{material_name}%"
+        if start_date_str:
+            start_date = parse_request_datetime(start_date_str)
+            sql += " AND [Batch Act Start] >= :start_date"
+            params["start_date"] = start_date
+        if end_date_str:
+            end_date = parse_request_datetime(end_date_str)
+            sql += " AND [Batch Act Start] <= :end_date"
+            params["end_date"] = end_date
 
         sql += " ORDER BY [Batch Act Start] DESC OFFSET :off ROWS FETCH NEXT :lim ROWS ONLY"
         params["off"] = offset
@@ -133,6 +151,8 @@ def get_batch_materials():
                     "batch_name": batch_name,
                     "product_name": product_name,
                     "material_name": material_name,
+                    "startDate": start_date_str,
+                    "endDate": end_date_str,
                 },
             }
         ), 200
@@ -153,7 +173,9 @@ def get_batch_materials_count():
         engine = _sqlserver_engine()
         with engine.connect() as conn:
             result = conn.execute(
-                text("SELECT COUNT(*) as total FROM [ASMBatchReports].[dbo].[BatchMaterials]")
+                text(
+                    f"SELECT COUNT(*) as total FROM [{SQLSERVER_DATABASE}].[dbo].[{SQLSERVER_BATCH_MATERIALS_TABLE}]"
+                )
             )
             count = result.fetchone()[0]
         return jsonify({"success": True, "total_records": count}), 200
@@ -171,8 +193,9 @@ def get_batch_materials_count():
 @sqlserver_bp.route("/api/sqlserver/batch-materials/<batch_guid>", methods=["GET"])
 def get_batch_material_by_guid(batch_guid):
     try:
+        tbl = SQLSERVER_BATCH_MATERIALS_TABLE
         q = text(
-            """
+            f"""
             SELECT TOP (1)
                 [Source Server],
                 [Batch GUID],
@@ -190,7 +213,7 @@ def get_batch_material_by_guid(batch_guid):
                 [SetPoint Float],
                 [Actual Value Float],
                 [FormulaCategoryName]
-            FROM [ASMBatchReports].[dbo].[BatchMaterials]
+            FROM [{SQLSERVER_DATABASE}].[dbo].[{tbl}]
             WHERE [Batch GUID] = TRY_CONVERT(uniqueidentifier, :bg)
             """
         )

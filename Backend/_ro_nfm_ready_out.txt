@@ -1,0 +1,883 @@
+
+===== 0 central identity =====
+s | captured_at | login_ | edition | ver | collation_
+DESKTOP-N8PGI9S\FAKIEH_REPORTING | 2026-06-22 00:45:11.8880481 +03:0 | DESKTOP-N8PGI9S\Hercu | Developer Edition (64-bit) | 16.0.1180.1 | SQL_Latin1_General_CP1_CI_AS
+(1 rows)
+
+===== 0 linked servers =====
+linked_server | data_source | is_data_access_enabled | is_rpc_out_enabled
+FAKIEH_SERVER1 | 192.168.1.50\INFSERVER | True | True
+FAKIEH_SERVER2 | 192.168.0.51,1433 | True | True
+OS1_SQL | 192.168.1.50,1433 | True | True
+(3 rows)
+
+===== 0 linked logins =====
+linked_server | remote_name | uses_self_credential
+FAKIEH_SERVER1 | LinkUser | False
+FAKIEH_SERVER2 | fakieh_login | False
+OS1_SQL | sa | False
+(3 rows)
+
+############################## FAKIEH_SERVER1 ##############################
+
+===== [FAKIEH_SERVER1] 1a identity =====
+s | login_ | edition | ver | collation_
+OS1\INFSERVER | LinkUser | Standard Edition (64-bit) | 14.0.1000.169 | Latin1_General_100_CI_AS_KS_WS
+(1 rows)
+
+===== [FAKIEH_SERVER1] 1b SOURCE table schemas (SimaticBatch) =====
+sch | tbl | column_id | col | type | max_length | is_nullable
+SIMATIC_BATCH | Action | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Action | 2 | ROOTOBJID | int | 4 | False
+SIMATIC_BATCH | Action | 3 | ROOTOTID | int | 4 | False
+SIMATIC_BATCH | Action | 4 | OBJID | int | 4 | False
+SIMATIC_BATCH | Action | 5 | OTID | int | 4 | False
+SIMATIC_BATCH | Action | 6 | POBJID | int | 4 | False
+SIMATIC_BATCH | Action | 7 | POTID | int | 4 | False
+SIMATIC_BATCH | Action | 8 | P2OBJID | int | 4 | False
+SIMATIC_BATCH | Action | 9 | P2OTID | int | 4 | False
+SIMATIC_BATCH | Action | 10 | ActivationCounter | int | 4 | False
+SIMATIC_BATCH | Action | 11 | Name | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 12 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | Action | 13 | Withdrawn | bit | 1 | True
+SIMATIC_BATCH | Action | 14 | ExAttribute | nvarchar | -1 | True
+SIMATIC_BATCH | Action | 15 | RpeDataId | int | 4 | True
+SIMATIC_BATCH | Action | 16 | EsigDynDataId | int | 4 | True
+SIMATIC_BATCH | Action | 17 | Actiontype | int | 4 | True
+SIMATIC_BATCH | Action | 18 | State | smallint | 2 | True
+SIMATIC_BATCH | Action | 19 | IsUserAction | bit | 1 | True
+SIMATIC_BATCH | Action | 20 | CreationTimestamp | datetimeoffset | 9 | True
+SIMATIC_BATCH | Action | 21 | CreationHostname | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 22 | ExecutionTimestamp | datetimeoffset | 9 | True
+SIMATIC_BATCH | Action | 23 | ExecutionHostname | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 24 | Userlogin | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 25 | Userloginlong | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Batch | 2 | ROOTOBJID | int | 4 | False
+SIMATIC_BATCH | Batch | 3 | ROOTOTID | int | 4 | False
+SIMATIC_BATCH | Batch | 4 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Batch | 5 | OBJID | int | 4 | False
+SIMATIC_BATCH | Batch | 6 | OTID | int | 4 | False
+SIMATIC_BATCH | Batch | 7 | Created | datetimeoffset | 9 | False
+SIMATIC_BATCH | Batch | 8 | ExAttribute | nvarchar | -1 | True
+SIMATIC_BATCH | Batch | 9 | Quantity | float | 8 | True
+SIMATIC_BATCH | Batch | 10 | ProductName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 11 | ProductCode | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 12 | ProductGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 13 | ProductUoMId | int | 4 | True
+SIMATIC_BATCH | Batch | 14 | FormulaCategoryName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 15 | FormulaName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 16 | FormulaVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 17 | FormulaGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 18 | FormulaId | int | 4 | True
+SIMATIC_BATCH | Batch | 19 | MRecipeName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 20 | MRecipeVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 21 | MRecipeGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 22 | MRecipeId | int | 4 | True
+SIMATIC_BATCH | Batch | 23 | OrderId | int | 4 | True
+SIMATIC_BATCH | Batch | 24 | PlanEnd | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 25 | PCellGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 26 | PCellId | int | 4 | True
+SIMATIC_BATCH | Batch | 27 | PartId | int | 4 | True
+SIMATIC_BATCH | Batch | 28 | BatchReleaseGroupId | int | 4 | True
+SIMATIC_BATCH | Batch | 29 | CreationDateTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 30 | BatchHasNoTags | bit | 1 | True
+SIMATIC_BATCH | Batch | 31 | BatchVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 32 | LastOSCDateTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 33 | MarkByOSC | bit | 1 | True
+SIMATIC_BATCH | Batch | 34 | BatchTransferTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 35 | InternalSettings | nvarchar | -1 | True
+SIMATIC_BATCH | BatchChanges | 1 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | BatchChanges | 2 | OBJID | int | 4 | False
+SIMATIC_BATCH | BatchChanges | 3 | EventID | bigint | 8 | False
+SIMATIC_BATCH | BatchChanges | 4 | Name | nvarchar | 512 | True
+SIMATIC_BATCH | BatchChanges | 5 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | BatchChanges | 6 | Deleted | bit | 1 | True
+SIMATIC_BATCH | BatchChanges | 7 | PredecessorBatchId | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 8 | ChainMode | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 9 | ChainIgnorePredecessorState | bit | 1 | True
+SIMATIC_BATCH | BatchChanges | 10 | ActQuantity | float | 8 | True
+SIMATIC_BATCH | BatchChanges | 11 | ReleaseTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 12 | PlanStart | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 13 | ActStart | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 14 | ActEnd | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 15 | StartMode | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 16 | State | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 17 | ExState | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 18 | ModificationDateTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 19 | GapTime | int | 4 | True
+SIMATIC_BATCH | Order | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Order | 2 | ROOTOBJID | int | 4 | False
+SIMATIC_BATCH | Order | 3 | ROOTOTID | int | 4 | False
+SIMATIC_BATCH | Order | 4 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Order | 5 | OBJID | int | 4 | False
+SIMATIC_BATCH | Order | 6 | OTID | int | 4 | False
+SIMATIC_BATCH | Order | 7 | Name | nvarchar | 512 | False
+SIMATIC_BATCH | Order | 8 | CreationDateTime | datetimeoffset | 9 | False
+SIMATIC_BATCH | Order | 9 | EarliestDateTime | datetimeoffset | 9 | False
+SIMATIC_BATCH | Order | 10 | LatestDateTime | datetimeoffset | 9 | False
+SIMATIC_BATCH | Order | 11 | Quantity | float | 8 | False
+SIMATIC_BATCH | Order | 12 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | OrderCategory | 1 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | OrderCategory | 2 | OBJID | int | 4 | False
+SIMATIC_BATCH | OrderCategory | 3 | OTID | int | 4 | False
+SIMATIC_BATCH | OrderCategory | 4 | Name | nvarchar | 512 | False
+SIMATIC_BATCH | OrderCategory | 5 | CreationDateTime | datetimeoffset | 9 | False
+SIMATIC_BATCH | OrderCategory | 6 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | ParValueOnline | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | ParValueOnline | 2 | POBJID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 3 | POTID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 4 | P2OBJID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 5 | P2OTID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 6 | OBJID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 7 | ActivationCounter | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 8 | EventID | bigint | 8 | False
+SIMATIC_BATCH | ParValueOnline | 9 | TimeStamp | datetimeoffset | 9 | False
+SIMATIC_BATCH | ParValueOnline | 10 | Name | nvarchar | 512 | False
+SIMATIC_BATCH | ParValueOnline | 11 | EventNotifyType | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 12 | UsageId | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 13 | DataTypeId | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 14 | DataTypeName | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 15 | UoMId | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 16 | UoMName | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 17 | HighValue | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 18 | LowValue | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 19 | RecHighValue | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 20 | RecLowValue | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 21 | sp_float | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 22 | asp_float | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 23 | av_float | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 24 | sp_int | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 25 | asp_int | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 26 | av_int | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 27 | sp_string | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 28 | asp_string | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 29 | av_string | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 30 | loc_unitallocname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 31 | loc_unitname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 32 | sp_locname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 33 | asp_locname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 34 | av_locname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 35 | sp_matname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 36 | sp_matcode | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 37 | asp_matname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 38 | asp_matcode | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 39 | av_matname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 40 | av_matcode | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 41 | sp_EnumValue | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 42 | asp_EnumValue | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 43 | av_EnumValue | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 44 | sp_Unit | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 45 | asp_Unit | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 46 | av_Unit | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 47 | sp_prot | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 48 | asp_prot | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 49 | av_prot | int | 4 | True
+(146 rows)
+
+===== [FAKIEH_SERVER1] 1b2 SOURCE PK/unique keys =====
+tbl | idx | pk | uq | col | ko
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTGUID | 1
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTOBJID | 2
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTOTID | 3
+Action | SIMATIC_BATCH_PK__Action | True | True | POBJID | 4
+Action | SIMATIC_BATCH_PK__Action | True | True | POTID | 5
+Action | SIMATIC_BATCH_PK__Action | True | True | P2OBJID | 6
+Action | SIMATIC_BATCH_PK__Action | True | True | P2OTID | 7
+Action | SIMATIC_BATCH_PK__Action | True | True | OBJID | 8
+Action | SIMATIC_BATCH_PK__Action | True | True | OTID | 9
+Action | SIMATIC_BATCH_PK__Action | True | True | ActivationCounter | 10
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTGUID | 1
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOBJID | 2
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOTID | 3
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OGUID | 4
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OBJID | 5
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OTID | 6
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | ROOTGUID | 1
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | POBJID | 2
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | POTID | 3
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | P2OBJID | 4
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | P2OTID | 5
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | OBJID | 6
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | ActivationCounter | 7
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | EventID | 8
+(24 rows)
+
+===== [FAKIEH_SERVER1] 1c triggers on source tables =====
+parent_sch | parent_tbl | trig | is_disabled | is_instead_of_trigger
+SIMATIC_BATCH | Action | tr_ActionMerger | False | True
+SIMATIC_BATCH | Batch | tr_BatchMerger | False | True
+SIMATIC_BATCH | BatchChanges | tr_BatchChangesMerger | False | True
+SIMATIC_BATCH | Order | tr_Order | False | True
+SIMATIC_BATCH | OrderCategory | tr_OrderCategory | False | True
+(5 rows)
+
+===== [FAKIEH_SERVER1] 1d triggers mentioning ASM (def may be hidden) =====
+parent_tbl | trig | mentions_asm | def_hidden
+Action | tr_ActionMerger | 0 | 1
+Allocation | tr_AllocMerger | 0 | 1
+AllocationCandidate | tr_AllocCandMerger | 0 | 1
+AS | tr_ASMerger | 0 | 1
+Batch | tr_BatchMerger | 0 | 1
+BatchChanges | tr_BatchChangesMerger | 0 | 1
+BatchTags | tr_BatchTagsMerger | 0 | 1
+BatchUserGroup | tr_BatchUserGroupMerger | 0 | 1
+Category | tr_CategoryMerger | 0 | 1
+CDVMessage | tr_CDVMessageMerger | 0 | 1
+CDVTag | tr_CDVTagMerger | 0 | 1
+CDVTagRange | tr_CDVTagRangeMerger | 0 | 1
+CDVTagValue | tr_CDVTagValueMerger | 0 | 1
+ChangedItem | tr_ChangedItemMerger | 0 | 1
+Comment | tr_CommentMerger | 0 | 1
+ConditionGate | tr_CondGateMerger | 0 | 1
+Container | tr_ContainerMerger | 0 | 1
+ContainerOnline | tr_ContainerOnlineMerger | 0 | 1
+DataType | tr_DataTypeMerger | 0 | 1
+DataTypeValue | tr_DataTypeValueMerger | 0 | 1
+EsigCollectionAndTypeInfo | tr_EsigCltnMerger | 0 | 1
+EsigDynData | tr_EsigDynDataMerger | 0 | 1
+EsigFixData | tr_EsigFixDataMerger | 0 | 1
+EsigSignature | tr_EsigSignatureMerger | 0 | 1
+ExecutedSignature | tr_ExecutedEsigMerger | 0 | 1
+ExtendedError | tr_ExtendedError | 0 | 1
+ExtendedErrorState | tr_ExtendedErrorState | 0 | 1
+Formula | tr_FormulaMerger | 0 | 1
+FormulaCategory | tr_FormCatMerger | 0 | 1
+Material | tr_MaterialMerger | 0 | 1
+ModeOfOP | tr_ModeOfOPMerger | 0 | 1
+Modification | tr_ModifMerger | 0 | 1
+Order | tr_Order | 0 | 1
+OrderCategory | tr_OrderCategory | 0 | 1
+PAInstance | tr_InstanceMerger | 0 | 1
+ParameterDescription | tr_ParamDescMerger | 0 | 1
+ParValue | tr_ParValueMerger | 0 | 1
+PCell | tr_PCellMerger | 0 | 1
+PHTagInfos | tr_PHTagInfosMerger | 0 | 1
+Procedure | tr_ProcedureMerger | 0 | 1
+RecRef | tr_RecRefMerger | 0 | 1
+ScaleFunc | tr_ScaleFuncMerger | 0 | 1
+SubType | tr_SubTypeMerger | 0 | 1
+TAG | tr_TAGMerger | 0 | 1
+TermTrans | tr_TermTransMerger | 0 | 1
+TermTransOnline | tr_TermTransOnlineMerger | 0 | 1
+UARef | tr_UARefMerger | 0 | 1
+UnitEqu | tr_UnitEquMerger | 0 | 1
+(48 rows)
+
+===== [FAKIEH_SERVER1] 1e TARGET tables rowcounts (ASMBatchReports) =====
+tbl | rows_
+BatchCopy | 0
+OrderDetails | 0
+ParValueOnline_copy | 0
+(3 rows)
+
+===== [FAKIEH_SERVER1] 1e2 TARGET table columns =====
+tbl | column_id | col | type | max_length | is_nullable
+BatchCopy | 1 | ROOTGUID | uniqueidentifier | 16 | False
+BatchCopy | 2 | ROOTOBJID | int | 4 | False
+BatchCopy | 3 | ROOTOTID | int | 4 | False
+BatchCopy | 4 | OGUID | uniqueidentifier | 16 | False
+BatchCopy | 5 | OBJID | int | 4 | False
+BatchCopy | 6 | OTID | int | 4 | False
+BatchCopy | 7 | Created | datetimeoffset | 9 | False
+BatchCopy | 8 | CreatedTSHostId | smallint | 2 | True
+BatchCopy | 9 | Deleted | datetimeoffset | 9 | True
+BatchCopy | 10 | DeletedTSHostId | smallint | 2 | True
+BatchCopy | 11 | Name | nvarchar | 512 | True
+BatchCopy | 12 | Description | nvarchar | -1 | True
+BatchCopy | 13 | Withdrawn | bit | 1 | True
+BatchCopy | 14 | ExAttribute | nvarchar | -1 | True
+BatchCopy | 15 | PredecessorBatchId | int | 4 | True
+BatchCopy | 16 | ChainMode | int | 4 | True
+BatchCopy | 17 | ChainIgnorePredecessorState | bit | 1 | True
+BatchCopy | 18 | Quantity | float | 8 | True
+BatchCopy | 19 | ActQuantity | float | 8 | True
+BatchCopy | 20 | ProductName | nvarchar | 512 | True
+BatchCopy | 21 | ProductCode | nvarchar | 512 | True
+BatchCopy | 22 | ProductGUID | uniqueidentifier | 16 | True
+BatchCopy | 23 | ProductUoMId | int | 4 | True
+BatchCopy | 24 | FormulaCategoryName | nvarchar | 512 | True
+BatchCopy | 25 | FormulaName | nvarchar | 512 | True
+BatchCopy | 26 | FormulaVersion | nvarchar | 512 | True
+BatchCopy | 27 | FormulaGUID | uniqueidentifier | 16 | True
+BatchCopy | 28 | FormulaId | int | 4 | True
+BatchCopy | 29 | MRecipeName | nvarchar | 512 | True
+BatchCopy | 30 | MRecipeVersion | nvarchar | 512 | True
+BatchCopy | 31 | MRecipeGUID | uniqueidentifier | 16 | True
+BatchCopy | 32 | MRecipeId | int | 4 | True
+BatchCopy | 33 | OrderId | int | 4 | True
+BatchCopy | 34 | ReleaseTime | datetimeoffset | 9 | True
+BatchCopy | 35 | PlanStart | datetimeoffset | 9 | True
+BatchCopy | 36 | PlanEnd | datetimeoffset | 9 | True
+BatchCopy | 37 | ActStart | datetimeoffset | 9 | True
+BatchCopy | 38 | ActEnd | datetimeoffset | 9 | True
+BatchCopy | 39 | Mode | int | 4 | True
+BatchCopy | 40 | Export | smallint | 2 | True
+BatchCopy | 41 | State | int | 4 | True
+BatchCopy | 42 | ExState | int | 4 | True
+BatchCopy | 43 | ModifiedBits | int | 4 | True
+BatchCopy | 44 | PCellGUID | uniqueidentifier | 16 | True
+BatchCopy | 45 | PCellId | int | 4 | True
+BatchCopy | 46 | PartId | int | 4 | True
+BatchCopy | 47 | BatchReleaseGroupId | int | 4 | True
+BatchCopy | 48 | CreationDateTime | datetimeoffset | 9 | True
+BatchCopy | 49 | ModificationDateTime | datetimeoffset | 9 | True
+BatchCopy | 50 | BatchHasNoTags | bit | 1 | True
+BatchCopy | 51 | CurrentBatchDataId | int | 4 | True
+BatchCopy | 52 | GapTime | int | 4 | True
+BatchCopy | 53 | BatchVersion | nvarchar | 512 | True
+BatchCopy | 54 | LastOSCDateTime | datetimeoffset | 9 | True
+BatchCopy | 55 | MarkByOSC | bit | 1 | True
+BatchCopy | 56 | BatchTransferTime | datetimeoffset | 9 | True
+OrderDetails | 1 | ROOTGUID | uniqueidentifier | 16 | False
+OrderDetails | 2 | OrderId | int | 4 | False
+OrderDetails | 3 | OrderName | nvarchar | 512 | True
+OrderDetails | 4 | OrderCategory | nvarchar | 512 | True
+OrderDetails | 5 | CreationDateTime | datetimeoffset | 10 | True
+OrderDetails | 6 | Quantity | float | 8 | True
+OrderDetails | 7 | Description | nvarchar | -1 | True
+ParValueOnline_copy | 1 | ROOTGUID | uniqueidentifier | 16 | False
+ParValueOnline_copy | 2 | POBJID | int | 4 | False
+ParValueOnline_copy | 3 | POTID | int | 4 | False
+ParValueOnline_copy | 4 | P2OBJID | int | 4 | False
+ParValueOnline_copy | 5 | P2OTID | int | 4 | False
+ParValueOnline_copy | 6 | OBJID | int | 4 | False
+ParValueOnline_copy | 7 | ActivationCounter | int | 4 | False
+ParValueOnline_copy | 8 | EventID | bigint | 8 | False
+ParValueOnline_copy | 9 | TimeStamp | datetimeoffset | 9 | False
+ParValueOnline_copy | 10 | Name | nvarchar | 512 | False
+ParValueOnline_copy | 11 | EventNotifyType | int | 4 | False
+ParValueOnline_copy | 12 | UsageId | int | 4 | True
+ParValueOnline_copy | 13 | DataTypeId | int | 4 | True
+ParValueOnline_copy | 14 | DataTypeName | nvarchar | 512 | True
+ParValueOnline_copy | 15 | UoMId | int | 4 | True
+ParValueOnline_copy | 16 | UoMName | nvarchar | 512 | True
+ParValueOnline_copy | 17 | HighValue | float | 8 | True
+ParValueOnline_copy | 18 | LowValue | float | 8 | True
+ParValueOnline_copy | 19 | RecHighValue | float | 8 | True
+ParValueOnline_copy | 20 | RecLowValue | float | 8 | True
+ParValueOnline_copy | 21 | sp_float | float | 8 | True
+ParValueOnline_copy | 22 | asp_float | float | 8 | True
+ParValueOnline_copy | 23 | av_float | float | 8 | True
+ParValueOnline_copy | 24 | sp_int | int | 4 | True
+ParValueOnline_copy | 25 | asp_int | int | 4 | True
+ParValueOnline_copy | 26 | av_int | int | 4 | True
+ParValueOnline_copy | 27 | sp_string | nvarchar | 512 | True
+ParValueOnline_copy | 28 | asp_string | nvarchar | 512 | True
+ParValueOnline_copy | 29 | av_string | nvarchar | 512 | True
+ParValueOnline_copy | 30 | loc_unitallocname | nvarchar | 512 | True
+ParValueOnline_copy | 31 | loc_unitname | nvarchar | 512 | True
+ParValueOnline_copy | 32 | sp_locname | nvarchar | 512 | True
+ParValueOnline_copy | 33 | asp_locname | nvarchar | 512 | True
+ParValueOnline_copy | 34 | av_locname | nvarchar | 512 | True
+ParValueOnline_copy | 35 | sp_matname | nvarchar | 512 | True
+ParValueOnline_copy | 36 | sp_matcode | nvarchar | 512 | True
+ParValueOnline_copy | 37 | asp_matname | nvarchar | 512 | True
+ParValueOnline_copy | 38 | asp_matcode | nvarchar | 512 | True
+ParValueOnline_copy | 39 | av_matname | nvarchar | 512 | True
+ParValueOnline_copy | 40 | av_matcode | nvarchar | 512 | True
+ParValueOnline_copy | 41 | sp_EnumValue | nvarchar | 512 | True
+ParValueOnline_copy | 42 | asp_EnumValue | nvarchar | 512 | True
+ParValueOnline_copy | 43 | av_EnumValue | nvarchar | 512 | True
+ParValueOnline_copy | 44 | sp_Unit | nvarchar | 512 | True
+ParValueOnline_copy | 45 | asp_Unit | nvarchar | 512 | True
+ParValueOnline_copy | 46 | av_Unit | nvarchar | 512 | True
+ParValueOnline_copy | 47 | sp_prot | int | 4 | True
+ParValueOnline_copy | 48 | asp_prot | int | 4 | True
+ParValueOnline_copy | 49 | av_prot | int | 4 | True
+(112 rows)
+
+############################## FAKIEH_SERVER2 ##############################
+
+===== [FAKIEH_SERVER2] 1a identity =====
+s | login_ | edition | ver | collation_
+OS2\INFSERVER | fakieh_login | Standard Edition (64-bit) | 14.0.1000.169 | Latin1_General_100_CI_AS_KS_WS
+(1 rows)
+
+===== [FAKIEH_SERVER2] 1b SOURCE table schemas (SimaticBatch) =====
+sch | tbl | column_id | col | type | max_length | is_nullable
+SIMATIC_BATCH | Action | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Action | 2 | ROOTOBJID | int | 4 | False
+SIMATIC_BATCH | Action | 3 | ROOTOTID | int | 4 | False
+SIMATIC_BATCH | Action | 4 | OBJID | int | 4 | False
+SIMATIC_BATCH | Action | 5 | OTID | int | 4 | False
+SIMATIC_BATCH | Action | 6 | POBJID | int | 4 | False
+SIMATIC_BATCH | Action | 7 | POTID | int | 4 | False
+SIMATIC_BATCH | Action | 8 | P2OBJID | int | 4 | False
+SIMATIC_BATCH | Action | 9 | P2OTID | int | 4 | False
+SIMATIC_BATCH | Action | 10 | ActivationCounter | int | 4 | False
+SIMATIC_BATCH | Action | 11 | Name | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 12 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | Action | 13 | Withdrawn | bit | 1 | True
+SIMATIC_BATCH | Action | 14 | ExAttribute | nvarchar | -1 | True
+SIMATIC_BATCH | Action | 15 | RpeDataId | int | 4 | True
+SIMATIC_BATCH | Action | 16 | EsigDynDataId | int | 4 | True
+SIMATIC_BATCH | Action | 17 | Actiontype | int | 4 | True
+SIMATIC_BATCH | Action | 18 | State | smallint | 2 | True
+SIMATIC_BATCH | Action | 19 | IsUserAction | bit | 1 | True
+SIMATIC_BATCH | Action | 20 | CreationTimestamp | datetimeoffset | 9 | True
+SIMATIC_BATCH | Action | 21 | CreationHostname | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 22 | ExecutionTimestamp | datetimeoffset | 9 | True
+SIMATIC_BATCH | Action | 23 | ExecutionHostname | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 24 | Userlogin | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 25 | Userloginlong | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Batch | 2 | ROOTOBJID | int | 4 | False
+SIMATIC_BATCH | Batch | 3 | ROOTOTID | int | 4 | False
+SIMATIC_BATCH | Batch | 4 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Batch | 5 | OBJID | int | 4 | False
+SIMATIC_BATCH | Batch | 6 | OTID | int | 4 | False
+SIMATIC_BATCH | Batch | 7 | Created | datetimeoffset | 9 | False
+SIMATIC_BATCH | Batch | 8 | ExAttribute | nvarchar | -1 | True
+SIMATIC_BATCH | Batch | 9 | Quantity | float | 8 | True
+SIMATIC_BATCH | Batch | 10 | ProductName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 11 | ProductCode | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 12 | ProductGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 13 | ProductUoMId | int | 4 | True
+SIMATIC_BATCH | Batch | 14 | FormulaCategoryName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 15 | FormulaName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 16 | FormulaVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 17 | FormulaGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 18 | FormulaId | int | 4 | True
+SIMATIC_BATCH | Batch | 19 | MRecipeName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 20 | MRecipeVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 21 | MRecipeGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 22 | MRecipeId | int | 4 | True
+SIMATIC_BATCH | Batch | 23 | OrderId | int | 4 | True
+SIMATIC_BATCH | Batch | 24 | PlanEnd | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 25 | PCellGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 26 | PCellId | int | 4 | True
+SIMATIC_BATCH | Batch | 27 | PartId | int | 4 | True
+SIMATIC_BATCH | Batch | 28 | BatchReleaseGroupId | int | 4 | True
+SIMATIC_BATCH | Batch | 29 | CreationDateTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 30 | BatchHasNoTags | bit | 1 | True
+SIMATIC_BATCH | Batch | 31 | BatchVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 32 | LastOSCDateTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 33 | MarkByOSC | bit | 1 | True
+SIMATIC_BATCH | Batch | 34 | BatchTransferTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 35 | InternalSettings | nvarchar | -1 | True
+SIMATIC_BATCH | BatchChanges | 1 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | BatchChanges | 2 | OBJID | int | 4 | False
+SIMATIC_BATCH | BatchChanges | 3 | EventID | bigint | 8 | False
+SIMATIC_BATCH | BatchChanges | 4 | Name | nvarchar | 512 | True
+SIMATIC_BATCH | BatchChanges | 5 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | BatchChanges | 6 | Deleted | bit | 1 | True
+SIMATIC_BATCH | BatchChanges | 7 | PredecessorBatchId | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 8 | ChainMode | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 9 | ChainIgnorePredecessorState | bit | 1 | True
+SIMATIC_BATCH | BatchChanges | 10 | ActQuantity | float | 8 | True
+SIMATIC_BATCH | BatchChanges | 11 | ReleaseTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 12 | PlanStart | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 13 | ActStart | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 14 | ActEnd | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 15 | StartMode | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 16 | State | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 17 | ExState | int | 4 | True
+SIMATIC_BATCH | BatchChanges | 18 | ModificationDateTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | BatchChanges | 19 | GapTime | int | 4 | True
+SIMATIC_BATCH | Order | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Order | 2 | ROOTOBJID | int | 4 | False
+SIMATIC_BATCH | Order | 3 | ROOTOTID | int | 4 | False
+SIMATIC_BATCH | Order | 4 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Order | 5 | OBJID | int | 4 | False
+SIMATIC_BATCH | Order | 6 | OTID | int | 4 | False
+SIMATIC_BATCH | Order | 7 | Name | nvarchar | 512 | False
+SIMATIC_BATCH | Order | 8 | CreationDateTime | datetimeoffset | 9 | False
+SIMATIC_BATCH | Order | 9 | EarliestDateTime | datetimeoffset | 9 | False
+SIMATIC_BATCH | Order | 10 | LatestDateTime | datetimeoffset | 9 | False
+SIMATIC_BATCH | Order | 11 | Quantity | float | 8 | False
+SIMATIC_BATCH | Order | 12 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | OrderCategory | 1 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | OrderCategory | 2 | OBJID | int | 4 | False
+SIMATIC_BATCH | OrderCategory | 3 | OTID | int | 4 | False
+SIMATIC_BATCH | OrderCategory | 4 | Name | nvarchar | 512 | False
+SIMATIC_BATCH | OrderCategory | 5 | CreationDateTime | datetimeoffset | 9 | False
+SIMATIC_BATCH | OrderCategory | 6 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | ParValueOnline | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | ParValueOnline | 2 | POBJID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 3 | POTID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 4 | P2OBJID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 5 | P2OTID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 6 | OBJID | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 7 | ActivationCounter | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 8 | EventID | bigint | 8 | False
+SIMATIC_BATCH | ParValueOnline | 9 | TimeStamp | datetimeoffset | 9 | False
+SIMATIC_BATCH | ParValueOnline | 10 | Name | nvarchar | 512 | False
+SIMATIC_BATCH | ParValueOnline | 11 | EventNotifyType | int | 4 | False
+SIMATIC_BATCH | ParValueOnline | 12 | UsageId | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 13 | DataTypeId | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 14 | DataTypeName | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 15 | UoMId | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 16 | UoMName | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 17 | HighValue | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 18 | LowValue | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 19 | RecHighValue | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 20 | RecLowValue | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 21 | sp_float | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 22 | asp_float | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 23 | av_float | float | 8 | True
+SIMATIC_BATCH | ParValueOnline | 24 | sp_int | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 25 | asp_int | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 26 | av_int | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 27 | sp_string | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 28 | asp_string | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 29 | av_string | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 30 | loc_unitallocname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 31 | loc_unitname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 32 | sp_locname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 33 | asp_locname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 34 | av_locname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 35 | sp_matname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 36 | sp_matcode | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 37 | asp_matname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 38 | asp_matcode | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 39 | av_matname | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 40 | av_matcode | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 41 | sp_EnumValue | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 42 | asp_EnumValue | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 43 | av_EnumValue | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 44 | sp_Unit | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 45 | asp_Unit | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 46 | av_Unit | nvarchar | 512 | True
+SIMATIC_BATCH | ParValueOnline | 47 | sp_prot | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 48 | asp_prot | int | 4 | True
+SIMATIC_BATCH | ParValueOnline | 49 | av_prot | int | 4 | True
+(146 rows)
+
+===== [FAKIEH_SERVER2] 1b2 SOURCE PK/unique keys =====
+tbl | idx | pk | uq | col | ko
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTGUID | 1
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTOBJID | 2
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTOTID | 3
+Action | SIMATIC_BATCH_PK__Action | True | True | POBJID | 4
+Action | SIMATIC_BATCH_PK__Action | True | True | POTID | 5
+Action | SIMATIC_BATCH_PK__Action | True | True | P2OBJID | 6
+Action | SIMATIC_BATCH_PK__Action | True | True | P2OTID | 7
+Action | SIMATIC_BATCH_PK__Action | True | True | OBJID | 8
+Action | SIMATIC_BATCH_PK__Action | True | True | OTID | 9
+Action | SIMATIC_BATCH_PK__Action | True | True | ActivationCounter | 10
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTGUID | 1
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOBJID | 2
+UNREACHABLE/ERROR: [Errno 22] Invalid argument
+
+===== [FAKIEH_SERVER2] 1c triggers on source tables =====
+parent_sch | parent_tbl | trig | is_disabled | is_instead_of_trigger
+SIMATIC_BATCH | Action | tr_ActionMerger | False | True
+SIMATIC_BATCH | Batch | tr_BatchMerger | False | True
+SIMATIC_BATCH | BatchChanges | tr_BatchChangesMerger | False | True
+SIMATIC_BATCH | Order | tr_Order | False | True
+SIMATIC_BATCH | OrderCategory | tr_OrderCategory | False | True
+(5 rows)
+
+===== [FAKIEH_SERVER2] 1d triggers mentioning ASM (def may be hidden) =====
+parent_tbl | trig | mentions_asm | def_hidden
+AS | tr_ASMerger | 1 | 0
+Action | tr_ActionMerger | 0 | 0
+Allocation | tr_AllocMerger | 0 | 0
+AllocationCandidate | tr_AllocCandMerger | 0 | 0
+Batch | tr_BatchMerger | 0 | 0
+BatchChanges | tr_BatchChangesMerger | 0 | 0
+BatchTags | tr_BatchTagsMerger | 0 | 0
+BatchUserGroup | tr_BatchUserGroupMerger | 0 | 0
+Category | tr_CategoryMerger | 0 | 0
+CDVMessage | tr_CDVMessageMerger | 0 | 0
+CDVTag | tr_CDVTagMerger | 0 | 0
+CDVTagRange | tr_CDVTagRangeMerger | 0 | 0
+CDVTagValue | tr_CDVTagValueMerger | 0 | 0
+ChangedItem | tr_ChangedItemMerger | 0 | 0
+Comment | tr_CommentMerger | 0 | 0
+ConditionGate | tr_CondGateMerger | 0 | 0
+Container | tr_ContainerMerger | 0 | 0
+ContainerOnline | tr_ContainerOnlineMerger | 0 | 0
+DataType | tr_DataTypeMerger | 0 | 0
+DataTypeValue | tr_DataTypeValueMerger | 0 | 0
+EsigCollectionAndTypeInfo | tr_EsigCltnMerger | 0 | 0
+EsigDynData | tr_EsigDynDataMerger | 0 | 0
+EsigFixData | tr_EsigFixDataMerger | 0 | 0
+EsigSignature | tr_EsigSignatureMerger | 0 | 0
+ExecutedSignature | tr_ExecutedEsigMerger | 0 | 0
+ExtendedError | tr_ExtendedError | 0 | 0
+ExtendedErrorState | tr_ExtendedErrorState | 0 | 0
+Formula | tr_FormulaMerger | 0 | 0
+FormulaCategory | tr_FormCatMerger | 0 | 0
+Material | tr_MaterialMerger | 0 | 0
+ModeOfOP | tr_ModeOfOPMerger | 0 | 0
+Modification | tr_ModifMerger | 0 | 0
+Order | tr_Order | 0 | 0
+OrderCategory | tr_OrderCategory | 0 | 0
+PAInstance | tr_InstanceMerger | 0 | 0
+ParameterDescription | tr_ParamDescMerger | 0 | 0
+ParValue | tr_ParValueMerger | 0 | 0
+PCell | tr_PCellMerger | 0 | 0
+PHTagInfos | tr_PHTagInfosMerger | 0 | 0
+Procedure | tr_ProcedureMerger | 0 | 0
+RecRef | tr_RecRefMerger | 0 | 0
+ScaleFunc | tr_ScaleFuncMerger | 0 | 0
+SubType | tr_SubTypeMerger | 0 | 0
+TAG | tr_TAGMerger | 0 | 0
+TermTrans | tr_TermTransMerger | 0 | 0
+TermTransOnline | tr_TermTransOnlineMerger | 0 | 0
+UARef | tr_UARefMerger | 0 | 0
+UnitEqu | tr_UnitEquMerger | 0 | 0
+(48 rows)
+
+===== [FAKIEH_SERVER2] 1e TARGET tables rowcounts (ASMBatchReports) =====
+UNREACHABLE/ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'ASMBatchReports.sys.tables\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC Driver 17 for SQL Se
+
+===== [FAKIEH_SERVER2] 1e2 TARGET table columns =====
+UNREACHABLE/ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'ASMBatchReports.sys.tables\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC Driver 17 for SQL Se
+
+############################## OS1_SQL ##############################
+
+===== [OS1_SQL] OS1_SQL identity + DB presence =====
+s | edition | has_simaticbatch | has_asmreports
+OS1\INFSERVER | Standard Edition (64-bit) | 1 | 1
+(1 rows)
+
+===== [OS1_SQL] 1a identity =====
+s | login_ | edition | ver | collation_
+OS1\INFSERVER | sa | Standard Edition (64-bit) | 14.0.1000.169 | Latin1_General_100_CI_AS_KS_WS
+(1 rows)
+
+===== [OS1_SQL] 1b SOURCE table schemas (SimaticBatch) =====
+sch | tbl | column_id | col | type | max_length | is_nullable
+SIMATIC_BATCH | Action | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Action | 2 | ROOTOBJID | int | 4 | False
+SIMATIC_BATCH | Action | 3 | ROOTOTID | int | 4 | False
+SIMATIC_BATCH | Action | 4 | OBJID | int | 4 | False
+SIMATIC_BATCH | Action | 5 | OTID | int | 4 | False
+SIMATIC_BATCH | Action | 6 | POBJID | int | 4 | False
+SIMATIC_BATCH | Action | 7 | POTID | int | 4 | False
+SIMATIC_BATCH | Action | 8 | P2OBJID | int | 4 | False
+SIMATIC_BATCH | Action | 9 | P2OTID | int | 4 | False
+SIMATIC_BATCH | Action | 10 | ActivationCounter | int | 4 | False
+SIMATIC_BATCH | Action | 11 | Name | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 12 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | Action | 13 | Withdrawn | bit | 1 | True
+SIMATIC_BATCH | Action | 14 | ExAttribute | nvarchar | -1 | True
+SIMATIC_BATCH | Action | 15 | RpeDataId | int | 4 | True
+SIMATIC_BATCH | Action | 16 | EsigDynDataId | int | 4 | True
+SIMATIC_BATCH | Action | 17 | Actiontype | int | 4 | True
+SIMATIC_BATCH | Action | 18 | State | smallint | 2 | True
+SIMATIC_BATCH | Action | 19 | IsUserAction | bit | 1 | True
+SIMATIC_BATCH | Action | 20 | CreationTimestamp | datetimeoffset | 9 | True
+SIMATIC_BATCH | Action | 21 | CreationHostname | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 22 | ExecutionTimestamp | datetimeoffset | 9 | True
+SIMATIC_BATCH | Action | 23 | ExecutionHostname | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 24 | Userlogin | nvarchar | 512 | True
+SIMATIC_BATCH | Action | 25 | Userloginlong | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 1 | ROOTGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Batch | 2 | ROOTOBJID | int | 4 | False
+SIMATIC_BATCH | Batch | 3 | ROOTOTID | int | 4 | False
+SIMATIC_BATCH | Batch | 4 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | Batch | 5 | OBJID | int | 4 | False
+SIMATIC_BATCH | Batch | 6 | OTID | int | 4 | False
+SIMATIC_BATCH | Batch | 7 | Created | datetimeoffset | 9 | False
+SIMATIC_BATCH | Batch | 8 | ExAttribute | nvarchar | -1 | True
+SIMATIC_BATCH | Batch | 9 | Quantity | float | 8 | True
+SIMATIC_BATCH | Batch | 10 | ProductName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 11 | ProductCode | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 12 | ProductGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 13 | ProductUoMId | int | 4 | True
+SIMATIC_BATCH | Batch | 14 | FormulaCategoryName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 15 | FormulaName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 16 | FormulaVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 17 | FormulaGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 18 | FormulaId | int | 4 | True
+SIMATIC_BATCH | Batch | 19 | MRecipeName | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 20 | MRecipeVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 21 | MRecipeGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 22 | MRecipeId | int | 4 | True
+SIMATIC_BATCH | Batch | 23 | OrderId | int | 4 | True
+SIMATIC_BATCH | Batch | 24 | PlanEnd | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 25 | PCellGUID | uniqueidentifier | 16 | True
+SIMATIC_BATCH | Batch | 26 | PCellId | int | 4 | True
+SIMATIC_BATCH | Batch | 27 | PartId | int | 4 | True
+SIMATIC_BATCH | Batch | 28 | BatchReleaseGroupId | int | 4 | True
+SIMATIC_BATCH | Batch | 29 | CreationDateTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 30 | BatchHasNoTags | bit | 1 | True
+SIMATIC_BATCH | Batch | 31 | BatchVersion | nvarchar | 512 | True
+SIMATIC_BATCH | Batch | 32 | LastOSCDateTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 33 | MarkByOSC | bit | 1 | True
+SIMATIC_BATCH | Batch | 34 | BatchTransferTime | datetimeoffset | 9 | True
+SIMATIC_BATCH | Batch | 35 | InternalSettings | nvarchar | -1 | True
+SIMATIC_BATCH | BatchChanges | 1 | OGUID | uniqueidentifier | 16 | False
+SIMATIC_BATCH | BatchChanges | 2 | OBJID | int | 4 | False
+SIMATIC_BATCH | BatchChanges | 3 | EventID | bigint | 8 | False
+SIMATIC_BATCH | BatchChanges | 4 | Name | nvarchar | 512 | True
+SIMATIC_BATCH | BatchChanges | 5 | Description | nvarchar | -1 | True
+SIMATIC_BATCH | BatchChanges | 6 | Deleted | bit | 1 | True
+SIMATIC_BATCH | BatchChanges | 7 | PredecessorBatchId | int | 4 | True
+UNREACHABLE/ERROR: [Errno 22] Invalid argument
+
+===== [OS1_SQL] 1b2 SOURCE PK/unique keys =====
+tbl | idx | pk | uq | col | ko
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTGUID | 1
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTOBJID | 2
+Action | SIMATIC_BATCH_PK__Action | True | True | ROOTOTID | 3
+Action | SIMATIC_BATCH_PK__Action | True | True | POBJID | 4
+Action | SIMATIC_BATCH_PK__Action | True | True | POTID | 5
+Action | SIMATIC_BATCH_PK__Action | True | True | P2OBJID | 6
+Action | SIMATIC_BATCH_PK__Action | True | True | P2OTID | 7
+Action | SIMATIC_BATCH_PK__Action | True | True | OBJID | 8
+Action | SIMATIC_BATCH_PK__Action | True | True | OTID | 9
+Action | SIMATIC_BATCH_PK__Action | True | True | ActivationCounter | 10
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTGUID | 1
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOBJID | 2
+Batch | SIMATIC_BATCH_PK__Batch | True | True | ROOTOTID | 3
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OGUID | 4
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OBJID | 5
+Batch | SIMATIC_BATCH_PK__Batch | True | True | OTID | 6
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | ROOTGUID | 1
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | POBJID | 2
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | POTID | 3
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | P2OBJID | 4
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | P2OTID | 5
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | OBJID | 6
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | ActivationCounter | 7
+ParValueOnline | SIMATIC_BATCH_PK__ParValueOnline | True | True | EventID | 8
+(24 rows)
+
+===== [OS1_SQL] 1c triggers on source tables =====
+parent_sch | parent_tbl | trig | is_disabled | is_instead_of_trigger
+SIMATIC_BATCH | Action | tr_ActionMerger | False | True
+SIMATIC_BATCH | Batch | tr_BatchMerger | False | True
+SIMATIC_BATCH | BatchChanges | tr_BatchChangesMerger | False | True
+SIMATIC_BATCH | Order | tr_Order | False | True
+SIMATIC_BATCH | OrderCategory | tr_OrderCategory | False | True
+(5 rows)
+
+===== [OS1_SQL] 1d triggers mentioning ASM (def may be hidden) =====
+parent_tbl | trig | mentions_asm | def_hidden
+AS | tr_ASMerger | 1 | 0
+Action | tr_ActionMerger | 0 | 0
+Allocation | tr_AllocMerger | 0 | 0
+AllocationCandidate | tr_AllocCandMerger | 0 | 0
+Batch | tr_BatchMerger | 0 | 0
+BatchChanges | tr_BatchChangesMerger | 0 | 0
+BatchTags | tr_BatchTagsMerger | 0 | 0
+BatchUserGroup | tr_BatchUserGroupMerger | 0 | 0
+Category | tr_CategoryMerger | 0 | 0
+CDVMessage | tr_CDVMessageMerger | 0 | 0
+CDVTag | tr_CDVTagMerger | 0 | 0
+CDVTagRange | tr_CDVTagRangeMerger | 0 | 0
+CDVTagValue | tr_CDVTagValueMerger | 0 | 0
+ChangedItem | tr_ChangedItemMerger | 0 | 0
+Comment | tr_CommentMerger | 0 | 0
+ConditionGate | tr_CondGateMerger | 0 | 0
+Container | tr_ContainerMerger | 0 | 0
+ContainerOnline | tr_ContainerOnlineMerger | 0 | 0
+DataType | tr_DataTypeMerger | 0 | 0
+DataTypeValue | tr_DataTypeValueMerger | 0 | 0
+EsigCollectionAndTypeInfo | tr_EsigCltnMerger | 0 | 0
+EsigDynData | tr_EsigDynDataMerger | 0 | 0
+EsigFixData | tr_EsigFixDataMerger | 0 | 0
+EsigSignature | tr_EsigSignatureMerger | 0 | 0
+ExecutedSignature | tr_ExecutedEsigMerger | 0 | 0
+ExtendedError | tr_ExtendedError | 0 | 0
+ExtendedErrorState | tr_ExtendedErrorState | 0 | 0
+Formula | tr_FormulaMerger | 0 | 0
+FormulaCategory | tr_FormCatMerger | 0 | 0
+Material | tr_MaterialMerger | 0 | 0
+ModeOfOP | tr_ModeOfOPMerger | 0 | 0
+Modification | tr_ModifMerger | 0 | 0
+Order | tr_Order | 0 | 0
+OrderCategory | tr_OrderCategory | 0 | 0
+PAInstance | tr_InstanceMerger | 0 | 0
+ParameterDescription | tr_ParamDescMerger | 0 | 0
+ParValue | tr_ParValueMerger | 0 | 0
+PCell | tr_PCellMerger | 0 | 0
+PHTagInfos | tr_PHTagInfosMerger | 0 | 0
+Procedure | tr_ProcedureMerger | 0 | 0
+RecRef | tr_RecRefMerger | 0 | 0
+ScaleFunc | tr_ScaleFuncMerger | 0 | 0
+SubType | tr_SubTypeMerger | 0 | 0
+TAG | tr_TAGMerger | 0 | 0
+TermTrans | tr_TermTransMerger | 0 | 0
+TermTransOnline | tr_TermTransOnlineMerger | 0 | 0
+UARef | tr_UARefMerger | 0 | 0
+UnitEqu | tr_UnitEquMerger | 0 | 0
+(48 rows)
+
+===== [OS1_SQL] 1e TARGET tables rowcounts (ASMBatchReports) =====
+tbl | rows_
+BatchCopy | 0
+OrderDetails | 0
+ParValueOnline_copy | 0
+(3 rows)
+
+===== [OS1_SQL] 1e2 TARGET table columns =====
+tbl | column_id | col | type | max_length | is_nullable
+BatchCopy | 1 | ROOTGUID | uniqueidentifier | 16 | False
+BatchCopy | 2 | ROOTOBJID | int | 4 | False
+BatchCopy | 3 | ROOTOTID | int | 4 | False
+BatchCopy | 4 | OGUID | uniqueidentifier | 16 | False
+BatchCopy | 5 | OBJID | int | 4 | False
+BatchCopy | 6 | OTID | int | 4 | False
+BatchCopy | 7 | Created | datetimeoffset | 9 | False
+BatchCopy | 8 | CreatedTSHostId | smallint | 2 | True
+BatchCopy | 9 | Deleted | datetimeoffset | 9 | True
+BatchCopy | 10 | DeletedTSHostId | smallint | 2 | True
+BatchCopy | 11 | Name | nvarchar | 512 | True
+BatchCopy | 12 | Description | nvarchar | -1 | True
+BatchCopy | 13 | Withdrawn | bit | 1 | True
+BatchCopy | 14 | ExAttribute | nvarchar | -1 | True
+BatchCopy | 15 | PredecessorBatchId | int | 4 | True
+BatchCopy | 16 | ChainMode | int | 4 | True
+BatchCopy | 17 | ChainIgnorePredecessorState | bit | 1 | True
+BatchCopy | 18 | Quantity | float | 8 | True
+BatchCopy | 19 | ActQuantity | float | 8 | True
+BatchCopy | 20 | ProductName | nvarchar | 512 | True
+BatchCopy | 21 | ProductCode | nvarchar | 512 | True
+BatchCopy | 22 | ProductGUID | uniqueidentifier | 16 | True
+BatchCopy | 23 | ProductUoMId | int | 4 | True
+BatchCopy | 24 | FormulaCategoryName | nvarchar | 512 | True
+BatchCopy | 25 | FormulaName | nvarchar | 512 | True
+BatchCopy | 26 | FormulaVersion | nvarchar | 512 | True
+BatchCopy | 27 | FormulaGUID | uniqueidentifier | 16 | True
+BatchCopy | 28 | FormulaId | int | 4 | True
+BatchCopy | 29 | MRecipeName | nvarchar | 512 | True
+BatchCopy | 30 | MRecipeVersion | nvarchar | 512 | True
+BatchCopy | 31 | MRecipeGUID | uniqueidentifier | 16 | True
+BatchCopy | 32 | MRecipeId | int | 4 | True
+BatchCopy | 33 | OrderId | int | 4 | True
+BatchCopy | 34 | ReleaseTime | datetimeoffset | 9 | True
+BatchCopy | 35 | PlanStart | datetimeoffset | 9 | True
+BatchCopy | 36 | PlanEnd | datetimeoffset | 9 | True
+BatchCopy | 37 | ActStart | datetimeoffset | 9 | True
+BatchCopy | 38 | ActEnd | datetimeoffset | 9 | True
+BatchCopy | 39 | Mode | int | 4 | True
+BatchCopy | 40 | Export | smallint | 2 | True
+BatchCopy | 41 | State | int | 4 | True
+BatchCopy | 42 | ExState | int | 4 | True
+BatchCopy | 43 | ModifiedBits | int | 4 | True
+BatchCopy | 44 | PCellGUID | uniqueidentifier | 16 | True
+BatchCopy | 45 | PCellId | int | 4 | True
+BatchCopy | 46 | PartId | int | 4 | True
+BatchCopy | 47 | BatchReleaseGroupId | int | 4 | True
+BatchCopy | 48 | CreationDateTime | datetimeoffset | 9 | True
+BatchCopy | 49 | ModificationDateTime | datetimeoffset | 9 | True
+BatchCopy | 50 | BatchHasNoTags | bit | 1 | True
+BatchCopy | 51 | CurrentBatchDataId | int | 4 | True
+BatchCopy | 52 | GapTime | int | 4 | True
+BatchCopy | 53 | BatchVersion | nvarchar | 512 | True
+BatchCopy | 54 | LastOSCDateTime | datetimeoffset | 9 | True
+BatchCopy | 55 | MarkByOSC | bit | 1 | True
+BatchCopy | 56 | BatchTransferTime | datetimeoffset | 9 | True
+OrderDetails | 1 | ROOTGUID | uniqueidentifier | 16 | False
+OrderDetails | 2 | OrderId | int | 4 | False
+OrderDetails | 3 | OrderName | nvarchar | 512 | True
+OrderDetails | 4 | OrderCategory | nvarchar | 512 | True
+OrderDetails | 5 | CreationDateTime | datetimeoffset | 10 | True
+OrderDetails | 6 | Quantity | float | 8 | True
+OrderDetails | 7 | Description | nvarchar | -1 | True
+ParValueOnline_copy | 1 | ROOTGUID | uniqueidentifier | 16 | False
+ParValueOnline_copy | 2 | POBJID | int | 4 | False
+ParValueOnline_copy | 3 | POTID | int | 4 | False
+ParValueOnline_copy | 4 | P2OBJID | int | 4 | False
+ParValueOnline_copy | 5 | P2OTID | int | 4 | False
+ParValueOnline_copy | 6 | OBJID | int | 4 | False
+ParValueOnline_copy | 7 | ActivationCounter | int | 4 | False
+UNREACHABLE/ERROR: [Errno 22] Invalid argument
+
+DONE

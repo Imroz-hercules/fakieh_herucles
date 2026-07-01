@@ -8,6 +8,7 @@ interface Silo {
   material_name: string;
   hl_active: boolean;
   lock_active: boolean;
+  quantity_kg?: number | null;
   dbSource: string;
   dbType: string;
   silo_no?: number;
@@ -67,6 +68,7 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
           material_name: silo.materialName,
           hl_active: silo.hlActive,
           lock_active: silo.lockActive,
+          quantity_kg: silo.quantityKg ?? null,
           updated_at: silo.updatedAt,
           dbSource: 'DB1', 
           dbType: 'Intake',
@@ -81,6 +83,7 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
           material_name: silo.materialName,
           hl_active: silo.hlActive,
           lock_active: silo.lockActive,
+          quantity_kg: silo.quantityKg ?? null,
           updated_at: silo.updatedAt,
           dbSource: 'DB2', 
           dbType: 'Outloading',
@@ -95,6 +98,7 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
           material_name: silo.materialName,
           hl_active: silo.hlActive,
           lock_active: silo.lockActive,
+          quantity_kg: silo.quantityKg ?? null,
           updated_at: silo.updatedAt,
           dbSource: 'DB3', 
           dbType: 'Mineral',

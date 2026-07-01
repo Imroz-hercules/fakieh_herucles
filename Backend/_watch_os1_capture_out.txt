@@ -1,0 +1,3 @@
+OS1 CAPTURE MONITOR start (gate C)
+[poll 0] BatchCopy rows=0 actStart=None actEnd=None xfer=None | PVcopy rows=0 roots=0 | OrderDetails=0 | live_PV_max_ts=2026-06-21 21:26:06.351 +00:00
+[poll 1] BatchCopy rows=0 actStart=None actEnd=None xfer=None | PVcopy rows=0 roots=0 | OrderDetails=0 | live_PV_max_ts=2026-06-21 21:26:06.351 +00:00

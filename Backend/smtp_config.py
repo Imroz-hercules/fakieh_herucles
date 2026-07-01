@@ -97,8 +97,14 @@ def set_smtp_config(data):
 
 # ── Senders ──────────────────────────────────────────────────────────────────
 
-def send_email_resend(recipients, subject, body_html, attachments=None, cfg=None):
-    """Send via the Resend cloud API. ``attachments`` = list of (filename, bytes)."""
+def send_email_resend(recipients, subject, body_html, attachments=None, cfg=None,
+                      inline_images=None):
+    """Send via the Resend cloud API.
+
+    ``attachments`` = list of (filename, bytes).
+    ``inline_images`` = list of (cid, filename, bytes) embedded in the HTML via
+    ``<img src="cid:...">`` using Resend's ``content_id`` support.
+    """
     cfg = cfg or get_smtp_config()
     api_key = cfg.get('resend_api_key')
     if not api_key:
@@ -119,11 +125,25 @@ def send_email_resend(recipients, subject, body_html, attachments=None, cfg=None
         'subject': subject,
         'html': body_html,
     }
+
+    att_list = []
     if attachments:
-        params['attachments'] = [
+        att_list += [
             {'filename': fn, 'content': base64.b64encode(content).decode('ascii')}
             for fn, content in attachments
         ]
+    if inline_images:
+        for cid, filename, content in inline_images:
+            mime_type, _ = mimetypes.guess_type(filename)
+            att_list.append({
+                'filename': filename,
+                'content': base64.b64encode(content).decode('ascii'),
+                'content_id': cid,
+                'content_type': mime_type or 'image/png',
+            })
+    if att_list:
+        params['attachments'] = att_list
+
     try:
         resend.Emails.send(params)
         return {'success': True}
@@ -132,8 +152,14 @@ def send_email_resend(recipients, subject, body_html, attachments=None, cfg=None
         return {'success': False, 'error': str(e)}
 
 
-def send_email_smtp(recipients, subject, body_html, attachments=None, cfg=None):
-    """Send via a custom SMTP server. ``attachments`` = list of (filename, bytes)."""
+def send_email_smtp(recipients, subject, body_html, attachments=None, cfg=None,
+                    inline_images=None):
+    """Send via a custom SMTP server.
+
+    ``attachments`` = list of (filename, bytes).
+    ``inline_images`` = list of (cid, filename, bytes) attached as related/inline
+    parts and referenced from the HTML via ``<img src="cid:...">``.
+    """
     cfg = cfg or get_smtp_config()
     if not cfg.get('smtp_server'):
         return {'success': False, 'error': 'No SMTP server configured'}
@@ -144,6 +170,16 @@ def send_email_smtp(recipients, subject, body_html, attachments=None, cfg=None):
     msg['To'] = ', '.join(recipients)
     msg.set_content('Please find the attached report(s).\n')
     msg.add_alternative(body_html, subtype='html')
+
+    # Embed inline logos on the HTML part so they render in the body (not as
+    # separate attachments). The HTML references them as cid:<cid>.
+    if inline_images:
+        html_part = msg.get_payload()[-1]
+        for cid, filename, content_bytes in inline_images:
+            mime_type, _ = mimetypes.guess_type(filename)
+            maintype, subtype = (mime_type.split('/', 1) if mime_type else ('image', 'png'))
+            html_part.add_related(content_bytes, maintype=maintype, subtype=subtype,
+                                  cid=f'<{cid}>')
 
     if attachments:
         for filename, content_bytes in attachments:
@@ -176,22 +212,40 @@ def send_email_smtp(recipients, subject, body_html, attachments=None, cfg=None):
         return {'success': False, 'error': str(e)}
 
 
-def send_email(recipients, subject, body_html, attachments=None):
+def send_email(recipients, subject, body_html, attachments=None, inline_images=None):
     """Send mail using whichever method is configured."""
     cfg = get_smtp_config()
     if cfg.get('send_method') == 'resend':
-        return send_email_resend(recipients, subject, body_html, attachments, cfg=cfg)
-    return send_email_smtp(recipients, subject, body_html, attachments, cfg=cfg)
+        return send_email_resend(recipients, subject, body_html, attachments,
+                                 cfg=cfg, inline_images=inline_images)
+    return send_email_smtp(recipients, subject, body_html, attachments,
+                           cfg=cfg, inline_images=inline_images)
 
 
 def test_email(to_email):
     """Send a small test message to confirm the configuration works."""
     if not to_email:
         return {'success': False, 'error': 'A test recipient is required'}
-    body = (
-        '<div style="font-family:Arial,sans-serif;font-size:14px;color:#111">'
-        '<h2>Fakieh Reports — test email</h2>'
-        '<p>Your email configuration is working correctly.</p>'
-        '</div>'
-    )
-    return send_email([to_email], 'Fakieh Reports — Test Email', body)
+
+    # Reuse the styled report card + inline logos so the test mirrors a real
+    # delivery. Imported lazily to avoid a circular import at module load.
+    inline_images = None
+    body = None
+    try:
+        from datetime import datetime
+        import distribution_engine as _de
+        now = datetime.now()
+        body = _de._build_email_html(
+            'Email Configuration Test', [], now, now, ['(test — no attachment)'])
+        inline_images = _de._email_inline_logos()
+    except Exception as e:  # pragma: no cover - styling is best-effort
+        logger.warning('Falling back to plain test email body: %s', e)
+        body = (
+            '<div style="font-family:Arial,sans-serif;font-size:14px;color:#111">'
+            '<h2>Fakieh Reports — test email</h2>'
+            '<p>Your email configuration is working correctly.</p>'
+            '</div>'
+        )
+
+    return send_email([to_email], 'Fakieh Reports — Test Email', body,
+                      inline_images=inline_images)

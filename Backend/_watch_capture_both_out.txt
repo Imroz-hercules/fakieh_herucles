@@ -1,0 +1,7 @@
+COMBINED OS1+OS2 CAPTURE MONITOR start (gates C+D)
+[poll 0] | OS1: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=54(max 2026-06-21 21:26:06.351 +00:00) | OS2: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=0(max None)
+[poll 1] | OS1: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=54(max 2026-06-21 21:26:06.351 +00:00) | OS2: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=0(max None)
+[poll 2] | OS1: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=54(max 2026-06-21 21:26:06.351 +00:00) | OS2: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=0(max None)
+[poll 3] | OS1: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=54(max 2026-06-21 21:26:06.351 +00:00) | OS2: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=0(max None)
+[poll 4] | OS1: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=54(max 2026-06-21 21:26:06.351 +00:00) | OS2: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=0(max None)
+[poll 5] | OS1: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=54(max 2026-06-21 21:26:06.351 +00:00) | OS2: BC=0(aS0/aE0/x0) PVc=0(max None) OD=0 livePV=0(max None)

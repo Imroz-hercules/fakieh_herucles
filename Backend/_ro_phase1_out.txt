@@ -1,0 +1,343 @@
+PHASE 1 CAPTURE @ local 2026-06-20T05:19:14.017174
+server=DESKTOP-N8PGI9S\FAKIEH_REPORTING db=ASMBatchReports login=fakieh_app_user
+
+===== 1.identity =====
+server_name | machine | instance | edition | ver | coll | cur_db | login_name | is_sa | captured_at
+ERROR: ('ODBC SQL type -155 is not yet supported.  column-index=9  type=-155', 'HY106')
+
+===== 1.db_roles (does app user own ASMBatchReports?) =====
+is_db_owner | is_datareader | is_ddladmin | view_def_db
+0 | 1 | 0 | 
+(1 rows)
+
+===== 2.linked_servers =====
+linked_server | product | provider | data_source | is_linked | is_data_access_enabled | is_rpc_out_enabled
+FAKIEH_SERVER1 |  | SQLNCLI11 | 192.168.1.50\INFSERVER | True | True | True
+FAKIEH_SERVER2 |  | SQLNCLI11 | 192.168.0.51,1433 | True | True | True
+OS1_SQL |  | SQLNCLI | 192.168.1.50,1433 | True | True | True
+(3 rows)
+
+===== 2.linked_logins =====
+linked_server | remote_name | uses_self_credential
+(0 rows)
+
+===== 3.all_user_tables_rowcounts =====
+schema | table | approx_rows | create_date | modify_date
+dbo | BatchCopy | 82 | 2025-08-03 08:21:18.880000 | 2026-06-17 10:15:55.157000
+dbo | BatchCopy_AutoPV_Backup_20260605 | 90 | 2026-06-05 13:53:57.123000 | 2026-06-05 13:53:57.123000
+dbo | BatchCopy_Phase1_Backup_20260617 | 485 | 2026-06-17 09:24:20.547000 | 2026-06-17 09:24:20.547000
+dbo | BatchMaterials | 21230 | 2025-08-11 17:38:49.857000 | 2026-06-17 10:16:15.197000
+dbo | BatchMaterials_BeforeCleanup_20260617 | 19593 | 2026-06-17 10:01:49.800000 | 2026-06-17 10:01:49.800000
+dbo | BatchMaterials_Phase1_Backup_20260617 | 19593 | 2026-06-17 09:24:20.563000 | 2026-06-17 09:24:20.563000
+dbo | DataSyncTracker | 3 | 2025-08-11 17:38:49.840000 | 2025-08-11 17:38:49.840000
+dbo | OrderDetails | 0 | 2025-08-03 08:21:18.883000 | 2025-08-03 08:21:18.883000
+dbo | ParValueOnline_copy | 357903 | 2025-08-03 08:21:18.887000 | 2026-06-17 09:33:53.897000
+dbo | ParValueOnline_copy_Backup_20260617 | 24423 | 2026-06-17 16:29:34.893000 | 2026-06-17 16:29:34.893000
+dbo | ParValueOnline_Phase1_Backup_20260617 | 22838 | 2026-06-17 09:24:20.600000 | 2026-06-17 09:24:20.600000
+dbo | ParValueOnline_Server1_Backup_20260617 | 2286 | 2026-06-17 16:22:11.447000 | 2026-06-17 16:22:11.447000
+(12 rows)
+
+===== 3.columns_core_tables =====
+table | column_id | col | dtype | max_length | precision | scale | is_nullable | is_identity | is_computed | default_def
+BatchCopy | 1 | ROOTGUID | uniqueidentifier | 16 | 0 | 0 | False | False | False | 
+BatchCopy | 2 | ROOTOBJID | int | 4 | 10 | 0 | False | False | False | 
+BatchCopy | 3 | ROOTOTID | int | 4 | 10 | 0 | False | False | False | 
+BatchCopy | 4 | OGUID | uniqueidentifier | 16 | 0 | 0 | False | False | False | 
+BatchCopy | 5 | OBJID | int | 4 | 10 | 0 | False | False | False | 
+BatchCopy | 6 | OTID | int | 4 | 10 | 0 | False | False | False | 
+BatchCopy | 7 | Created | datetimeoffset | 9 | 30 | 3 | False | False | False | 
+BatchCopy | 8 | CreatedTSHostId | smallint | 2 | 5 | 0 | True | False | False | 
+BatchCopy | 9 | Deleted | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 10 | DeletedTSHostId | smallint | 2 | 5 | 0 | True | False | False | 
+BatchCopy | 11 | Name | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 12 | Description | nvarchar | -1 | 0 | 0 | True | False | False | 
+BatchCopy | 13 | Withdrawn | bit | 1 | 1 | 0 | True | False | False | 
+BatchCopy | 14 | ExAttribute | nvarchar | -1 | 0 | 0 | True | False | False | 
+BatchCopy | 15 | PredecessorBatchId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 16 | ChainMode | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 17 | ChainIgnorePredecessorState | bit | 1 | 1 | 0 | True | False | False | 
+BatchCopy | 18 | Quantity | float | 8 | 53 | 0 | True | False | False | 
+BatchCopy | 19 | ActQuantity | float | 8 | 53 | 0 | True | False | False | 
+BatchCopy | 20 | ProductName | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 21 | ProductCode | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 22 | ProductGUID | uniqueidentifier | 16 | 0 | 0 | True | False | False | 
+BatchCopy | 23 | ProductUoMId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 24 | FormulaCategoryName | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 25 | FormulaName | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 26 | FormulaVersion | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 27 | FormulaGUID | uniqueidentifier | 16 | 0 | 0 | True | False | False | 
+BatchCopy | 28 | FormulaId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 29 | MRecipeName | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 30 | MRecipeVersion | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 31 | MRecipeGUID | uniqueidentifier | 16 | 0 | 0 | True | False | False | 
+BatchCopy | 32 | MRecipeId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 33 | OrderId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 34 | ReleaseTime | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 35 | PlanStart | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 36 | PlanEnd | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 37 | ActStart | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 38 | ActEnd | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 39 | Mode | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 40 | Export | smallint | 2 | 5 | 0 | True | False | False | 
+BatchCopy | 41 | State | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 42 | ExState | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 43 | ModifiedBits | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 44 | PCellGUID | uniqueidentifier | 16 | 0 | 0 | True | False | False | 
+BatchCopy | 45 | PCellId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 46 | PartId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 47 | BatchReleaseGroupId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 48 | CreationDateTime | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 49 | ModificationDateTime | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 50 | BatchHasNoTags | bit | 1 | 1 | 0 | True | False | False | 
+BatchCopy | 51 | CurrentBatchDataId | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 52 | GapTime | int | 4 | 10 | 0 | True | False | False | 
+BatchCopy | 53 | BatchVersion | nvarchar | 512 | 0 | 0 | True | False | False | 
+BatchCopy | 54 | LastOSCDateTime | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 55 | MarkByOSC | bit | 1 | 1 | 0 | True | False | False | 
+BatchCopy | 56 | BatchTransferTime | datetimeoffset | 9 | 30 | 3 | True | False | False | 
+BatchCopy | 57 | SourceServer | varchar | 20 | 0 | 0 | True | False | False | 
+BatchMaterials | 1 | Source Server | nvarchar | 100 | 0 | 0 | False | False | False | 
+BatchMaterials | 2 | Batch GUID | uniqueidentifier | 16 | 0 | 0 | False | False | False | 
+BatchMaterials | 3 | ROOTGUID | uniqueidentifier | 16 | 0 | 0 | True | False | False | 
+BatchMaterials | 4 | OrderId | int | 4 | 10 | 0 | True | False | False | 
+BatchMaterials | 5 | Batch Name | nvarchar | 510 | 0 | 0 | True | False | False | 
+BatchMaterials | 6 | Product Name | nvarchar | 510 | 0 | 0 | True | False | False | 
+BatchMaterials | 7 | Batch Act Start | datetime | 8 | 23 | 3 | True | False | False | 
+BatchMaterials | 8 | Batch Act End | datetime | 8 | 23 | 3 | True | False | False | 
+BatchMaterials | 9 | Batch Transfer Time | datetime | 8 | 23 | 3 | True | False | False | 
+BatchMaterials | 10 | Quantity | float | 8 | 53 | 0 | True | False | False | 
+BatchMaterials | 11 | Material Name | nvarchar | 510 | 0 | 0 | True | False | False | 
+BatchMaterials | 12 | Material Code | nvarchar | 510 | 0 | 0 | True | False | False | 
+BatchMaterials | 13 | sp_prot | float | 8 | 53 | 0 | True | False | False | 
+BatchMaterials | 14 | SetPoint Float | float | 8 | 53 | 0 | True | False | False | 
+BatchMaterials | 15 | Actual Value Float | float | 8 | 53 | 0 | True | False | False | 
+BatchMaterials | 16 | FormulaCategoryName | nvarchar | 510 | 0 | 0 | True | False | False | 
+DataSyncTracker | 1 | Source Server | nvarchar | 100 | 0 | 0 | False | False | False | 
+DataSyncTracker | 2 | LastTimeStamp | datetime | 8 | 23 | 3 | True | False | False | 
+ParValueOnline_copy | 1 | ROOTGUID | uniqueidentifier | 16 | 0 | 0 | False | False | False | 
+ParValueOnline_copy | 2 | POBJID | int | 4 | 10 | 0 | False | False | False | 
+ParValueOnline_copy | 3 | POTID | int | 4 | 10 | 0 | False | False | False | 
+ParValueOnline_copy | 4 | P2OBJID | int | 4 | 10 | 0 | False | False | False | 
+ParValueOnline_copy | 5 | P2OTID | int | 4 | 10 | 0 | False | False | False | 
+ParValueOnline_copy | 6 | OBJID | int | 4 | 10 | 0 | False | False | False | 
+ParValueOnline_copy | 7 | ActivationCounter | int | 4 | 10 | 0 | False | False | False | 
+ParValueOnline_copy | 8 | EventID | bigint | 8 | 19 | 0 | False | False | False | 
+ParValueOnline_copy | 9 | TimeStamp | datetimeoffset | 9 | 30 | 3 | False | False | False | 
+ParValueOnline_copy | 10 | Name | nvarchar | 512 | 0 | 0 | False | False | False | 
+ParValueOnline_copy | 11 | EventNotifyType | int | 4 | 10 | 0 | False | False | False | 
+ParValueOnline_copy | 12 | UsageId | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 13 | DataTypeId | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 14 | DataTypeName | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 15 | UoMId | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 16 | UoMName | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 17 | HighValue | float | 8 | 53 | 0 | True | False | False | 
+ParValueOnline_copy | 18 | LowValue | float | 8 | 53 | 0 | True | False | False | 
+ParValueOnline_copy | 19 | RecHighValue | float | 8 | 53 | 0 | True | False | False | 
+ParValueOnline_copy | 20 | RecLowValue | float | 8 | 53 | 0 | True | False | False | 
+ParValueOnline_copy | 21 | sp_float | float | 8 | 53 | 0 | True | False | False | 
+ParValueOnline_copy | 22 | asp_float | float | 8 | 53 | 0 | True | False | False | 
+ParValueOnline_copy | 23 | av_float | float | 8 | 53 | 0 | True | False | False | 
+ParValueOnline_copy | 24 | sp_int | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 25 | asp_int | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 26 | av_int | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 27 | sp_string | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 28 | asp_string | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 29 | av_string | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 30 | loc_unitallocname | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 31 | loc_unitname | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 32 | sp_locname | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 33 | asp_locname | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 34 | av_locname | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 35 | sp_matname | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 36 | sp_matcode | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 37 | asp_matname | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 38 | asp_matcode | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 39 | av_matname | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 40 | av_matcode | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 41 | sp_EnumValue | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 42 | asp_EnumValue | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 43 | av_EnumValue | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 44 | sp_Unit | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 45 | asp_Unit | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 46 | av_Unit | nvarchar | 512 | 0 | 0 | True | False | False | 
+ParValueOnline_copy | 47 | sp_prot | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 48 | asp_prot | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 49 | av_prot | int | 4 | 10 | 0 | True | False | False | 
+ParValueOnline_copy | 50 | SourceServer | varchar | 20 | 0 | 0 | True | False | False | 
+(125 rows)
+
+===== 3.indexes_core_tables =====
+table | index_name | is_primary_key | is_unique | has_filter | filter_definition | col | key_ordinal | is_included_column
+BatchCopy | IX_BatchCopy_OGUID | False | False | False |  | OGUID | 1 | False
+BatchCopy | IX_BatchCopy_SourceServer | False | False | False |  | SourceServer | 1 | False
+BatchCopy | IX_BatchCopy_TransferTime | False | False | False |  | BatchTransferTime | 1 | False
+BatchCopy | UX_BatchCopy_OGUID_SourceServer | False | True | False |  | OGUID | 1 | False
+BatchCopy | UX_BatchCopy_OGUID_SourceServer | False | True | False |  | SourceServer | 2 | False
+BatchMaterials | IX_BatchMaterials_BatchGUID | False | False | False |  | Batch GUID | 1 | False
+BatchMaterials | IX_BatchMaterials_BatchGUID_Source | False | False | False |  | Batch GUID | 1 | False
+BatchMaterials | IX_BatchMaterials_BatchGUID_Source | False | False | False |  | Source Server | 2 | False
+BatchMaterials | IX_BatchMaterials_SourceServer | False | False | False |  | Source Server | 1 | False
+BatchMaterials | UX_BatchMaterials_Final | False | True | False |  | Source Server | 1 | False
+BatchMaterials | UX_BatchMaterials_Final | False | True | False |  | Batch GUID | 2 | False
+BatchMaterials | UX_BatchMaterials_Final | False | True | False |  | Material Name | 3 | False
+BatchMaterials | UX_BatchMaterials_Final | False | True | False |  | Material Code | 4 | False
+BatchMaterials | UX_BatchMaterials_Final | False | True | False |  | sp_prot | 5 | False
+BatchMaterials | UX_BatchMaterials_Unique | False | True | False |  | Source Server | 1 | False
+BatchMaterials | UX_BatchMaterials_Unique | False | True | False |  | Batch GUID | 2 | False
+BatchMaterials | UX_BatchMaterials_Unique | False | True | False |  | Material Name | 3 | False
+BatchMaterials | UX_BatchMaterials_Unique | False | True | False |  | Material Code | 4 | False
+BatchMaterials | UX_BatchMaterials_Unique | False | True | False |  | sp_prot | 5 | False
+DataSyncTracker | PK__DataSync__5831D05E9DE42DC2 | True | True | False |  | Source Server | 1 | False
+ParValueOnline_copy | IX_ParValueOnline_ROOTGUID | False | False | False |  | ROOTGUID | 1 | False
+ParValueOnline_copy | IX_ParValueOnline_Source | False | False | False |  | SourceServer | 1 | False
+ParValueOnline_copy | IX_ParValueOnline_TimeStamp | False | False | False |  | TimeStamp | 1 | False
+(23 rows)
+
+===== 4.object_inventory =====
+object_name | type_desc | create_date | modify_date | def_len
+OS2_BatchCopy_Compat | VIEW | 2025-09-01 12:27:46.090000 | 2025-09-01 13:49:31.913000 | NULL/HIDDEN
+(1 rows)
+
+===== 5.jobs =====
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object 'sysjobs', database 'msdb', schema 'dbo'. (229) (SQLExecDirectW)")
+
+===== 5.job_steps =====
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object 'sysjobs', database 'msdb', schema 'dbo'. (229) (SQLExecDirectW)")
+
+===== 5.job_schedules =====
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object 'sysschedules', database 'msdb', schema 'dbo'. (229) (SQLExecDirectW)")
+
+===== 5.job_history_recent_all =====
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object 'sysjobs', database 'msdb', schema 'dbo'. (229) (SQLExecDirectW)")
+
+===== 5.job_history_failures_only =====
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object 'sysjobs', database 'msdb', schema 'dbo'. (229) (SQLExecDirectW)")
+
+===== 5.active_jobs_now =====
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object 'sysjobs', database 'msdb', schema 'dbo'. (229) (SQLExecDirectW)")
+
+===== 6.DataSyncTracker =====
+Source Server | LastTimeStamp
+BatchCopy | 2026-06-19 16:34:12.857000
+Server1 | 2026-06-19 16:34:12.857000
+Server2 | 2026-06-16 11:45:12.227000
+(3 rows)
+
+===== 7.default_trace_rework =====
+ERROR: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]You do not have permission to run 'FN_TRACE_GETINFO'. (8189) (SQLExecDirectW)")
+
+===== 8.backup_snapshot_tables =====
+schema | table | create_date | modify_date | approx_rows
+dbo | BatchCopy_AutoPV_Backup_20260605 | 2026-06-05 13:53:57.123000 | 2026-06-05 13:53:57.123000 | 90
+dbo | BatchCopy_Phase1_Backup_20260617 | 2026-06-17 09:24:20.547000 | 2026-06-17 09:24:20.547000 | 485
+dbo | BatchMaterials_Phase1_Backup_20260617 | 2026-06-17 09:24:20.563000 | 2026-06-17 09:24:20.563000 | 19593
+dbo | ParValueOnline_Phase1_Backup_20260617 | 2026-06-17 09:24:20.600000 | 2026-06-17 09:24:20.600000 | 22838
+dbo | BatchMaterials_BeforeCleanup_20260617 | 2026-06-17 10:01:49.800000 | 2026-06-17 10:01:49.800000 | 19593
+dbo | ParValueOnline_Server1_Backup_20260617 | 2026-06-17 16:22:11.447000 | 2026-06-17 16:22:11.447000 | 2286
+dbo | ParValueOnline_copy_Backup_20260617 | 2026-06-17 16:29:34.893000 | 2026-06-17 16:29:34.893000 | 24423
+(7 rows)
+
+===== 9.dups_current_BatchMaterials =====
+Source Server | Batch GUID | Material Name | Material Code | sp_prot | dup_rows
+(0 rows)
+
+===== 9.dup_summary_current_BM =====
+dup_groups | extra_rows
+0 | 
+(1 rows)
+
+===== 10.missing_completed_qualifying_summary =====
+missing_batches | oldest_first_pv | newest_last_pv | qual_rows_waiting
+ERROR: ('ODBC SQL type -155 is not yet supported.  column-index=1  type=-155', 'HY106')
+
+===== 10.missing_guid_list =====
+ROOTGUID | SourceServer | first_pv | last_pv | pv_rows | qual
+ERROR: ('ODBC SQL type -155 is not yet supported.  column-index=2  type=-155', 'HY106')
+
+===== 10.daily_parity =====
+report_date | captured | reported | gap
+2026-06-17 | 15 | 39 | -24
+2026-06-18 | 35 | 25 | 10
+2026-06-19 | 42 | 30 | 12
+(3 rows)
+
+===== 11.BatchCopy_all =====
+ROOTGUID | ROOTOBJID | ROOTOTID | OGUID | OBJID | OTID | Created | CreatedTSHostId | Deleted | DeletedTSHostId | Name | Description | Withdrawn | ExAttribute | PredecessorBatchId | ChainMode | ChainIgnorePredecessorState | Quantity | ActQuantity | ProductName | ProductCode | ProductGUID | ProductUoMId | FormulaCategoryName | FormulaName | FormulaVersion | FormulaGUID | FormulaId | MRecipeName | MRecipeVersion | MRecipeGUID | MRecipeId | OrderId | ReleaseTime | PlanStart | PlanEnd | ActStart | ActEnd | Mode | Export | State | ExState | ModifiedBits | PCellGUID | PCellId | PartId | BatchReleaseGroupId | CreationDateTime | ModificationDateTime | BatchHasNoTags | CurrentBatchDataId | GapTime | BatchVersion | LastOSCDateTime | MarkByOSC | BatchTransferTime | SourceServer
+ERROR: ('ODBC SQL type -155 is not yet supported.  column-index=6  type=-155', 'HY106')
+
+===== 11.BatchMaterials_recent =====
+Source Server | Batch GUID | ROOTGUID | OrderId | Batch Name | Product Name | Batch Act Start | Batch Act End | Batch Transfer Time | Quantity | Material Name | Material Code | sp_prot | SetPoint Float | Actual Value Float | FormulaCategoryName
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | *MIXED MEALE* | 199 | 100.0 | 200.0 | 201.0996 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | BETAIN HCL | 142 | 100.0 | 1.2 | 1.788195 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | BIOSTRONG 510 | 140 | 100.0 | 0.6 | 0.7204862 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Broiler Mineral Mix | 31 | 100.0 | 3.6 | 3.96412 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Broiler Starter PX | 69 | 100.0 | 3.6 | 5.601852 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | HERBIN | 149 | 100.0 | 2.4 | 0.4745369 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | HY-Bond | 111 | 100.0 | 4.0 | 4.036458 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | KENZYME PRO | 77 | 100.0 | 1.2 | 1.20081 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | L Isoleucine | 73 | 100.0 | 1.2 | 1.339699 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Limestone | 113 | 100.0 | 48.0 | 100.1157 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | L-VALINE 98% | 72 | 100.0 | 3.6 | 3.75 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | LYSOFORTE DRY | 30 | 100.0 | 0.8 | 0.889757 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Maize | 100 | 100.0 | 2259.6 | 2379.919 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Methionine | 12 | 100.0 | 14.8 | 15.0463 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Monocalcium Phos | 204 | 100.0 | 22.0 | 21.99074 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Provi Oxi Stop | 21 | 100.0 | 0.4 | 2.002315 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | ROVABIO PhyPlus | 75 | 100.0 | 0.4 | 1.41059 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Salt | 202 | 100.0 | 10.0 | 12.0081 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | SENITHETIC LYSIN | 8 | 100.0 | 9.6 | 7.957175 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | SOUDIOM Bicarbon | 35 | 100.0 | 5.6 | 1.880787 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | SOYA- | 105 | 100.0 | 1356.0 | 1431.134 | Production Recipes
+Server1 | A6A2B27B-5217-4A44-A795-DB0A2EB3D66B | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:34:12.857000 | 2026-06-19 16:35:16.897000 | 4000.0 | Soya Oil | 210 | 100.0 | 42.0 | 42.25 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | *MIXED MEALE* | 199 | 100.0 | 200.0 | 198.2058 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | BETAIN HCL | 142 | 100.0 | 1.2 | 2.089121 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | BIOSTRONG 510 | 140 | 100.0 | 0.6 | 0.7291667 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Broiler Mineral Mix | 31 | 100.0 | 3.6 | 3.935185 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Broiler Starter PX | 69 | 100.0 | 3.6 | 4.791667 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | HERBIN | 149 | 100.0 | 2.4 | 1.059028 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | HY-Bond | 111 | 100.0 | 4.0 | 4.166666 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | KENZYME PRO | 77 | 100.0 | 1.2 | 1.273148 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | L Isoleucine | 73 | 100.0 | 1.2 | 1.439526 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | L Threonine | 60 | 100.0 | 5.2 | 0.2314816 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Limestone | 113 | 100.0 | 48.0 | 96.0648 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | L-VALINE 98% | 72 | 100.0 | 3.6 | 3.831018 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | LYSOFORTE DRY | 30 | 100.0 | 0.8 | 1.310764 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Maize | 100 | 100.0 | 2259.6 | 2362.558 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Methionine | 12 | 100.0 | 14.8 | 15.0463 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Monocalcium Phos | 204 | 100.0 | 22.0 | 22.13542 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Provi Oxi Stop | 21 | 100.0 | 0.4 | 3.657409 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | ROVABIO PhyPlus | 75 | 100.0 | 0.4 | 1.309317 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Salt | 202 | 100.0 | 10.0 | 9.982639 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | SENITHETIC LYSIN | 8 | 100.0 | 9.6 | 9.085649 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | SOYA- | 105 | 100.0 | 1356.0 | 1439.236 | Production Recipes
+Server1 | C0008D5F-D6D8-4988-AA94-52FFE9CEA035 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 16:19:44.650000 | 2026-06-19 16:27:53.203000 | 2026-06-19 16:28:57.970000 | 4000.0 | Soya Oil | 210 | 100.0 | 42.0 | 42.25 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | *MIXED MEALE* | 199 | 100.0 | 200.0 | 214.1204 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | BIOSTRONG 510 | 140 | 100.0 | 0.6 | 0.7204859 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | Broiler Mineral Mix | 31 | 100.0 | 3.6 | 3.631366 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | Broiler Starter PX | 69 | 100.0 | 3.6 | 5.179399 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | HY-Bond | 111 | 100.0 | 4.0 | 4.036458 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | KENZYME PRO | 77 | 100.0 | 1.2 | 1.229746 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | L Isoleucine | 73 | 100.0 | 1.2 | 1.41059 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | Limestone | 113 | 100.0 | 48.0 | 103.0093 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | L-VALINE 98% | 72 | 100.0 | 3.6 | 3.969908 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | BETAIN HCL | 142 | 100.0 | 1.2 | 2.34375 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | HERBIN | 149 | 100.0 | 2.4 | 1.776621 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | Provi Oxi Stop | 21 | 100.0 | 0.4 | 4.207176 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | SOUDIOM Bicarbon | 35 | 100.0 | 5.6 | 0.1446762 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | Soya Oil | 210 | 100.0 | 42.0 | 42.25 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | LYSOFORTE DRY | 30 | 100.0 | 0.8 | 1.150174 | Production Recipes
+Server1 | 0DC727B2-2AD9-47F1-88B3-1EA8A96A0897 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | 4 | BROILER GROWER | BROILER GROWER 1 | 2026-06-19 15:51:25.177000 | 2026-06-19 16:13:58.120000 | 2026-06-19 16:15:02.153000 | 4000.0 | Maize | 100 | 100.0 | 2259.6 | 2366.898 | Production Recipes
+(60 rows)
+
+===== 11.PV_copy_recent =====
+ROOTGUID | POBJID | POTID | P2OBJID | P2OTID | OBJID | ActivationCounter | EventID | TimeStamp | Name | EventNotifyType | UsageId | DataTypeId | DataTypeName | UoMId | UoMName | HighValue | LowValue | RecHighValue | RecLowValue | sp_float | asp_float | av_float | sp_int | asp_int | av_int | sp_string | asp_string | av_string | loc_unitallocname | loc_unitname | sp_locname | asp_locname | av_locname | sp_matname | sp_matcode | asp_matname | asp_matcode | av_matname | av_matcode | sp_EnumValue | asp_EnumValue | av_EnumValue | sp_Unit | asp_Unit | av_Unit | sp_prot | asp_prot | av_prot | SourceServer
+ERROR: ('ODBC SQL type -155 is not yet supported.  column-index=8  type=-155', 'HY106')
+
+===== 11.trace_present_batch =====
+traced_present_guid
+A6A2B27B-5217-4A44-A795-DB0A2EB3D66B
+(1 rows)
+layer | ROOTGUID | ROOTOBJID | ROOTOTID | OGUID | OBJID | OTID | Created | CreatedTSHostId | Deleted | DeletedTSHostId | Name | Description | Withdrawn | ExAttribute | PredecessorBatchId | ChainMode | ChainIgnorePredecessorState | Quantity | ActQuantity | ProductName | ProductCode | ProductGUID | ProductUoMId | FormulaCategoryName | FormulaName | FormulaVersion | FormulaGUID | FormulaId | MRecipeName | MRecipeVersion | MRecipeGUID | MRecipeId | OrderId | ReleaseTime | PlanStart | PlanEnd | ActStart | ActEnd | Mode | Export | State | ExState | ModifiedBits | PCellGUID | PCellId | PartId | BatchReleaseGroupId | CreationDateTime | ModificationDateTime | BatchHasNoTags | CurrentBatchDataId | GapTime | BatchVersion | LastOSCDateTime | MarkByOSC | BatchTransferTime | SourceServer
+ERROR: ('ODBC SQL type -155 is not yet supported.  column-index=7  type=-155', 'HY106')
+
+DONE PHASE1

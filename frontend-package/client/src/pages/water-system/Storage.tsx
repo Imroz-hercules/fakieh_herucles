@@ -164,6 +164,7 @@ export function Storage() {
   const activeSilos = allSilos.filter(silo => silo.material_code || silo.material_name).length;
   const hlActiveCount = allSilos.filter(silo => silo.hl_active).length;
   const lockActiveCount = allSilos.filter(silo => silo.lock_active).length;
+  const totalQtyKg = allSilos.reduce((sum, s) => sum + (s.quantity_kg ?? 0), 0);
 
   return (
     <WaterSystemLayout
@@ -172,7 +173,7 @@ export function Storage() {
     >
       <div className="space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <KPICard
             title="TOTAL SILOS"
             value={totalSilos.toString()}
@@ -204,6 +205,14 @@ export function Storage() {
             icon="pump"
             color="purple"
             chartType="line"
+          />
+          <KPICard
+            title="TOTAL INVENTORY"
+            value={totalQtyKg.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            subtitle="KG (DB5 qty)"
+            icon="gauge"
+            color="cyan"
+            chartType="bar"
           />
         </div>
         <div className="flex items-center justify-between gap-4">
@@ -408,6 +417,9 @@ export function Storage() {
                       Material Code
                     </TableHead>
                     <TableHead className="text-white light:text-gray-900 font-semibold">
+                      Quantity (KG)
+                    </TableHead>
+                    <TableHead className="text-white light:text-gray-900 font-semibold">
                       High Level
                     </TableHead>
                     <TableHead className="text-white light:text-gray-900 font-semibold">
@@ -441,6 +453,14 @@ export function Storage() {
                         </TableCell>
                         <TableCell className="text-slate-300 light:text-gray-700">
                           {silo.material_code || "—"}
+                        </TableCell>
+                        <TableCell className="text-slate-300 light:text-gray-700 tabular-nums">
+                          {silo.quantity_kg != null
+                            ? silo.quantity_kg.toLocaleString(undefined, {
+                                maximumFractionDigits: 1,
+                                minimumFractionDigits: 0,
+                              })
+                            : "—"}
                         </TableCell>
                         <TableCell>
                           <span

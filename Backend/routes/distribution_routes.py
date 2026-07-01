@@ -104,6 +104,37 @@ def _validate(data):
     else:
         dom = int(dom) if dom not in (None, '') else None
 
+    # ── Data window (independent of the send trigger above) ──
+    window_mode = data.get('window_mode', 'auto')
+    if window_mode not in ('auto', 'custom'):
+        errors.append('window_mode must be auto or custom')
+
+    def _parse_time(value, default='07:00'):
+        s = str(value or default)
+        if not re.match(r'^\d{1,2}:\d{2}$', s):
+            return None
+        h, m = s.split(':')
+        return time(int(h), int(m))
+
+    window_start_time = _parse_time(data.get('window_start_time', '07:00'))
+    window_end_time = _parse_time(data.get('window_end_time', '07:00'))
+    if window_start_time is None or window_end_time is None:
+        errors.append('window_start_time / window_end_time must be in HH:MM format')
+
+    custom_start = custom_end = None
+    if window_mode == 'custom':
+        cs = data.get('custom_start')
+        ce = data.get('custom_end')
+        try:
+            custom_start = datetime.fromisoformat(str(cs).replace('Z', '')) if cs else None
+            custom_end = datetime.fromisoformat(str(ce).replace('Z', '')) if ce else None
+        except (TypeError, ValueError):
+            errors.append('custom_start / custom_end must be valid date-times')
+        if not custom_start or not custom_end:
+            errors.append('Custom window requires both a start and end date-time')
+        elif custom_start >= custom_end:
+            errors.append('Custom window start must be before end')
+
     if errors:
         return None, '; '.join(errors)
 
@@ -119,6 +150,11 @@ def _validate(data):
         'schedule_time': time(int(hh), int(mm)),
         'schedule_day_of_week': dow,
         'schedule_day_of_month': dom,
+        'window_mode': window_mode,
+        'window_start_time': window_start_time,
+        'window_end_time': window_end_time,
+        'custom_start': custom_start,
+        'custom_end': custom_end,
         'enabled': bool(data.get('enabled', True)),
     }
     return cleaned, None
