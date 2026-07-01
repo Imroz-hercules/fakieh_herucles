@@ -63,7 +63,7 @@ def persist_silos(rows: List[Dict[str, Any]]):
                     material_name = EXCLUDED.material_name,
                     hl_active = EXCLUDED.hl_active,
                     lock_active = EXCLUDED.lock_active,
-                    quantity_kg = EXCLUDED.quantity_kg,
+                    quantity_kg = COALESCE(EXCLUDED.quantity_kg, public.silo_status.quantity_kg),
                     updated_at = now()
             """),
             [
@@ -90,3 +90,28 @@ def persist_silos(rows: List[Dict[str, Any]]):
                 """),
                 changed
             )
+
+
+def persist_silo_qty_batch(qty_by_silo: Dict[int, float]) -> int:
+    """Upsert quantity_kg for every silo in the DB5 qty map."""
+    if not qty_by_silo:
+        return 0
+
+    engine = db.get_engine()
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO public.silo_status
+                    (silo_no, db_no, material_code, material_name, hl_active, lock_active, quantity_kg)
+                VALUES
+                    (:silo_no, 0, '', '', false, false, :quantity_kg)
+                ON CONFLICT (silo_no) DO UPDATE SET
+                    quantity_kg = EXCLUDED.quantity_kg,
+                    updated_at = now()
+            """),
+            [
+                {"silo_no": int(silo_no), "quantity_kg": float(qty)}
+                for silo_no, qty in qty_by_silo.items()
+            ],
+        )
+    return len(qty_by_silo)

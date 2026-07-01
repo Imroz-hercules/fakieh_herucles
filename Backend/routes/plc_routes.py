@@ -1986,7 +1986,7 @@ def persist_silos_from_plc(db_no: int = 3, qty_by_silo: Optional[Dict[int, float
                 material_name = EXCLUDED.material_name,
                 hl_active     = EXCLUDED.hl_active,
                 lock_active   = EXCLUDED.lock_active,
-                quantity_kg   = EXCLUDED.quantity_kg,
+                quantity_kg   = COALESCE(EXCLUDED.quantity_kg, public.silo_status.quantity_kg),
                 updated_at    = now();
         """, (silo_no, db_no, mat_code, mat_name, hl, lock, qty))
         upserts += 1
@@ -2002,7 +2002,15 @@ def silos_sync_once():
     total_upserts = 0
     
     qty_by_silo = fetch_silo_qty_from_plc()
-    results["db5_qty"] = {"read": len(qty_by_silo), "error": None if qty_by_silo or DEMO_MODE else "PLC unreachable or DB5 absent"}
+    qty_upserts = 0
+    if qty_by_silo:
+        from routes.silos_sink import persist_silo_qty_batch
+        qty_upserts = persist_silo_qty_batch(qty_by_silo)
+    results["db5_qty"] = {
+        "read": len(qty_by_silo),
+        "upserts": qty_upserts,
+        "error": None if qty_by_silo or DEMO_MODE else "PLC unreachable or DB5 absent",
+    }
 
     # Sync all databases
     for db_no in [1, 2, 3]:
@@ -2033,23 +2041,29 @@ def silos_sync_once():
 # ───────────────── Frontend endpoints (database-backed) ─────────────────
 @plc_bp.route("/silos", methods=["GET"])
 def silos_from_db_under_plc_prefix():
-    """DB-backed snapshot for tools that expect /api/plc/silos."""
+    """DB-backed snapshot; merges live DB5 qty when PLC is reachable."""
     rows = _app_rows("""
         SELECT silo_no, db_no, material_code, material_name, hl_active, lock_active, quantity_kg, updated_at
         FROM public.silo_status
         ORDER BY silo_no
     """)
+    qty_live = fetch_silo_qty_from_plc()
     out = []
     for r in rows:
+        silo_no = int(r.silo_no)
+        if qty_live:
+            qty = qty_live.get(silo_no)
+        else:
+            qty = float(r.quantity_kg) if r.quantity_kg is not None else None
         out.append({
-            "siloNo":       int(r.silo_no),
+            "siloNo":       silo_no,
             "dbNo":         int(r.db_no) if r.db_no is not None else None,
-            "binName":      f"Silo {int(r.silo_no)}",
+            "binName":      f"Silo {silo_no}",
             "materialCode": r.material_code or "",
             "materialName": r.material_name or "",
             "hlActive":     bool(r.hl_active),
             "lockActive":   bool(r.lock_active),
-            "quantityKg":   float(r.quantity_kg) if r.quantity_kg is not None else None,
+            "quantityKg":   qty,
             "updatedAt":    r.updated_at.isoformat() if r.updated_at else None,
         })
     return jsonify(out)
@@ -2067,6 +2081,7 @@ def api_silos():
         FROM public.silo_status
         ORDER BY silo_no
     """)
+    qty_live = fetch_silo_qty_from_plc()
     return jsonify([
         {
             "siloNo":       int(r.silo_no),
@@ -2076,7 +2091,11 @@ def api_silos():
             "materialName": r.material_name or "",
             "hlActive":     bool(r.hl_active),
             "lockActive":   bool(r.lock_active),
-            "quantityKg":   float(r.quantity_kg) if r.quantity_kg is not None else None,
+            "quantityKg":   (
+                qty_live.get(int(r.silo_no))
+                if qty_live
+                else (float(r.quantity_kg) if r.quantity_kg is not None else None)
+            ),
             "updatedAt":    r.updated_at.isoformat() if r.updated_at else None,
         }
         for r in rows

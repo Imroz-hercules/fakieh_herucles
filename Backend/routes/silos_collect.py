@@ -28,4 +28,7 @@ def collect_all_silos(db_list=(1, 2, 3)) -> List[Dict[str, Any]]:
                 "lock_active": bool(r.get("lock_active", False)),
                 "quantity_kg": qty_by_silo.get(s_no),
             })
+    if qty_by_silo:
+        from routes.silos_sink import persist_silo_qty_batch
+        persist_silo_qty_batch(qty_by_silo)
     return out
