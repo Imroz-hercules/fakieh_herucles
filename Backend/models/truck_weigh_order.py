@@ -53,3 +53,25 @@ class TruckWeighOrder(db.Model):
             "site_status": self.site_status(),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+def ensure_truck_weigh_orders_table():
+    """Create truck_weigh_orders on existing installs (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    db.create_all()
+    insp = inspect(db.engine)
+    if not insp.has_table("truck_weigh_orders"):
+        return
+
+    index_statements = [
+        "CREATE INDEX IF NOT EXISTS ix_truck_weigh_orders_truck_id ON truck_weigh_orders (truck_id)",
+        "CREATE INDEX IF NOT EXISTS ix_truck_weigh_orders_status ON truck_weigh_orders (status)",
+        "CREATE INDEX IF NOT EXISTS ix_truck_weigh_orders_created_at ON truck_weigh_orders (created_at)",
+    ]
+    try:
+        for stmt in index_statements:
+            db.session.execute(text(stmt))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()

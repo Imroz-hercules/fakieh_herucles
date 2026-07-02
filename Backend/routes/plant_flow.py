@@ -28,6 +28,8 @@ def send_to_plc(payload: dict) -> dict:
 @plant_bp.route("/weights/today", methods=["GET"])
 def weights_today():
     """
+    DEPRECATED: Legacy IN/OUT pairs from weights_log (no material).
+    Prefer GET /api/truck-entry/orders/today for completed truck weigh trips.
     Returns IN/OUT pairs (and NET) for a local day, enriched with truck plate & driver name.
     Query params:
       - date=YYYY-MM-DD (optional; default = today in Asia/Kolkata)
@@ -111,7 +113,9 @@ def weights_today():
             p["truck_driver"] = getattr(d, "name", None)
 
     return jsonify({"date": day_label, "pairs": pairs}), 200
-# 1) Gate IN weigh
+
+# DEPRECATED: use POST /api/truck-entry/orders + /first + /second instead.
+# 1) Gate IN weigh (legacy weights_log — truck_id only, no material)
 @plant_bp.route("/weigh/in", methods=["POST"])
 def weigh_in():
     data = request.get_json(force=True) or {}
@@ -148,7 +152,8 @@ def rfid_log():
         "plc_ack": ack
     }), 200
 
-# 3) Gate OUT weigh -> compute NET = OUT - latest unmatched IN
+# DEPRECATED: use POST /api/truck-entry/orders/<id>/second instead.
+# 3) Gate OUT weigh -> compute NET = OUT - latest unmatched IN (legacy)
 @plant_bp.route("/weigh/out", methods=["POST"])
 def weigh_out():
     data = request.get_json(force=True) or {}

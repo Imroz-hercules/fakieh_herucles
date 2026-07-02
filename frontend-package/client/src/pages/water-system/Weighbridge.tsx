@@ -249,7 +249,7 @@ export default function Weighbridge() {
             )}
             {openCount > 0 && !errorMsg && (
               <span className="text-xs text-amber-400 light:text-amber-700">
-                {openCount} open trip(s) on Truck Weighbridge — not shown here
+                {openCount} open trip(s) on Weighbridge Entry — not shown here
               </span>
             )}
           </div>

@@ -215,7 +215,7 @@ export default function TruckEntry() {
 
   return (
     <WaterSystemLayout
-      title="Truck Weighbridge"
+      title="Weighbridge Entry"
       subtitle="Create entry, record first and second weights manually"
     >
       <div className="space-y-6">

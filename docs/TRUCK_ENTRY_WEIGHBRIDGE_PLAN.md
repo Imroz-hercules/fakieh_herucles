@@ -1,5 +1,15 @@
 # Truck Entry & Weighbridge — Full Implementation Plan
 
+**Status (July 2026):** Phases 1–3 and 5 **complete**. Phase 4 (Truck Management OUT pending) **skipped** per product decision.
+
+| Phase | Status |
+|-------|--------|
+| 1 Backend API + `truck_weigh_orders` | Done |
+| 2 Truck Weighbridge UI (`TruckEntry.tsx`) | Done |
+| 3 Weighbridge Log (`Weighbridge.tsx`) | Done |
+| 4 Truck Management site status | Skipped |
+| 5 Polish + deploy migration | Done |
+
 **Scope:** Manual truck weighbridge flow (no RFID). Operator selects truck + material (same list as Orders), records two manual weights (entry / exit), NET stored on completion. Truck Management shows OUT pending; Weighbridge Log shows completed trips only.
 
 **Out of scope (for now):** RFID linking, live scale hardware, PLC order dispatch from weighbridge.

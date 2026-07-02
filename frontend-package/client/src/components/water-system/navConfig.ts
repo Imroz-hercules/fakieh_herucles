@@ -59,16 +59,25 @@ const trucksItems: SidebarNavItem[] = [
     description: 'Manage Trucks & Fleet',
   },
   {
-    path: '/fakieh/truck-entry',
-    icon: Scale,
-    label: 'Truck Weighbridge',
-    description: 'Live Weighbridge & Entry Management',
-  },
-  {
     path: '/fakieh/client-information',
     icon: Users,
     label: 'Client Information',
     description: 'Manage client name and contact number',
+  },
+]
+
+const weighbridgeItems: SidebarNavItem[] = [
+  {
+    path: '/fakieh/truck-entry',
+    icon: Scale,
+    label: 'Weighbridge Entry',
+    description: 'Create entries and record first and second weights',
+  },
+  {
+    path: '/fakieh/weighbridge',
+    icon: Scale,
+    label: 'Weighbridge Log',
+    description: 'Read-only log of completed weigh trips',
   },
 ]
 
@@ -128,15 +137,16 @@ export const sidebarNavEntries: SidebarNavEntry[] = [
     description: 'RFID Tracking System',
   },
   {
-    path: '/fakieh/weighbridge',
+    id: 'weighbridge',
+    label: 'Weighbridge',
+    description: 'Weighbridge entry and completed trip log',
     icon: Scale,
-    label: 'Weighbridge Log',
-    description: 'Weighbridge Management',
+    items: weighbridgeItems,
   },
   {
     id: 'trucks',
     label: 'Trucks',
-    description: 'Fleet and weighbridge entry',
+    description: 'Fleet and client information',
     icon: Truck,
     items: trucksItems,
   },
@@ -204,11 +214,13 @@ export const topNavItems: TopNavItem[] = [
     icon: Radio,
   },
   {
-    kind: 'link',
-    path: '/fakieh/weighbridge',
-    label: 'Weighbridge Log',
-    shortLabel: 'Weighbridge',
+    kind: 'group',
+    label: 'Weighbridge',
     icon: Scale,
+    items: [
+      { path: '/fakieh/truck-entry', label: 'Weighbridge entry' },
+      { path: '/fakieh/weighbridge', label: 'Weighbridge log' },
+    ],
   },
   {
     kind: 'group',
@@ -216,7 +228,6 @@ export const topNavItems: TopNavItem[] = [
     icon: Truck,
     items: [
       { path: '/fakieh/truck-management', label: 'Truck management' },
-      { path: '/fakieh/truck-entry', label: 'Truck weighbridge' },
       { path: '/fakieh/client-information', label: 'Client information' },
     ],
   },

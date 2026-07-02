@@ -150,6 +150,12 @@ if __name__ == '__main__':
             ensure_clients_index()
         except Exception as _client_idx_err:
             print(f"Clients index migration skipped: {_client_idx_err}")
+
+        try:
+            from models.truck_weigh_order import ensure_truck_weigh_orders_table
+            ensure_truck_weigh_orders_table()
+        except Exception as _truck_weigh_err:
+            print(f"Truck weigh orders migration skipped: {_truck_weigh_err}")
         
         # Start background silo sync task (in-process; avoids HTTP self-call)
         start_silo_sync(app)

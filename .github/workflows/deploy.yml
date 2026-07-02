@@ -22,6 +22,12 @@ jobs:
           cd /d C:\Users\Hercu\OneDrive\Desktop\main_code\fakieh_27aug\fakieh_27aug\Backend
           C:\Users\Hercu\AppData\Local\Programs\Python\Python311\python.exe -m pip install -r requirements.txt
 
+      - name: Run truck weighbridge DB migration
+        shell: cmd
+        run: |
+          cd /d C:\Users\Hercu\OneDrive\Desktop\main_code\fakieh_27aug\fakieh_27aug\Backend
+          C:\Users\Hercu\AppData\Local\Programs\Python\Python311\python.exe scripts\run_truck_weigh_migration.py
+
       - name: Install frontend dependencies
         shell: cmd
         run: |
@@ -38,3 +44,4 @@ jobs:
         shell: cmd
         run: |
           curl http://localhost:5000/api/health
+          curl http://localhost:5000/api/truck-entry/orders/open
