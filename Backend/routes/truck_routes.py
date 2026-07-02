@@ -57,7 +57,7 @@ def add_truck():
         year=data['year'],
         capacity=data['capacity'],
         company=data['company'],
-        status=data['status'],
+        status=data.get('status', 'active'),
         contact=data['contact']
     )
     db.session.add(truck)
@@ -76,7 +76,8 @@ def update_truck(truck_id):
     truck.year = data['year']
     truck.capacity = data['capacity']
     truck.company = data['company']
-    truck.status = data['status']
+    if 'status' in data:
+        truck.status = data['status']
     truck.contact = data['contact']
     db.session.commit()
     return jsonify(truck.to_dict())

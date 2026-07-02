@@ -14,9 +14,7 @@ interface Truck {
   year: string
   capacity: string
   company: string
-  status: 'active' | 'maintenance'
   contact: string
-  rfid?: string
 }
 
 interface Driver {
@@ -78,7 +76,6 @@ export default function TruckManagement(): JSX.Element {
   const [activeTab, setActiveTab] = useState<'trucks' | 'drivers' | 'maintenance'>('trucks')
 
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('All')
 
   const [truckData, setTruckData] = useState<Truck[]>([])
   const [driverData, setDriverData] = useState<Driver[]>([])
@@ -100,13 +97,8 @@ export default function TruckManagement(): JSX.Element {
     year: '',
     capacity: '',
     company: '',
-    status: 'active' as 'active' | 'maintenance',
     contact: '',
-    rfid: '',
   })
-
-  // RFID tags for dropdown
-  const [rfidTags, setRfidTags] = useState<Array<{id: number, rfid_number: string, rfid_linked_to_order?: string, rfid_used?: string}>>([])
 
   // --- CRUD states for Drivers ---
   const [showAddDriverModal, setShowAddDriverModal] = useState(false)
@@ -163,16 +155,6 @@ export default function TruckManagement(): JSX.Element {
     }
   }
 
-  const fetchRFIDTags = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/rfid/config`)
-      const body = res.data
-      setRfidTags(Array.isArray(body) ? body : body?.items ?? [])
-    } catch (err) {
-      
-    }
-  }
-
   // NEW: fetch today's IN/OUT pairs (supports both shapes: {pairs:[...]} or {rows:[...]})
   const fetchWeightsToday = async () => {
     try {
@@ -218,7 +200,6 @@ export default function TruckManagement(): JSX.Element {
     fetchTrucks()
     fetchDrivers()
     fetchMaintenance()
-    fetchRFIDTags()
     fetchWeightsToday()
   }, [])
 
@@ -248,7 +229,7 @@ export default function TruckManagement(): JSX.Element {
       setShowAddModal(false)
       setEditMode(false)
       setSelectedTruck(null)
-      setNewTruck({ license: '', model: '', year: '', capacity: '', company: '', status: 'active', contact: '', rfid: '' })
+      setNewTruck({ license: '', model: '', year: '', capacity: '', company: '', contact: '' })
       fetchTrucks()
     } catch (err) {
       
@@ -311,11 +292,9 @@ export default function TruckManagement(): JSX.Element {
 
   const filteredTrucks = useMemo(() => {
     return truckData.filter((t) => {
-      const match = t.license.toLowerCase().includes(search.toLowerCase()) || t.model.toLowerCase().includes(search.toLowerCase())
-      const statusMatch = filter === 'All' || t.status === filter.toLowerCase()
-      return match && statusMatch
+      return t.license.toLowerCase().includes(search.toLowerCase()) || t.model.toLowerCase().includes(search.toLowerCase())
     })
-  }, [truckData, search, filter])
+  }, [truckData, search])
 
   return (
     <WaterSystemLayout title="Truck Management" subtitle="Manage trucks, drivers, and fleet maintenance">
@@ -334,8 +313,8 @@ export default function TruckManagement(): JSX.Element {
           <div className="bg-slate-800 light:bg-white p-4 rounded-lg text-white light:text-gray-900 border border-slate-700 light:border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-300 light:text-gray-600">ACTIVE TRUCKS</p>
-            <p className="text-2xl font-bold">{truckData.filter(t => t.status === 'active').length}</p>
+                <p className="text-sm text-slate-300 light:text-gray-600">PENDING MAINTENANCE</p>
+            <p className="text-2xl font-bold">{maintenanceData.filter(m => m.status === 'pending').length}</p>
               </div>
               <Wrench className="h-8 w-8 text-green-400 light:text-green-600" />
             </div>
@@ -399,7 +378,7 @@ export default function TruckManagement(): JSX.Element {
               className="bg-cyan-600 text-white light:bg-cyan-600 light:text-white hover:bg-cyan-700 light:hover:bg-cyan-700" 
               onClick={() => {
                 setEditMode(false)
-                setNewTruck({ license: '', model: '', year: '', capacity: '', company: '', status: 'active', contact: '', rfid: '' })
+                setNewTruck({ license: '', model: '', year: '', capacity: '', company: '', contact: '' })
                 setShowAddModal(true)
               }}
               style={{ backgroundColor: '#0891b2', color: 'white' }}
@@ -432,7 +411,7 @@ export default function TruckManagement(): JSX.Element {
           )}
         </div>
 
-        {/* Search + Filter */}
+        {/* Search */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4 mt-6">
           <Input 
             placeholder="Search..." 
@@ -440,22 +419,6 @@ export default function TruckManagement(): JSX.Element {
             value={search} 
             onChange={(e) => setSearch(e.target.value)} 
           />
-          <div className="w-full md:w-48">
-            <Select onValueChange={setFilter} defaultValue="All">
-              <SelectTrigger className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300">
-                <SelectItem value="All">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         {/* Tab Content */}
@@ -469,25 +432,19 @@ export default function TruckManagement(): JSX.Element {
                   <TableHead>Year</TableHead>
                   <TableHead>Capacity</TableHead>
                   <TableHead>Owner Company</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Contact</TableHead>
-                  <TableHead>RFID</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTrucks.map((truck) => {
-                  const w = weightsByTruck[truck.id]
-                  return (
+                {filteredTrucks.map((truck) => (
                     <TableRow key={truck.id} className="bg-slate-900 light:bg-white hover:bg-slate-800 light:hover:bg-gray-50 text-white light:text-gray-900">
                       <TableCell className="text-cyan-400 light:text-cyan-600 font-semibold">{truck.license}</TableCell>
                       <TableCell>{truck.model}</TableCell>
                       <TableCell>{truck.year}</TableCell>
                       <TableCell>{truck.capacity}</TableCell>
                       <TableCell>{truck.company}</TableCell>
-                      <TableCell><span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(truck.status)}`}>{truck.status}</span></TableCell>
                       <TableCell>{truck.contact}</TableCell>
-                      <TableCell>{truck.rfid || 'N/A'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end space-x-2">
                           <button 
@@ -509,9 +466,7 @@ export default function TruckManagement(): JSX.Element {
                                 year: truck.year,
                                 capacity: truck.capacity,
                                 company: truck.company,
-                                status: truck.status,
                                 contact: truck.contact,
-                                rfid: truck.rfid || ''
                               })
                               setEditMode(true)
                               setShowAddModal(true)
@@ -528,8 +483,7 @@ export default function TruckManagement(): JSX.Element {
                         </div>
                       </TableCell>
                     </TableRow>
-                  )
-                })}
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -671,18 +625,8 @@ export default function TruckManagement(): JSX.Element {
                   <p className="text-lg">{selectedTruck.company}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-300 light:text-gray-600">Status</label>
-                  <span className={`inline-block px-3 py-1 text-sm rounded-full font-medium ${getStatusColor(selectedTruck.status)}`}>
-                    {selectedTruck.status}
-                  </span>
-                </div>
-                <div>
                   <label className="text-sm font-medium text-slate-300 light:text-gray-600">Contact</label>
                   <p className="text-lg">{selectedTruck.contact}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-300 light:text-gray-600">RFID Tag</label>
-                  <p className="text-lg">{selectedTruck.rfid || 'Not assigned'}</p>
                 </div>
               </div>
             </div>
@@ -738,9 +682,7 @@ export default function TruckManagement(): JSX.Element {
                     year: selectedTruck.year,
                     capacity: selectedTruck.capacity,
                     company: selectedTruck.company,
-                    status: selectedTruck.status,
                     contact: selectedTruck.contact,
-                    rfid: selectedTruck.rfid || ''
                   })
                   setEditMode(true)
                   setShowAddModal(true)
@@ -843,32 +785,6 @@ export default function TruckManagement(): JSX.Element {
                 onChange={(e) => handleChange('contact', e.target.value)}
                 className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-900"
               />
-              <div className="md:col-span-2">
-                <Select onValueChange={(v) => handleChange('status', v)} defaultValue={newTruck.status}>
-                  <SelectTrigger className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-900">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300">
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="md:col-span-2">
-                <Select onValueChange={(v) => handleChange('rfid', v === 'none' ? '' : v)} value={newTruck.rfid || 'none'}>
-                  <SelectTrigger className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-900">
-                    <SelectValue placeholder="Select RFID Tag" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300">
-                    <SelectItem value="none">No RFID</SelectItem>
-                    {rfidTags.map((tag) => (
-                      <SelectItem key={tag.id} value={tag.rfid_number}>
-                        {tag.rfid_number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <Button 
