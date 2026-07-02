@@ -53,6 +53,14 @@ export const API_ENDPOINTS = {
   
   // Weighbridge
   WEIGHBRIDGE: '/api/weighbridge',
+
+  // Truck entry / weighbridge orders
+  TRUCK_ENTRY: {
+    ORDERS: '/api/truck-entry/orders',
+    OPEN: '/api/truck-entry/orders/open',
+    TODAY: '/api/truck-entry/orders/today',
+    STATUS_BY_TRUCK: '/api/truck-entry/status/by-truck',
+  },
   
   // Reports (Postgres-backed app reports: /daily, /weekly, …)
   REPORTS: '/api/reports',

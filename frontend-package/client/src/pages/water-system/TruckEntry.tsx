@@ -1,394 +1,498 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayout'
-import { KPICard } from '../../components/water-system/KPICard'
-import { Filter } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { WaterSystemLayout } from "../../components/water-system/WaterSystemLayout";
+import { KPICard } from "../../components/water-system/KPICard";
+import { Filter, Plus, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { API_BASE_URL } from "../../config/api";
+import { getSelectableMaterialCodes } from "../../constants/materialCodes";
+import {
+  createTruckWeighOrder,
+  fetchCompletedToday,
+  fetchOpenOrders,
+  saveFirstWeight,
+  saveSecondWeight,
+  type TruckWeighOrder,
+} from "../../api/truckEntry";
 
-// ---------- Config ----------
-const API_BASE = "http://localhost:5000"
-
-// ---------- Types from /api/weights/today ----------
-interface Row {
-  ticket: string;
-  truck_id: number | string;
-  truck_plate?: string | null;
-  truck_driver?: string | null;
-  truck_material?: string | null; // derived from RFIDLog.order_ref
-  // weights
-  weight: string;       // NET display e.g. "24T" or "24000 kg"
-  weight_kg: number;    // NET exact kg
-  in_weight_kg?: number | null;
-  out_weight_kg?: number | null;
-  // flags
-  rfid_linked: boolean;
-  order_linked: string | null;
-  // timestamps
-  in_ts?: string | null;
-  out_ts?: string | null;
+interface TruckOption {
+  id: number;
+  license: string;
+  model: string;
 }
 
 function fmtTime(ts?: string | null) {
-  if (!ts) return '-';
+  if (!ts) return "-";
   try {
-    const d = new Date(ts);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch { return '-'; }
+    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "-";
+  }
+}
+
+function statusLabel(status: TruckWeighOrder["status"]) {
+  if (status === "awaiting_first") return "Awaiting first weight";
+  if (status === "awaiting_second") return "OUT pending";
+  if (status === "completed") return "Completed";
+  return status;
 }
 
 export default function TruckEntry() {
-  // ------- table state -------
-  const [weighbridgeData, setWeighbridgeData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
-  // ------- forms -------
-  const [truckIdIn, setTruckIdIn] = useState("");
-  const [weightIn, setWeightIn] = useState("");
-  const [truckIdOut, setTruckIdOut] = useState("");
-  const [weightOut, setWeightOut] = useState("");
+  const [truckData, setTruckData] = useState<TruckOption[]>([]);
+  const [openOrders, setOpenOrders] = useState<TruckWeighOrder[]>([]);
+  const [completedToday, setCompletedToday] = useState<TruckWeighOrder[]>([]);
+  const [activeOrder, setActiveOrder] = useState<TruckWeighOrder | null>(null);
 
-  // ------- truck data for dropdowns -------
-  const [truckData, setTruckData] = useState<Array<{id: number, license: string, model: string}>>([]);
+  const [newTruckId, setNewTruckId] = useState("");
+  const [newMaterialCode, setNewMaterialCode] = useState("");
+  const [firstWeightInput, setFirstWeightInput] = useState("");
+  const [secondWeightInput, setSecondWeightInput] = useState("");
 
-  // ------- filters -------
   const [filters, setFilters] = useState({
     truckId: "",
     truckPlate: "",
     truckDriver: "",
+    material: "all",
   });
 
-  // ------- helpers -------
-  function normalizeRows(data: any): Row[] {
-    // Preferred: rows (table-ready)
-    if (Array.isArray(data?.rows)) {
-      return data.rows.map((r: any) => ({
-        ticket: r.ticket ?? `${r.truck_id}-${r.out_ts ?? ''}`,
-        truck_id: r.truck_id,
-        truck_plate: r.truck_plate ?? null,
-        truck_driver: r.truck_driver ?? null,
-        truck_material: r.truck_material ?? r.order_linked ?? null,
-        weight: r.weight,                       // NET display
-        weight_kg: Number(r.weight_kg ?? 0),    // NET exact
-        in_weight_kg: r.in_weight ?? r.in_weight_kg ?? null,
-        out_weight_kg: r.out_weight ?? r.out_weight_kg ?? null,
-        rfid_linked: !!r.rfid_linked,
-        order_linked: r.order_linked ?? null,
-        in_ts: r.in_ts ?? null,
-        out_ts: r.out_ts ?? null,
-      }));
-    }
-    // Fallback: pairs (classic)
-    if (Array.isArray(data?.pairs)) {
-      return data.pairs.map((p: any) => {
-        const net = typeof p.net === 'number' ? p.net : (p.out_weight != null && p.in_weight != null ? p.out_weight - p.in_weight : 0);
-        return {
-          ticket: `${p.truck_id}-${p.out_ts ?? ''}`,
-          truck_id: p.truck_id,
-          truck_plate: p.truck_plate ?? null,
-          truck_driver: p.truck_driver ?? null,
-          truck_material: p.order_linked ?? null,
-          weight: `${Math.round(net)} kg`,
-          weight_kg: net ?? 0,
-          in_weight_kg: p.in_weight ?? null,
-          out_weight_kg: p.out_weight ?? null,
-          rfid_linked: !!p.order_linked,
-          order_linked: p.order_linked ?? null,
-          in_ts: p.in_ts ?? null,
-          out_ts: p.out_ts ?? null,
-        } as Row;
-      });
-    }
-    return [];
-  }
+  const selectableMaterials = useMemo(() => getSelectableMaterialCodes(), []);
 
-  async function fetchTable() {
-    setErrorMsg(null);
-    setMessage(null);
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
+  const refreshData = useCallback(async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
-      // Ask for kg so we can show exact numbers
-      const res = await fetch(`${API_BASE}/api/weights/today?unit=kg`, { signal: ac.signal });
-      const data = await res.json();
-      setWeighbridgeData(normalizeRows(data));
-    } catch (err: any) {
-      if (err?.name !== "AbortError") {
-        
-        setErrorMsg("Failed to load table");
-        setWeighbridgeData([]);
-      }
+      const [open, today] = await Promise.all([fetchOpenOrders(), fetchCompletedToday()]);
+      setOpenOrders(open);
+      setCompletedToday(today);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
-  }
-
-  async function fetchTrucks() {
-    try {
-      const res = await fetch(`${API_BASE}/api/trucks/`);
-      const data = await res.json();
-      setTruckData(Array.isArray(data) ? data : data?.items ?? []);
-    } catch (err) {
-      
-      setTruckData([]);
-    }
-  }
-
-  async function postJSON(path: string, body: any) {
-    setErrorMsg(null);
-    const r = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error(await r.text());
-    return r.json();
-  }
-
-  useEffect(() => {
-    fetchTable();
-    fetchTrucks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // unique options for filters
-  const uniqueMaterials = useMemo(
-    () => Array.from(new Set(weighbridgeData.map((i) => i.truck_material).filter(Boolean))).sort(),
-    [weighbridgeData]
-  );
-  const uniqueOrders = useMemo(
-    () => Array.from(new Set(weighbridgeData.map((i) => i.order_linked).filter((o) => o && o !== "NA"))).sort() as string[],
-    [weighbridgeData]
-  );
+  const fetchTrucks = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/trucks/`);
+      const data = await res.json();
+      setTruckData(Array.isArray(data) ? data : data?.items ?? []);
+    } catch {
+      setTruckData([]);
+    }
+  }, []);
 
-  // apply filters
-  const filteredWeighbridgeData = useMemo(() => {
-    return weighbridgeData.filter((item) => {
-      if (!item) return false;
+  useEffect(() => {
+    fetchTrucks();
+    refreshData();
+  }, [fetchTrucks, refreshData]);
+
+  const outPendingCount = openOrders.filter((o) => o.status === "awaiting_second").length;
+
+  const filteredCompleted = useMemo(() => {
+    return completedToday.filter((item) => {
+      const matLabel = item.material_name || item.material_code || "";
       return (
-        (filters.truckId === "" || String(item.truck_id ?? "").includes(filters.truckId)) &&
-        (filters.truckPlate === "" || String(item.truck_plate ?? "").toLowerCase().includes(filters.truckPlate.toLowerCase())) &&
-        (filters.truckDriver === "" || String(item.truck_driver ?? "").toLowerCase().includes(filters.truckDriver.toLowerCase()))
+        (filters.truckId === "" || String(item.truck_id).includes(filters.truckId)) &&
+        (filters.truckPlate === "" ||
+          String(item.truck_plate ?? "")
+            .toLowerCase()
+            .includes(filters.truckPlate.toLowerCase())) &&
+        (filters.truckDriver === "" ||
+          String(item.truck_driver ?? "")
+            .toLowerCase()
+            .includes(filters.truckDriver.toLowerCase())) &&
+        (filters.material === "all" || item.material_code === filters.material)
       );
     });
-  }, [weighbridgeData, filters]);
+  }, [completedToday, filters]);
 
   function clearFilters() {
-    setFilters({ truckId: "", truckPlate: "", truckDriver: "" });
+    setFilters({ truckId: "", truckPlate: "", truckDriver: "", material: "all" });
   }
 
-  // KPI values
-  const totalTrucks = filteredWeighbridgeData.length;
-  const completeToday = weighbridgeData.length; // all rows are completed pairs
-  const weighingNow = 0;
-  const activeBays = 1;
+  function selectOrder(order: TruckWeighOrder) {
+    setActiveOrder(order);
+    setFirstWeightInput(order.first_weight_kg != null ? String(order.first_weight_kg) : "");
+    setSecondWeightInput("");
+    setMessage(null);
+    setErrorMsg(null);
+  }
 
-  // Handlers: IN, OUT
-  async function handleSaveIn() {
-    const id = Number(truckIdIn), w = Number(weightIn);
-    if (!id || !w) return setErrorMsg("Truck ID and IN weight are required.");
+  function clearActiveOrder() {
+    setActiveOrder(null);
+    setFirstWeightInput("");
+    setSecondWeightInput("");
+  }
+
+  async function handleCreate() {
+    const truckId = Number(newTruckId);
+    if (!truckId || !newMaterialCode) {
+      setErrorMsg("Select a truck and material.");
+      return;
+    }
+    setLoading(true);
+    setErrorMsg(null);
+    setMessage(null);
     try {
-      setLoading(true);
-      const resp = await postJSON("/api/weigh/in", { truck_id: id, weight: w });
-      setMessage(`IN saved for Truck ${resp.truck_id} @ ${resp.weight} kg`);
-      setWeightIn("");
-      await fetchTable();
-    } catch (e: any) {
-      setErrorMsg(e.message || "Failed to save IN");
+      const order = await createTruckWeighOrder(truckId, newMaterialCode);
+      setActiveOrder(order);
+      setFirstWeightInput("");
+      setSecondWeightInput("");
+      setNewTruckId("");
+      setNewMaterialCode("");
+      setMessage(`Order ${order.ticket} created — enter first weight.`);
+      await refreshData();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to create order");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleSaveOut() {
-    const id = Number(truckIdOut), w = Number(weightOut);
-    if (!id || !w) return setErrorMsg("Truck ID and OUT weight are required.");
+  async function handleSaveFirst() {
+    if (!activeOrder) return;
+    const w = Number(firstWeightInput);
+    if (!w || w <= 0) {
+      setErrorMsg("Enter a valid first weight (kg).");
+      return;
+    }
+    setLoading(true);
+    setErrorMsg(null);
+    setMessage(null);
     try {
-      setLoading(true);
-      const resp = await postJSON("/api/weigh/out", { truck_id: id, weight: w });
-      if (resp.warning) setErrorMsg(resp.warning);
-      else setMessage(`OUT saved. NET = ${resp.NET} kg (Truck ${resp.truck_id})`);
-      setWeightOut("");
-      await fetchTable();
-    } catch (e: any) {
-      setErrorMsg(e.message || "Failed to save OUT");
+      const updated = await saveFirstWeight(activeOrder.id, w);
+      setActiveOrder(updated);
+      setMessage(`First weight saved. OUT pending for ${updated.truck_plate ?? updated.truck_id}.`);
+      await refreshData();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save first weight");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveSecond() {
+    if (!activeOrder) return;
+    const w = Number(secondWeightInput);
+    if (!w || w <= 0) {
+      setErrorMsg("Enter a valid second weight (kg).");
+      return;
+    }
+    setLoading(true);
+    setErrorMsg(null);
+    setMessage(null);
+    try {
+      const updated = await saveSecondWeight(activeOrder.id, w);
+      setMessage(`Trip completed. NET = ${Math.round(updated.net_kg ?? 0)} kg`);
+      clearActiveOrder();
+      await refreshData();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save second weight");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <WaterSystemLayout title="Truck Entry" subtitle="Vehicle weighing, truck logging, and weight management">
+    <WaterSystemLayout
+      title="Truck Weighbridge"
+      subtitle="Create entry, record first and second weights manually"
+    >
       <div className="space-y-6">
-        {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KPICard title="TOTAL TRUCKS" value={String(totalTrucks)} icon="gauge" color="blue" chartType="bar" />
-          <KPICard title="ACTIVE BAYS" value={String(activeBays)} icon="activity" color="orange" chartType="circle" />
-          <KPICard title="WEIGHING" value={String(weighingNow)} icon="pump" color="purple" chartType="line" />
-          <KPICard title="COMPLETE TODAY" value={String(completeToday)} icon="water" color="green" chartType="gauge" />
+          <KPICard title="OPEN ORDERS" value={String(openOrders.length)} icon="activity" color="orange" chartType="circle" />
+          <KPICard title="OUT PENDING" value={String(outPendingCount)} icon="pump" color="purple" chartType="line" />
+          <KPICard title="COMPLETE TODAY" value={String(completedToday.length)} icon="water" color="green" chartType="gauge" />
+          <KPICard title="ON SCALE" value={activeOrder ? "1" : "0"} icon="gauge" color="blue" chartType="bar" />
         </div>
 
-        {/* Controls: Gate IN and OUT */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Gate IN */}
-          <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200">
-            <CardHeader className="pb-3"><CardTitle className="text-white light:text-gray-900 text-sm">Gate IN</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              <div className="space-y-1">
-                <label className="text-slate-300 light:text-gray-700 text-xs">Truck ID</label>
-                <Select onValueChange={(value) => setTruckIdIn(value)} value={truckIdIn || "manual"}>
-                  <SelectTrigger className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700">
-                    <SelectValue placeholder="Select Truck or Enter Manually" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300">
-                    <SelectItem value="manual">Enter Manually</SelectItem>
-                    {truckData.map((truck) => (
-                      <SelectItem key={truck.id} value={String(truck.id)}>
-                        {truck.id} - {truck.license} ({truck.model})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {truckIdIn === "manual" && (
-                  <Input 
-                    placeholder="Enter Truck ID manually" 
-                    value={truckIdIn === "manual" ? "" : truckIdIn} 
-                    onChange={(e) => setTruckIdIn(e.target.value)}
-                    className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700"
-                  />
-                )}
-              </div>
-              <Input placeholder="IN Weight (kg)" value={weightIn} onChange={(e)=>setWeightIn(e.target.value)} className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700" />
-              <Button size="sm" onClick={handleSaveIn} disabled={loading} className="bg-cyan-600 text-white light:bg-cyan-600 light:text-white hover:bg-cyan-700 light:hover:bg-cyan-700">Save IN</Button>
+        {(message || errorMsg) && (
+          <div className="text-sm px-1">
+            {message && <span className="text-green-400 light:text-green-700">{message}</span>}
+            {errorMsg && <span className="text-red-400 light:text-red-700 ml-3">{errorMsg}</span>}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Open orders sidebar */}
+          <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200 lg:col-span-1">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-white light:text-gray-900 text-sm">Open orders</CardTitle>
+              <Button variant="ghost" size="sm" onClick={refreshData} disabled={loading} className="h-8 w-8 p-0">
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-2 max-h-72 overflow-y-auto">
+              {openOrders.length === 0 && (
+                <p className="text-xs text-slate-400 light:text-gray-500 py-4 text-center">No open orders</p>
+              )}
+              {openOrders.map((order) => (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={() => selectOrder(order)}
+                  className={`w-full text-left rounded-md border p-3 transition-colors ${
+                    activeOrder?.id === order.id
+                      ? "border-cyan-500 bg-cyan-500/10"
+                      : "border-slate-600 light:border-gray-200 hover:bg-slate-700/40 light:hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-white light:text-gray-900">
+                      {order.truck_plate ?? `Truck ${order.truck_id}`}
+                    </span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        order.status === "awaiting_second"
+                          ? "bg-yellow-500/20 text-yellow-400 light:text-yellow-700"
+                          : "bg-blue-500/20 text-blue-400 light:text-blue-700"
+                      }`}
+                    >
+                      {order.status === "awaiting_second" ? "OUT pending" : "First weight"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 light:text-gray-600 mt-1">
+                    {order.material_code} — {order.material_name}
+                  </p>
+                  <p className="text-xs text-slate-500 light:text-gray-500">{order.ticket}</p>
+                </button>
+              ))}
             </CardContent>
           </Card>
 
-          {/* Gate OUT */}
-          <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200">
-            <CardHeader className="pb-3"><CardTitle className="text-white light:text-gray-900 text-sm">Gate OUT</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              <div className="space-y-1">
-                <label className="text-slate-300 light:text-gray-700 text-xs">Truck ID</label>
-                <Select onValueChange={(value) => setTruckIdOut(value)} value={truckIdOut || "manual"}>
-                  <SelectTrigger className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700">
-                    <SelectValue placeholder="Select Truck or Enter Manually" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300">
-                    <SelectItem value="manual">Enter Manually</SelectItem>
-                    {truckData.map((truck) => (
-                      <SelectItem key={truck.id} value={String(truck.id)}>
-                        {truck.id} - {truck.license} ({truck.model})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {truckIdOut === "manual" && (
-                  <Input 
-                    placeholder="Enter Truck ID manually" 
-                    value={truckIdOut === "manual" ? "" : truckIdOut} 
-                    onChange={(e) => setTruckIdOut(e.target.value)}
-                    className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700"
-                  />
-                )}
-              </div>
-              <Input placeholder="OUT Weight (kg)" value={weightOut} onChange={(e)=>setWeightOut(e.target.value)} className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700" />
-              <Button size="sm" onClick={handleSaveOut} disabled={loading} className="bg-cyan-600 text-white light:bg-cyan-600 light:text-white hover:bg-cyan-700 light:hover:bg-cyan-700">Save OUT</Button>
-            </CardContent>
-          </Card>
+          {/* New entry + active order */}
+          <div className="lg:col-span-2 space-y-4">
+            <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-white light:text-gray-900 text-sm flex items-center gap-2">
+                  <Plus className="h-4 w-4" /> New entry
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-300 light:text-gray-700 text-xs">Truck</label>
+                  <Select value={newTruckId || undefined} onValueChange={setNewTruckId}>
+                    <SelectTrigger className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700">
+                      <SelectValue placeholder="Select truck" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300">
+                      {truckData.map((truck) => (
+                        <SelectItem key={truck.id} value={String(truck.id)}>
+                          {truck.id} — {truck.license} ({truck.model})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-300 light:text-gray-700 text-xs">Material</label>
+                  <Select value={newMaterialCode || undefined} onValueChange={setNewMaterialCode}>
+                    <SelectTrigger className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700">
+                      <SelectValue placeholder="Select material" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 max-h-60">
+                      {selectableMaterials.map((m) => (
+                        <SelectItem key={m.code} value={m.code}>
+                          {m.code} — {m.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                    onClick={handleCreate}
+                    disabled={loading}
+                  >
+                    Create
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {activeOrder && (
+              <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200 border-cyan-500/30">
+                <CardHeader className="pb-3 flex flex-row items-start justify-between">
+                  <div>
+                    <CardTitle className="text-white light:text-gray-900 text-sm">Active order</CardTitle>
+                    <p className="text-xs text-slate-400 light:text-gray-600 mt-1">
+                      {activeOrder.ticket} · {activeOrder.truck_plate ?? `Truck ${activeOrder.truck_id}`} ·{" "}
+                      {activeOrder.material_name ?? activeOrder.material_code}
+                    </p>
+                    <p className="text-xs text-cyan-400 light:text-cyan-600 mt-0.5">{statusLabel(activeOrder.status)}</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={clearActiveOrder} className="text-slate-400">
+                    Clear
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {activeOrder.status === "awaiting_first" && (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        type="number"
+                        placeholder="First weight — entry to site (kg)"
+                        value={firstWeightInput}
+                        onChange={(e) => setFirstWeightInput(e.target.value)}
+                        className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700"
+                      />
+                      <Button onClick={handleSaveFirst} disabled={loading} className="bg-cyan-600 hover:bg-cyan-700 text-white shrink-0">
+                        Save first weight
+                      </Button>
+                    </div>
+                  )}
+
+                  {activeOrder.status === "awaiting_second" && (
+                    <>
+                      <div className="rounded-md bg-slate-900/50 light:bg-gray-100 p-3 text-sm">
+                        <span className="text-slate-400 light:text-gray-600">First weight: </span>
+                        <span className="font-semibold text-white light:text-gray-900">
+                          {Math.round(activeOrder.first_weight_kg ?? 0)} kg
+                        </span>
+                        <span className="text-slate-500 light:text-gray-500 ml-2">@ {fmtTime(activeOrder.first_ts)}</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          type="number"
+                          placeholder="Second weight — leaving site (kg)"
+                          value={secondWeightInput}
+                          onChange={(e) => setSecondWeightInput(e.target.value)}
+                          className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700"
+                        />
+                        <Button onClick={handleSaveSecond} disabled={loading} className="bg-cyan-600 hover:bg-cyan-700 text-white shrink-0">
+                          Save second weight
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
-        {/* Filter Section */}
-        <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200 mb-4 light:shadow-md">
+        {/* Filters */}
+        <Card className="bg-slate-800/30 light:bg-white border-slate-700 light:border-gray-200">
           <CardHeader className="pb-3">
             <CardTitle className="text-white light:text-gray-900 flex items-center gap-2 text-lg">
               <Filter className="h-4 w-4 text-cyan-400 light:text-blue-600" />
-              Truck Entry Filters
+              Completed today — filters
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="text-slate-300 light:text-gray-700 text-xs mb-1 block">Truck ID</label>
-                <Input type="text" placeholder="Search ID..." value={filters.truckId} onChange={(e) => setFilters({ ...filters, truckId: e.target.value })} className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700 h-8 text-sm" />
-              </div>
-              <div>
-                <label className="text-slate-300 light:text-gray-700 text-xs mb-1 block">Truck Plate</label>
-                <Input type="text" placeholder="Search plate..." value={filters.truckPlate} onChange={(e) => setFilters({ ...filters, truckPlate: e.target.value })} className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700 h-8 text-sm" />
-              </div>
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <label className="text-slate-300 light:text-gray-700 text-xs mb-1 block">Driver</label>
-                  <Input type="text" placeholder="Search driver..." value={filters.truckDriver} onChange={(e) => setFilters({ ...filters, truckDriver: e.target.value })} className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-700 h-8 text-sm" />
-                </div>
-                <Button onClick={clearFilters} variant="outline" size="sm" className="border-slate-600 text-slate-300 light:border-gray-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-100 h-8">
-                  Clear Filters
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <Input
+                placeholder="Truck ID"
+                value={filters.truckId}
+                onChange={(e) => setFilters({ ...filters, truckId: e.target.value })}
+                className="bg-slate-700 light:bg-white border-slate-600 h-8 text-sm"
+              />
+              <Input
+                placeholder="Plate"
+                value={filters.truckPlate}
+                onChange={(e) => setFilters({ ...filters, truckPlate: e.target.value })}
+                className="bg-slate-700 light:bg-white border-slate-600 h-8 text-sm"
+              />
+              <Input
+                placeholder="Driver"
+                value={filters.truckDriver}
+                onChange={(e) => setFilters({ ...filters, truckDriver: e.target.value })}
+                className="bg-slate-700 light:bg-white border-slate-600 h-8 text-sm"
+              />
+              <div className="flex gap-2">
+                <Select value={filters.material} onValueChange={(v) => setFilters({ ...filters, material: v })}>
+                  <SelectTrigger className="bg-slate-700 light:bg-white border-slate-600 h-8 text-sm flex-1">
+                    <SelectValue placeholder="Material" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All materials</SelectItem>
+                    {selectableMaterials.map((m) => (
+                      <SelectItem key={m.code} value={m.code}>
+                        {m.code} — {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={clearFilters} variant="outline" size="sm" className="h-8">
+                  Clear
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Weighbridge Data Table */}
-        <div className="bg-slate-950/50 light:bg-white border border-slate-700/30 light:border-gray-200 rounded-lg backdrop-blur-sm light:shadow-lg">
-          <div className="p-6 border-b border-slate-700/30 light:border-gray-200 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white light:text-gray-900">Weighbridge Data Table</h3>
-            {(message || errorMsg) && (
-              <div className="text-xs">
-                {message && <span className="text-green-400 light:text-green-700 mr-3">{message}</span>}
-                {errorMsg && <span className="text-red-400 light:text-red-700">{errorMsg}</span>}
-              </div>
-            )}
+        {/* Today's completed table */}
+        <div className="bg-slate-950/50 light:bg-white border border-slate-700/30 light:border-gray-200 rounded-lg">
+          <div className="p-6 border-b border-slate-700/30 light:border-gray-200">
+            <h3 className="text-lg font-semibold text-white light:text-gray-900">Completed today</h3>
           </div>
-
-          <div className="p-6">
-            <div className="rounded-md border border-slate-700/30 light:border-gray-200 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Truck ID</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Truck Plate</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Driver</TableHead>
-                    {/* New time + weight columns */}
-                    <TableHead className="text-white light:text-gray-900 font-semibold">IN Time</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">OUT Time</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">IN (kg)</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">OUT (kg)</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">NET (kg)</TableHead>
+          <div className="p-6 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Truck</TableHead>
+                  <TableHead>Plate</TableHead>
+                  <TableHead>Driver</TableHead>
+                  <TableHead>Material</TableHead>
+                  <TableHead>IN time</TableHead>
+                  <TableHead>OUT time</TableHead>
+                  <TableHead>IN (kg)</TableHead>
+                  <TableHead>OUT (kg)</TableHead>
+                  <TableHead>NET (kg)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCompleted.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">{row.truck_id}</TableCell>
+                    <TableCell>{row.truck_plate ?? "-"}</TableCell>
+                    <TableCell>{row.truck_driver ?? "-"}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-xs text-slate-400">{row.material_code}</span>
+                        <span>{row.material_name ?? "-"}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{fmtTime(row.first_ts)}</TableCell>
+                    <TableCell>{fmtTime(row.second_ts)}</TableCell>
+                    <TableCell>{row.first_weight_kg != null ? Math.round(row.first_weight_kg) : "-"}</TableCell>
+                    <TableCell>{row.second_weight_kg != null ? Math.round(row.second_weight_kg) : "-"}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                        {row.net_kg != null ? Math.round(row.net_kg) : "-"}
+                      </span>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredWeighbridgeData.map((item, index) => (
-                    <TableRow key={index} className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50 transition-colors">
-                      <TableCell className="text-white light:text-gray-900 font-medium">{item.truck_id}</TableCell>
-                      <TableCell className="text-slate-300 light:text-gray-700">{item.truck_plate ?? "-"}</TableCell>
-                      <TableCell className="text-slate-300 light:text-gray-700">{item.truck_driver ?? "-"}</TableCell>
-
-                      <TableCell className="text-slate-300 light:text-gray-700">{fmtTime(item.in_ts)}</TableCell>
-                      <TableCell className="text-slate-300 light:text-gray-700">{fmtTime(item.out_ts)}</TableCell>
-                      <TableCell className="text-slate-300 light:text-gray-700">{item.in_weight_kg != null ? Math.round(item.in_weight_kg) : "-"}</TableCell>
-                      <TableCell className="text-slate-300 light:text-gray-700">{item.out_weight_kg != null ? Math.round(item.out_weight_kg) : "-"}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 light:bg-yellow-100 border border-yellow-500/20 light:border-yellow-300 text-yellow-400 light:text-yellow-600">
-                          {Math.round(item.weight_kg)}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredWeighbridgeData.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-6 text-sm text-slate-400 light:text-gray-600">No records</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+                {filteredCompleted.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-slate-400 light:text-gray-500">
+                      No completed trips today
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>
@@ -396,5 +500,4 @@ export default function TruckEntry() {
   );
 }
 
-// Optional named export
 export { TruckEntry };

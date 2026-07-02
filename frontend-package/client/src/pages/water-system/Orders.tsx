@@ -18,6 +18,7 @@ import {
   formatDestSelLabel,
   isOutloadingHighSilo,
 } from '../../utils/outloadingSilos'
+import { MATERIAL_CODES, getMaterialNameFromCode } from '../../constants/materialCodes'
 
 const baseUrl = API_BASE_URL
 const plcBase = PLC_BASE_URL;
@@ -182,39 +183,7 @@ export function Orders() {
   const { getSilosForOrder, getAvailableSilos } = useSilos();
   const { toast } = useToast();
   
-  // Hardcoded material codes and names from XML data
-  const materialCodes = [
-    { code: "None", name: "None" },
-    { code: "002", name: "Soya" },
-    { code: "5000", name: "PRODUCT1" },
-    { code: "202", name: "Salt" },
-    { code: "000", name: "Empty" },
-    { code: "100", name: "Yellow Maize 7.8%" },
-    { code: "112", name: "Bran 15.7%" },
-    { code: "105", name: "Soya O/C 47.5%" },
-    { code: "210", name: "Soya Oil" },
-    { code: "113", name: "Limestone 36%" },
-    { code: "204", name: "Monocalcium Phos" },
-    { code: "035", name: "Sodium Bicarbonate" },
-    { code: "012", name: "DL Methionine" },
-    { code: "073", name: "L Isoleucine" },
-    { code: "060", name: "L Threonine" },
-    { code: "072", name: "L Valine" },
-    { code: "8", name: "Lysine HCL" },
-    { code: "71", name: "Broiler Finisher PX" },
-    { code: "70", name: "Broiler Grower PX" },
-    { code: "31", name: "Broiler Mineral Mix" },
-    { code: "69", name: "Broiler Starter PX" },
-    { code: "26", name: "Choline Chloride" },
-    { code: "21", name: "Provi Oxi Stop" },
-    { code: "132", name: "Salmocid - F" },
-    { code: "79", name: "Sangrovit" },
-    { code: "62", name: "Econase XT25(100g)" },
-    { code: "44", name: "Phytase 10000 1000FTU (100g)" },
-    { code: "91", name: "Sacox (500g)" },
-    { code: "49", name: "Pelcin" },
-    { code: "300", name: "Water" }
-  ];
+  const materialCodes = MATERIAL_CODES;
   
   // Helper function to get material name for a silo number
   const getMaterialNameForSilo = (siloNumber: string | number) => {
@@ -239,14 +208,6 @@ export function Orders() {
     }
     
     return `Silo ${siloNumber}`;
-  };
-  
-  // Helper function to get material name from material code
-  const getMaterialNameFromCode = (materialCode: string | number) => {
-    if (!materialCode || materialCode === '') return '-';
-    
-    const material = materialCodes.find(m => m.code === String(materialCode));
-    return material ? material.name : String(materialCode);
   };
   
   // Helper function to extract used silos from current orders
