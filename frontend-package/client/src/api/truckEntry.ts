@@ -73,11 +73,16 @@ export async function fetchOpenOrders(): Promise<TruckWeighOrder[]> {
   return data.orders ?? [];
 }
 
-export async function fetchCompletedToday(date?: string): Promise<TruckWeighOrder[]> {
+export interface CompletedTodayResult {
+  date: string | null;
+  rows: TruckWeighOrder[];
+}
+
+export async function fetchCompletedToday(date?: string): Promise<CompletedTodayResult> {
   const qs = date ? `?date=${encodeURIComponent(date)}` : "";
   const res = await fetch(`${BASE}/orders/today${qs}`);
-  const data = await parseJson<{ rows: TruckWeighOrder[] }>(res);
-  return data.rows ?? [];
+  const data = await parseJson<{ date?: string; rows: TruckWeighOrder[] }>(res);
+  return { date: data.date ?? null, rows: data.rows ?? [] };
 }
 
 export async function fetchTruckWeighOrder(orderId: number): Promise<TruckWeighOrder> {

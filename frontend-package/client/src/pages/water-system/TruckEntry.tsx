@@ -81,9 +81,9 @@ export default function TruckEntry() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const [open, today] = await Promise.all([fetchOpenOrders(), fetchCompletedToday()]);
+      const [open, todayResult] = await Promise.all([fetchOpenOrders(), fetchCompletedToday()]);
       setOpenOrders(open);
-      setCompletedToday(today);
+      setCompletedToday(todayResult.rows);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to load data");
     } finally {
