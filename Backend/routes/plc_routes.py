@@ -801,6 +801,44 @@ _order_lifecycle_tracker = {}
 # Global dictionary to track order timestamps buffer
 _order_timestamps_buffer = {}
 
+# Truck/client metadata set at order create (PLC does not carry these fields)
+_order_pending_metadata: dict[str, dict] = {}
+
+
+def _compute_order_key(order_type: str, data: dict) -> Optional[str]:
+    if order_type in ("intake", "outloading"):
+        badge = str(data.get("badge_no") or data.get("badgeNo") or "")
+    elif order_type == "bulk":
+        badge = str(data.get("source_silo") or data.get("sourceSilo") or "")
+    elif order_type == "pit":
+        badge = str(data.get("pit_no") or data.get("pitNo") or "")
+    else:
+        return None
+    if not badge or badge in ("0", ""):
+        return None
+    dest1 = str(data.get("dest1") or data.get("destinationSilo1") or "")
+    dest2 = str(data.get("dest2") or data.get("destinationSilo2") or "")
+    return f"{order_type}_{badge}_{dest1}_{dest2}"
+
+
+def _stash_order_metadata(order_type: str, data: dict) -> None:
+    truck_id = data.get("truck_id")
+    client_id = data.get("client_id")
+    if truck_id is None and client_id is None:
+        return
+    key = _compute_order_key(order_type, data)
+    if not key:
+        return
+    _order_pending_metadata[key] = {
+        "truck_id": int(truck_id) if truck_id not in (None, "") else None,
+        "client_id": int(client_id) if client_id not in (None, "") else None,
+    }
+    _vlog(f"[METADATA] Stashed truck/client for {key}: {_order_pending_metadata[key]}")
+
+
+def _pop_order_metadata(order_key: str) -> dict:
+    return _order_pending_metadata.pop(order_key, {})
+
 def _update_timestamp_buffer(order_key, timestamp_type, timestamp):
     """Update the timestamp buffer for an order"""
     if order_key not in _order_timestamps_buffer:
@@ -910,6 +948,10 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
         _vlog(f"[LIFECYCLE]   finished_at: {finished_at_from_buffer.strftime('%Y-%m-%d %H:%M:%S')}")
         _vlog(f"[LIFECYCLE]   idle_at: {idle_at.strftime('%Y-%m-%d %H:%M:%S')}")
         
+        meta = _pop_order_metadata(order_key)
+        truck_id = meta.get("truck_id")
+        client_id = meta.get("client_id")
+        
         # Verify chronological order
         if created_at <= started_at <= finished_at_from_buffer <= idle_at:
             _vlog(f"[LIFECYCLE] ✅ Timestamps are in correct chronological order")
@@ -949,6 +991,8 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
                 active_destination=dest1,
                 status_word="8",  # Status 8 (Stopping/Finished)
                 line=order_data.get("line", "1"),
+                truck_id=truck_id,
+                client_id=client_id,
                 created_at=created_at,  # Use timestamp from buffer
                 started_at=started_at,  # Use timestamp from buffer
                 finished_at=finished_at_from_buffer,  # Use timestamp from buffer
@@ -981,6 +1025,8 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
                 status_word="8",  # Status 8 (Stopping/Finished)
                 activ_dest_set=str(order_data.get("dest_sel") or order_data.get("dest1") or ""),
                 line=str(order_data.get("line", "1")),  # Add line field
+                truck_id=truck_id,
+                client_id=client_id,
                 created_at=created_at,  # Use timestamp from buffer
                 started_at=started_at,  # Use timestamp from buffer
                 finished_at=finished_at_from_buffer,  # Use timestamp from buffer
@@ -1007,6 +1053,8 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
                 declared_quantity_kg=order_data.get("declared_qty_kg") or order_data.get("declaredQuantityKG") or 0.0,
                 scale_sel=str(order_data.get("scale_sel") or order_data.get("scaleSel") or ""),
                 status_word="8",  # Status 8 (Stopping/Finished)
+                truck_id=truck_id,
+                client_id=client_id,
                 created_at=created_at,  # Use timestamp from buffer
                 started_at=started_at,  # Use timestamp from buffer
                 finished_at=finished_at_from_buffer,  # Use timestamp from buffer
@@ -1034,6 +1082,8 @@ def _store_complete_order_with_lifecycle(order_data, model_class, order_type, ba
                 declared_quantity_kg=order_data.get("declared_qty_kg") or order_data.get("declaredQuantityKG") or 0.0,
                 scale_sel=str(order_data.get("scale_sel") or order_data.get("scaleSel") or ""),
                 status_word="8",  # Status 8 (Stopping/Finished)
+                truck_id=truck_id,
+                client_id=client_id,
                 created_at=created_at,  # Use timestamp from buffer
                 started_at=started_at,  # Use timestamp from buffer
                 finished_at=finished_at_from_buffer,  # Use timestamp from buffer
@@ -2346,6 +2396,8 @@ def create_order_comprehensive():
     
     if not order_type:
         return jsonify({"error": "order_type is required"}), 400
+    
+    _stash_order_metadata(order_type, data)
     
     try:
         if order_type == "intake":

@@ -25,6 +25,8 @@ class IntakeOrder(db.Model):
     active_destination = db.Column(db.String(50), nullable=False)
     status_word = db.Column(db.String(20), nullable=False)
     line = db.Column(db.String(20), nullable=False)
+    truck_id = db.Column(db.Integer, nullable=True)
+    client_id = db.Column(db.Integer, nullable=True)
 
     # 🔹 Lifecycle timestamps
     created_at = db.Column(db.DateTime, default=datetime.now)
@@ -50,6 +52,8 @@ class IntakeOrder(db.Model):
             'activeDestination': self.active_destination,
             'statusWord': self.status_word,
             'line': self.line,
+            'truckId': self.truck_id,
+            'clientId': self.client_id,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
             'startedAt': self.started_at.isoformat() if self.started_at else None,
             'finishedAt': self.finished_at.isoformat() if self.finished_at else None,
@@ -82,6 +86,8 @@ class OutloadingOrder(db.Model):
     status_word = db.Column(db.String(20), nullable=False)
     activ_dest_set = db.Column(db.String(50), nullable=False)
     line = db.Column(db.String(20), nullable=False)  # Add missing line field
+    truck_id = db.Column(db.Integer, nullable=True)
+    client_id = db.Column(db.Integer, nullable=True)
 
     # 🔹 Lifecycle timestamps
     created_at = db.Column(db.DateTime, default=datetime.now)
@@ -109,6 +115,8 @@ class OutloadingOrder(db.Model):
             'statusWord': self.status_word,
             'activDestSet': self.activ_dest_set,
             'line': self.line,
+            'truckId': self.truck_id,
+            'clientId': self.client_id,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
             'startedAt': self.started_at.isoformat() if self.started_at else None,
             'finishedAt': self.finished_at.isoformat() if self.finished_at else None,
@@ -152,6 +160,8 @@ class BulkLineOrder(db.Model):
     active_cc25_sel = db.Column(db.String(50))
     active_qty_kg = db.Column(db.Float)
     active_scale_sel = db.Column(db.String(50))
+    truck_id = db.Column(db.Integer, nullable=True)
+    client_id = db.Column(db.Integer, nullable=True)
 
     # 🔹 Lifecycle timestamps
     created_at = db.Column(db.DateTime, default=datetime.now)
@@ -199,6 +209,8 @@ class BulkLineOrder(db.Model):
             'completedAt': self.completed_at.isoformat() if self.completed_at else None,
             'isComplete': getattr(self, 'is_complete', False),
             'line': 'Bulk',  # Bulk orders don't have line numbers
+            'truckId': self.truck_id,
+            'clientId': self.client_id,
         }
 
 
@@ -220,6 +232,8 @@ class PTLineOrder(db.Model):
     declared_quantity_kg = db.Column(db.Float)
     scale_sel = db.Column(db.String(50))
     status_word = db.Column(db.String(50))
+    truck_id = db.Column(db.Integer, nullable=True)
+    client_id = db.Column(db.Integer, nullable=True)
 
     # 🔹 Lifecycle timestamps
     created_at = db.Column(db.DateTime, default=datetime.now)
@@ -252,4 +266,6 @@ class PTLineOrder(db.Model):
             'completedAt': self.completed_at.isoformat() if self.completed_at else None,
             'isComplete': getattr(self, 'is_complete', False),
             'line': 'PIT',  # PIT orders don't have line numbers
+            'truckId': self.truck_id,
+            'clientId': self.client_id,
         }

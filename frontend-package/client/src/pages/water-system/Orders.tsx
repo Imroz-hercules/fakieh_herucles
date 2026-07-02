@@ -26,6 +26,16 @@ const plcBase = PLC_BASE_URL;
 type OrderType = 'intake' | 'outloading' | 'bulk' | 'pit';
 const toNum = (v: any) => (v === '' || v === null || v === undefined ? 0 : Number(v));
 
+const TRUCK_CLIENT_FIELDS = [
+  { name: 'truckId', label: 'Truck', type: 'select' as const },
+  { name: 'clientId', label: 'Client Name', type: 'select' as const },
+];
+
+const orderMetaFields = (item: any) => ({
+  truck_id: item.truckId ? Number(item.truckId) : null,
+  client_id: item.clientId ? Number(item.clientId) : null,
+});
+
 const plcEndpointFor = (orderType: OrderType, line?: number, isMineralOrder: boolean = false) => {
   if (orderType === 'intake') {
     if (isMineralOrder) {
@@ -59,7 +69,7 @@ const payloadFor = (orderType: OrderType, item: any) => {
     } else if (item.destSel !== undefined && item.destSel !== null) {
       p.dest_sel = toNum(item.destSel);
     }
-    return p;
+    return { ...p, ...orderMetaFields(item) };
   }
   if (orderType === 'bulk') {
     return {
@@ -69,6 +79,7 @@ const payloadFor = (orderType: OrderType, item: any) => {
       cc25_sel: toNum(item.cc25Sel),
       declared_qty_kg: toNum(item.declaredQuantityKG),
       scale_sel: toNum(item.scaleSel),
+      ...orderMetaFields(item),
     };
   }
   if (orderType === 'pit') {
@@ -84,6 +95,7 @@ const payloadFor = (orderType: OrderType, item: any) => {
       dest2: toNum(item.destinationSilo2),
       declared_qty_kg: toNum(item.declaredQuantityKG),
       scale_sel: toNum(item.scaleSel),
+      ...orderMetaFields(item),
     };
   }
 };
@@ -422,6 +434,8 @@ export function Orders() {
   const [ptLineData, setPtLineData] = useState<any[]>([])
   const [binMaterials, setBinMaterials] = useState<any[]>([])
   const [rfidConfigs, setRfidConfigs] = useState<any[]>([])
+  const [trucks, setTrucks] = useState<Array<{ id: number; license: string; model: string }>>([])
+  const [clients, setClients] = useState<Array<{ id: number; name: string; phone: string }>>([])
   
   // Note: Pagination removed since we're getting live PLC data
 
@@ -447,6 +461,28 @@ export function Orders() {
       setRfidConfigs(list)
     } catch (error) {
       
+    }
+  }, [])
+
+  const fetchTrucks = useCallback(async () => {
+    try {
+      const response = await axios.get(`${baseUrl}/trucks/`)
+      const body = response.data
+      setTrucks(Array.isArray(body) ? body : body?.items ?? [])
+    } catch (error) {
+      setTrucks([])
+    }
+  }, [])
+
+  const fetchClients = useCallback(async () => {
+    try {
+      const response = await axios.get(`${baseUrl}/clients/`, {
+        params: { limit: 2000, offset: 0 },
+      })
+      const body = response.data
+      setClients(Array.isArray(body) ? body : body?.items ?? [])
+    } catch (error) {
+      setClients([])
     }
   }, [])
 
@@ -633,6 +669,8 @@ export function Orders() {
     fetchOrders()
     fetchBinMaterials()
     fetchRfidConfigs()
+    fetchTrucks()
+    fetchClients()
     checkBroadcastStatus()
 
     // Set up real-time updates every 5 seconds for live PLC status
@@ -835,6 +873,7 @@ export function Orders() {
       case 'intake-line-2':
       case 'mineral-intake':
         return [
+          ...TRUCK_CLIENT_FIELDS,
           { name: 'badgeNo', label: 'RFID', type: 'select' },
           { name: 'sourceMaterialCode', label: 'Source Material Code', type: 'select' },
           { name: 'declaredQuantityKG', label: 'Declared Quantity (KG)', type: 'number' },
@@ -846,6 +885,7 @@ export function Orders() {
       case 'outloading-2':
       case 'outloading-3':
         return [
+          ...TRUCK_CLIENT_FIELDS,
           { name: 'badgeNo', label: 'RFID', type: 'select' },
           { name: 'sourceMaterialCode', label: 'Source Material Code', type: 'select' },
           { name: 'destSel', label: 'Destination (Bulk / Packing)', type: 'select' },
@@ -855,6 +895,7 @@ export function Orders() {
         ]
       case 'bulk-line':
         return [
+          ...TRUCK_CLIENT_FIELDS,
           { name: 'sourceSilo', label: 'Source Silo (With Material)', type: 'select' },
           { name: 'destinationSilo1', label: 'Destination 1 (Available Only)', type: 'select' },
           { name: 'destinationSilo2', label: 'Destination 2 (Available Only)', type: 'select' },
@@ -864,6 +905,7 @@ export function Orders() {
         ]
       case 'pt-line':
         return [
+          ...TRUCK_CLIENT_FIELDS,
           { name: 'pitNo', label: 'Pit Number', type: 'text' },
           { name: 'rawCode', label: 'Raw Material Code', type: 'select' },
           { name: 'destinationSilo1', label: 'Destination 1 (Available Only)', type: 'select' },
@@ -1269,6 +1311,23 @@ export function Orders() {
                         }
                       });
 
+                      if (!newOrder.truckId) {
+                        toast({
+                          title: 'Truck required',
+                          description: 'Please select a truck for this order.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      if (!newOrder.clientId) {
+                        toast({
+                          title: 'Client required',
+                          description: 'Please select a client for this order.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+
                       let orderType: OrderType;
                       let line: number | undefined;
                       
@@ -1422,8 +1481,22 @@ export function Orders() {
                             <SelectValue placeholder={`Select ${field.label}`} />
                           </SelectTrigger>
                           <SelectContent className="bg-slate-800 light:bg-white border-slate-600 light:border-gray-200">
-                            {field.name !== 'destSel' && <SelectItem value="none">None</SelectItem>}
-                            {field.name === 'badgeNo' ? (
+                            {field.name !== 'destSel' && field.name !== 'truckId' && field.name !== 'clientId' && (
+                              <SelectItem value="none">None</SelectItem>
+                            )}
+                            {field.name === 'truckId' ? (
+                              trucks.map((truck) => (
+                                <SelectItem key={truck.id} value={String(truck.id)}>
+                                  {truck.license} — {truck.model}
+                                </SelectItem>
+                              ))
+                            ) : field.name === 'clientId' ? (
+                              clients.map((client) => (
+                                <SelectItem key={client.id} value={String(client.id)}>
+                                  {client.name}
+                                </SelectItem>
+                              ))
+                            ) : field.name === 'badgeNo' ? (
                               // RFID configs for badge number
                               rfidConfigs.map((rfid) => (
                                 <SelectItem key={rfid.id} value={rfid.rfid_number}>
