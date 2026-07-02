@@ -222,9 +222,9 @@ export default function TruckManagement(): JSX.Element {
   const handleAddTruck = async () => {
     try {
       if (editMode && selectedTruck) {
-        await axios.put(`${API_BASE}/api/trucks/${selectedTruck.id}`, newTruck)
+        await axios.put(`${API_BASE}/trucks/${selectedTruck.id}`, newTruck)
       } else {
-        await axios.post(`${API_BASE}/api/trucks/`, newTruck)
+        await axios.post(`${API_BASE}/trucks/`, newTruck)
       }
       setShowAddModal(false)
       setEditMode(false)
@@ -239,9 +239,9 @@ export default function TruckManagement(): JSX.Element {
   const handleAddDriver = async () => {
     try {
       if (editDriverMode && selectedDriver) {
-        await axios.put(`${API_BASE}/api/trucks/drivers/${selectedDriver.id}`, newDriver)
+        await axios.put(`${API_BASE}/trucks/drivers/${selectedDriver.id}`, newDriver)
       } else {
-        await axios.post(`${API_BASE}/api/trucks/drivers`, newDriver)
+        await axios.post(`${API_BASE}/trucks/drivers`, newDriver)
       }
       setShowAddDriverModal(false)
       setEditDriverMode(false)
@@ -255,7 +255,7 @@ export default function TruckManagement(): JSX.Element {
 
   const handleAddMaintenance = async () => {
     try {
-      await axios.post(`${API_BASE}/api/maintenance/`, newMaintenance)
+      await axios.post(`${API_BASE}/maintenance/`, newMaintenance)
       setShowAddMaintenanceModal(false)
       setNewMaintenance({ truck: '', type: '', issue: '', scheduledDate: '', lastServiceDate: '', technician: '', status: 'pending' })
       fetchMaintenance()
@@ -267,7 +267,7 @@ export default function TruckManagement(): JSX.Element {
   const handleDeleteTruck = async () => {
     if (!truckToDelete) return
     try {
-      await axios.delete(`${API_BASE}/api/trucks/${truckToDelete.id}`)
+      await axios.delete(`${API_BASE}/trucks/${truckToDelete.id}`)
       setShowDeleteModal(false)
       setTruckToDelete(null)
       fetchTrucks()
@@ -283,7 +283,7 @@ export default function TruckManagement(): JSX.Element {
 
   const handleDeleteDriver = async (id: number) => {
     try {
-      await axios.delete(`${API_BASE}/api/trucks/drivers/${id}`)
+      await axios.delete(`${API_BASE}/trucks/drivers/${id}`)
       fetchDrivers()
     } catch (err) {
       
