@@ -23,11 +23,8 @@ import { Storage } from "./pages/water-system/Storage";
 import { Production } from "./pages/water-system/Production";
 import { Orders } from "./pages/water-system/Orders";
 import { OrderHistory } from "./pages/water-system/OrderHistory";
-import { RFID } from "./pages/water-system/RFID";
 import { Weighbridge } from "./pages/water-system/Weighbridge";
-import TruckManagement from "./pages/water-system/TruckManagement";
 import TruckEntry from "./pages/water-system/TruckEntry";
-import ClientInformation from "./pages/water-system/ClientInformation";
 import { Alarms } from "./pages/water-system/Alarms";
 import { Admin } from "./pages/water-system/Admin";
 import { PLCConfiguration } from "./pages/water-system/PlcConfiguration";
@@ -36,6 +33,7 @@ import { BatchCalendarPage } from "./pages/water-system/BatchCalendarPage";
 import { BatchHistoricalReports } from "./pages/water-system/BatchHistoricalReports";
 import { BatchRawDataPage } from "./pages/water-system/BatchRawDataPage";
 import { Distribution } from "./pages/water-system/Distribution";
+import Management from "./pages/water-system/Management";
 
 function Router() {
   const { isInitialized } = useTheme();
@@ -64,11 +62,16 @@ function Router() {
       <Route path="/fakieh/orders" component={() => { window.location.replace('/fakieh/live_orders'); return null; }} />
       <Route path="/fakieh/live_orders" component={Orders} />
       <Route path="/fakieh/order-history" component={OrderHistory} />
-      <Route path="/fakieh/rfid" component={RFID} />
+      <Route path="/fakieh/rfid" component={() => { window.location.replace('/fakieh/management/rfid'); return null; }} />
       <Route path="/fakieh/weighbridge" component={Weighbridge} />
-      <Route path="/fakieh/truck-management" component={TruckManagement} />
+      <Route path="/fakieh/management" component={() => { window.location.replace('/fakieh/management/trucks'); return null; }} />
+      <Route path="/fakieh/management/rfid" component={Management} />
+      <Route path="/fakieh/management/trucks" component={Management} />
+      <Route path="/fakieh/management/drivers" component={Management} />
+      <Route path="/fakieh/management/clients" component={Management} />
+      <Route path="/fakieh/truck-management" component={() => { window.location.replace('/fakieh/management/trucks'); return null; }} />
       <Route path="/fakieh/truck-entry" component={TruckEntry} />
-      <Route path="/fakieh/client-information" component={ClientInformation} />
+      <Route path="/fakieh/client-information" component={() => { window.location.replace('/fakieh/management/clients'); return null; }} />
       <Route path="/fakieh/alarms" component={Alarms} />
       <Route path="/fakieh/admin" component={Admin} />
       <Route path="/fakieh/distribution" component={Distribution} />

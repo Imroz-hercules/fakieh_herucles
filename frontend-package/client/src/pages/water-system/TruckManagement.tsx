@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Eye, Pencil, Trash2, X, Truck, Users, Wrench, Scale } from 'lucide-react'
-import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayout'
 
 interface Truck {
   id: number
@@ -72,8 +71,16 @@ function formatTime(ts?: string | null) {
   }
 }
 
-export default function TruckManagement(): JSX.Element {
-  const [activeTab, setActiveTab] = useState<'trucks' | 'drivers' | 'maintenance'>('trucks')
+export default function TruckManagement({
+  section = 'trucks',
+}: {
+  section?: 'trucks' | 'drivers'
+}): JSX.Element {
+  const [activeTab, setActiveTab] = useState<'trucks' | 'drivers' | 'maintenance'>(section)
+
+  useEffect(() => {
+    setActiveTab(section)
+  }, [section])
 
   const [search, setSearch] = useState('')
 
@@ -297,7 +304,7 @@ export default function TruckManagement(): JSX.Element {
   }, [truckData, search])
 
   return (
-    <WaterSystemLayout title="Truck Management" subtitle="Manage trucks, drivers, and fleet maintenance">
+    <>
       <div className="p-6 space-y-6 truck-management-container">
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -339,40 +346,7 @@ export default function TruckManagement(): JSX.Element {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center justify-between mt-6">
-          <div className="flex gap-2">
-            <Button 
-              variant={activeTab === 'trucks' ? 'outline' : 'ghost'} 
-              className={activeTab === 'trucks' 
-                ? 'bg-cyan-600 text-white light:bg-cyan-600 light:text-white border-cyan-600 light:border-cyan-600' 
-                : 'bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200'
-              } 
-              onClick={() => setActiveTab('trucks')}
-            >
-              Trucks
-            </Button>
-            <Button 
-              variant={activeTab === 'drivers' ? 'outline' : 'ghost'} 
-              className={activeTab === 'drivers' 
-                ? 'bg-cyan-600 text-white light:bg-cyan-600 light:text-white border-cyan-600 light:border-cyan-600' 
-                : 'bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200'
-              } 
-              onClick={() => setActiveTab('drivers')}
-            >
-              Drivers
-            </Button>
-            <Button 
-              variant={activeTab === 'maintenance' ? 'outline' : 'ghost'} 
-              className={activeTab === 'maintenance' 
-                ? 'bg-cyan-600 text-white light:bg-cyan-600 light:text-white border-cyan-600 light:border-cyan-600' 
-                : 'bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200'
-              } 
-              onClick={() => setActiveTab('maintenance')}
-            >
-              Maintenance
-            </Button>
-          </div>
+        <div className="flex items-center justify-end mt-2">
           {activeTab === 'trucks' && (
             <Button 
               className="bg-cyan-600 text-white light:bg-cyan-600 light:text-white hover:bg-cyan-700 light:hover:bg-cyan-700" 
@@ -398,15 +372,6 @@ export default function TruckManagement(): JSX.Element {
               style={{ backgroundColor: '#0891b2', color: 'white' }}
             >
               <Plus className="h-4 w-4 mr-2" /> Add Driver
-            </Button>
-          )}
-          {activeTab === 'maintenance' && (
-            <Button 
-              className="bg-cyan-600 text-white light:bg-cyan-600 light:text-white hover:bg-cyan-700 light:hover:bg-cyan-700" 
-              onClick={() => setShowAddMaintenanceModal(true)}
-              style={{ backgroundColor: '#0891b2', color: 'white' }}
-            >
-              <Plus className="h-4 w-4 mr-2" /> Add Maintenance
             </Button>
           )}
         </div>
@@ -882,7 +847,7 @@ export default function TruckManagement(): JSX.Element {
           </div>
         </div>
       )}
-    </WaterSystemLayout>
+    </>
   )
 }
 

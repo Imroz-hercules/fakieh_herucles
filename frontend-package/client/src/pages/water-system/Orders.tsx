@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayout'
-import { Truck, Package, Calendar, MapPin, CheckCircle, Clock, FileText, Search, RefreshCw, X } from 'lucide-react'
+import { Truck, Package, Calendar, MapPin, CheckCircle, Clock, FileText, Search, RefreshCw, X, Radio } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -19,12 +19,20 @@ import {
   isOutloadingHighSilo,
 } from '../../utils/outloadingSilos'
 import { MATERIAL_CODES, getMaterialNameFromCode } from '../../constants/materialCodes'
+import { RfidAssignModal, orderRefLabelFromActiveTab } from '../../components/water-system/RfidAssignModal'
 
 const baseUrl = API_BASE_URL
 const plcBase = PLC_BASE_URL;
 
 type OrderType = 'intake' | 'outloading' | 'bulk' | 'pit';
 const toNum = (v: any) => (v === '' || v === null || v === undefined ? 0 : Number(v));
+
+const ORDER_BTN =
+  'bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white';
+const ORDER_BTN_OUTLINE =
+  'text-xs bg-cyan-600 hover:bg-cyan-700 text-white border-cyan-600 hover:border-cyan-700 light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white light:border-cyan-600 light:hover:border-cyan-700';
+const ORDER_BTN_SM =
+  'text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700';
 
 const TRUCK_CLIENT_FIELDS = [
   { name: 'truckId', label: 'Truck', type: 'select' as const },
@@ -406,6 +414,7 @@ export function Orders() {
   }
   
   const [showModal, setShowModal] = useState(false)
+  const [showAssignModal, setShowAssignModal] = useState(false)
   const [activeTab, setActiveTab] = useState('intake-line-1')
   
   // State to track currently used silos
@@ -984,8 +993,8 @@ export function Orders() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className="text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700">View</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 light:bg-orange-600 light:text-white light:hover:bg-orange-700 border-2 border-orange-500 font-bold">✏️ Edit</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className={ORDER_BTN_SM}>View</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className={ORDER_BTN_SM}>Edit</Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1068,8 +1077,8 @@ export function Orders() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className="text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700">View</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 light:bg-orange-600 light:text-white light:hover:bg-orange-700 border-2 border-orange-500 font-bold">✏️ Edit</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className={ORDER_BTN_SM}>View</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className={ORDER_BTN_SM}>Edit</Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1142,8 +1151,8 @@ export function Orders() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className="text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700">View</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 light:bg-orange-600 light:text-white light:hover:bg-orange-700 border-2 border-orange-500 font-bold">✏️ Edit</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className={ORDER_BTN_SM}>View</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className={ORDER_BTN_SM}>Edit</Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1211,8 +1220,8 @@ export function Orders() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className="text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700">View</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 light:bg-orange-600 light:text-white light:hover:bg-orange-700 border-2 border-orange-500 font-bold">✏️ Edit</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleView(item)} className={ORDER_BTN_SM}>View</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className={ORDER_BTN_SM}>Edit</Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1267,17 +1276,17 @@ export function Orders() {
               size="sm" 
               onClick={fetchOrders}
               disabled={isLoading}
-              className="text-xs bg-cyan-600 hover:bg-cyan-700 text-white border-cyan-600 hover:border-cyan-700 light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white light:border-cyan-600 light:hover:border-cyan-700"
+              className={ORDER_BTN_OUTLINE}
             >
               <RefreshCw className="h-3 w-3 mr-1" />
               Refresh
             </Button>
             <Button 
-              variant={broadcastStatus === 'running' ? 'destructive' : 'default'}
+              variant="outline"
               size="sm" 
               onClick={broadcastStatus === 'running' ? stopBroadcast : startBroadcast}
               disabled={broadcastStatus === 'starting' || broadcastStatus === 'stopping'}
-              className="text-xs bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700 light:bg-red-600 light:hover:bg-red-700 light:text-white light:border-red-600 light:hover:border-red-700"
+              className={ORDER_BTN_OUTLINE}
             >
               {broadcastStatus === 'running' ? 'Stop Broadcast' : 
                broadcastStatus === 'starting' ? 'Starting...' :
@@ -1286,15 +1295,23 @@ export function Orders() {
           </div>
         </div>
 
-        <Button
-          className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white mb-4"
-          onClick={() => {
-            setFormData(isOutloadingTab(activeTab) ? { destSel: '0' } : {});
-            setShowModal(true);
-          }}
-        >
-          Add Order
-        </Button>
+        <div className="flex gap-2 mb-4">
+          <Button
+            className={ORDER_BTN}
+            onClick={() => setShowAssignModal(true)}
+          >
+            <Radio className="h-4 w-4 mr-2" /> RFID Assign
+          </Button>
+          <Button
+            className={ORDER_BTN}
+            onClick={() => {
+              setFormData(isOutloadingTab(activeTab) ? { destSel: '0' } : {});
+              setShowModal(true);
+            }}
+          >
+            Add Order
+          </Button>
+        </div>
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-slate-900 p-4 rounded-xl w-full max-w-xl space-y-3 border border-slate-700 shadow-xl overflow-y-auto max-h-[90vh]">
@@ -1882,7 +1899,7 @@ export function Orders() {
                 
                 <div className="flex justify-end space-x-2 pt-3 mt-2">
                   <Button variant="ghost" className="!text-slate-400 hover:!bg-slate-700/50 light:!text-white light:hover:!bg-gray-600 px-3 py-1 text-sm border border-slate-600 light:border-gray-300" onClick={() => setShowModal(false)} type="button">Cancel</Button>
-                  <Button className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white px-4 py-1 text-sm" type="submit">Add</Button>
+                  <Button className={`${ORDER_BTN} px-4 py-1 text-sm`} type="submit">Add</Button>
                 </div>
               </form>
             </div>
@@ -1919,7 +1936,7 @@ export function Orders() {
               <div className="flex justify-end pt-4 mt-4 border-t border-gray-200 dark:border-slate-600">
                 <Button 
                   onClick={() => setViewModal(false)}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white"
+                  className={ORDER_BTN}
                 >
                   Close
                 </Button>
@@ -2229,7 +2246,7 @@ export function Orders() {
                   </Button>
                   <Button 
                     type="submit"
-                    className="bg-orange-600 hover:bg-orange-700 text-white light:bg-orange-600 light:hover:bg-orange-700 light:text-white px-4 py-1 text-sm"
+                    className={`${ORDER_BTN} px-4 py-1 text-sm`}
                     disabled={isLoading}
                   >
                     {isLoading ? 'Updating...' : 'Update Order'}
@@ -2286,6 +2303,15 @@ export function Orders() {
             {renderPTLineTable(ptLineData, "PIT Line Orders")}
           </TabsContent>
         </Tabs>
+
+        <RfidAssignModal
+          open={showAssignModal}
+          onOpenChange={setShowAssignModal}
+          rfidTags={rfidConfigs}
+          trucks={trucks}
+          defaultOrderRef={orderRefLabelFromActiveTab(activeTab)}
+          onAssigned={fetchRfidConfigs}
+        />
       </div>
     </WaterSystemLayout>
   )

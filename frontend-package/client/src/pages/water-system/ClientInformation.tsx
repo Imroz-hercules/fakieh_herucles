@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Pencil, Trash2, X, Users, ChevronLeft, ChevronRight } from 'lucide-react'
-import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayout'
 import { API_BASE_URL } from '../../config/api'
 
 interface Client {
@@ -157,11 +156,8 @@ export default function ClientInformation(): JSX.Element {
   }
 
   return (
-    <WaterSystemLayout
-      title="Client Information"
-      subtitle="Manage client name and contact number"
-    >
-      <div className="p-6">
+    <>
+      <div className="p-6 pt-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-slate-800 light:bg-white p-4 rounded-lg text-white light:text-gray-900 border border-slate-700 light:border-gray-200">
             <div className="flex items-center justify-between">
@@ -401,6 +397,6 @@ export default function ClientInformation(): JSX.Element {
           </div>
         </div>
       )}
-    </WaterSystemLayout>
+    </>
   )
 }

@@ -51,17 +51,29 @@ const ordersItems: SidebarNavItem[] = [
   },
 ]
 
-const trucksItems: SidebarNavItem[] = [
+const managementItems: SidebarNavItem[] = [
   {
-    path: '/fakieh/truck-management',
-    icon: Truck,
-    label: 'Truck Management',
-    description: 'Manage Trucks & Fleet',
+    path: '/fakieh/management/rfid',
+    icon: Radio,
+    label: 'RFID',
+    description: 'RFID tracking and assignment',
   },
   {
-    path: '/fakieh/client-information',
+    path: '/fakieh/management/trucks',
+    icon: Truck,
+    label: 'Trucks',
+    description: 'Manage fleet trucks',
+  },
+  {
+    path: '/fakieh/management/drivers',
     icon: Users,
-    label: 'Client Information',
+    label: 'Drivers',
+    description: 'Manage drivers and assignments',
+  },
+  {
+    path: '/fakieh/management/clients',
+    icon: Users,
+    label: 'Clients',
     description: 'Manage client name and contact number',
   },
 ]
@@ -131,12 +143,6 @@ export const sidebarNavEntries: SidebarNavEntry[] = [
     items: ordersItems,
   },
   {
-    path: '/fakieh/rfid',
-    icon: Radio,
-    label: 'RFID',
-    description: 'RFID Tracking System',
-  },
-  {
     id: 'weighbridge',
     label: 'Weighbridge',
     description: 'Weighbridge entry and completed trip log',
@@ -144,11 +150,11 @@ export const sidebarNavEntries: SidebarNavEntry[] = [
     items: weighbridgeItems,
   },
   {
-    id: 'trucks',
-    label: 'Trucks',
-    description: 'Fleet and client information',
-    icon: Truck,
-    items: trucksItems,
+    id: 'management',
+    label: 'Management',
+    description: 'RFID, trucks, drivers, and clients',
+    icon: Users,
+    items: managementItems,
   },
   {
     path: '/fakieh/distribution',
@@ -208,10 +214,16 @@ export const topNavItems: TopNavItem[] = [
     ],
   },
   {
-    kind: 'link',
-    path: '/fakieh/rfid',
-    label: 'RFID',
-    icon: Radio,
+    kind: 'group',
+    label: 'Management',
+    shortLabel: 'Management',
+    icon: Users,
+    items: [
+      { path: '/fakieh/management/rfid', label: 'RFID' },
+      { path: '/fakieh/management/trucks', label: 'Trucks' },
+      { path: '/fakieh/management/drivers', label: 'Drivers' },
+      { path: '/fakieh/management/clients', label: 'Clients' },
+    ],
   },
   {
     kind: 'group',
@@ -220,15 +232,6 @@ export const topNavItems: TopNavItem[] = [
     items: [
       { path: '/fakieh/truck-entry', label: 'Weighbridge entry' },
       { path: '/fakieh/weighbridge', label: 'Weighbridge log' },
-    ],
-  },
-  {
-    kind: 'group',
-    label: 'Trucks',
-    icon: Truck,
-    items: [
-      { path: '/fakieh/truck-management', label: 'Truck management' },
-      { path: '/fakieh/client-information', label: 'Client information' },
     ],
   },
   {
