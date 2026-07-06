@@ -211,16 +211,17 @@ def list_open_orders():
 @truck_entry_bp.route("/orders/today", methods=["GET"])
 def list_completed_today():
     date_str = request.args.get("date")
-    local_created = func.timezone(TIMEZONE_NAME, TruckWeighOrder.created_at)
+    # Business day is based on completion (OUT) time, not order creation time.
+    local_completed = func.timezone(TIMEZONE_NAME, TruckWeighOrder.second_ts)
 
     if date_str:
         day = _parse_date_yyyy_mm_dd(date_str)
         if not day:
             return jsonify({"error": "date must be YYYY-MM-DD"}), 400
-        day_filter = func.date(local_created) == day
+        day_filter = func.date(local_completed) == day
         day_label = day.isoformat()
     else:
-        day_filter = func.date(local_created) == func.date(
+        day_filter = func.date(local_completed) == func.date(
             func.timezone(TIMEZONE_NAME, func.now())
         )
         day_label = db.session.query(
@@ -230,6 +231,7 @@ def list_completed_today():
     orders = (
         TruckWeighOrder.query.filter(
             TruckWeighOrder.status == "completed",
+            TruckWeighOrder.second_ts.isnot(None),
             day_filter,
         )
         .order_by(TruckWeighOrder.second_ts.desc().nullslast(), TruckWeighOrder.id.desc())

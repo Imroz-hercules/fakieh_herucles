@@ -37,6 +37,9 @@ export default function Weighbridge() {
   const [openCount, setOpenCount] = useState(0);
   const [outPendingCount, setOutPendingCount] = useState(0);
   const [reportDate, setReportDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -53,7 +56,10 @@ export default function Weighbridge() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const [completedResult, open] = await Promise.all([fetchCompletedToday(), fetchOpenOrders()]);
+      const [completedResult, open] = await Promise.all([
+        fetchCompletedToday(selectedDate),
+        fetchOpenOrders(),
+      ]);
       setCompletedRows(completedResult.rows);
       setReportDate(completedResult.date);
       setOpenCount(open.length);
@@ -66,7 +72,7 @@ export default function Weighbridge() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     loadData();
@@ -170,7 +176,16 @@ export default function Weighbridge() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+              <div>
+                <label className="text-slate-300 light:text-gray-700 text-xs mb-1 block">Date</label>
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-slate-700 light:bg-white border-slate-600 h-8 text-sm"
+                />
+              </div>
               <div>
                 <label className="text-slate-300 light:text-gray-700 text-xs mb-1 block">Truck ID</label>
                 <Input
@@ -241,7 +256,9 @@ export default function Weighbridge() {
                 Completed weighbridge trips
               </h3>
               {reportDate && (
-                <p className="text-xs text-slate-400 light:text-gray-500 mt-1">Date: {reportDate}</p>
+                <p className="text-xs text-slate-400 light:text-gray-500 mt-1">
+                  Completed on: {reportDate}
+                </p>
               )}
             </div>
             {errorMsg && (
@@ -310,7 +327,7 @@ export default function Weighbridge() {
                       colSpan={10}
                       className="text-center py-8 text-sm text-slate-400 light:text-gray-500"
                     >
-                      {loading ? "Loading..." : "No completed trips today"}
+                      {loading ? "Loading..." : `No completed trips on ${reportDate ?? selectedDate}`}
                     </TableCell>
                   </TableRow>
                 )}
