@@ -34,6 +34,20 @@ const ORDER_BTN_OUTLINE =
 const ORDER_BTN_SM =
   'text-xs px-2 py-1 bg-cyan-600 text-white hover:bg-cyan-700 light:bg-cyan-600 light:text-white light:hover:bg-cyan-700';
 
+// Shared column widths so the live-order table and the waiting-order table line up.
+const COLW_INTAKE = ['8%', '16%', '12%', '14%', '14%', '12%', '10%', '14%'];
+const COLW_OUTLOADING = ['7%', '14%', '10%', '9%', '12%', '12%', '11%', '10%', '15%'];
+const COLW_BULK = ['14%', '14%', '14%', '11%', '12%', '11%', '10%', '14%'];
+const COLW_PIT = ['11%', '11%', '15%', '15%', '12%', '11%', '11%', '14%'];
+
+const ColGroup = ({ widths }: { widths: string[] }) => (
+  <colgroup>
+    {widths.map((w, i) => (
+      <col key={i} style={{ width: w }} />
+    ))}
+  </colgroup>
+);
+
 const TRUCK_CLIENT_FIELDS = [
   { name: 'truckId', label: 'Truck', type: 'select' as const },
   { name: 'clientId', label: 'Client Name', type: 'select' as const },
@@ -495,6 +509,34 @@ export function Orders() {
       toast({ title: 'Cancel failed', description: msg, variant: 'destructive' })
     }
   }, [fetchQueue, fetchRfidConfigs, toast])
+
+  const startQueuedOrder = useCallback(async (id: number) => {
+    try {
+      await axios.post(`${plcBase}/orders/queue/${id}/start`)
+      toast({ title: 'Order started', description: 'Written to the PLC. It will run when the line begins.', variant: 'default' })
+      await fetchQueue()
+      await fetchOrders()
+    } catch (err: any) {
+      const status = err?.response?.status
+      const msg = err?.response?.data?.error || err?.message || 'Failed to start order'
+      // If the line is busy/not idle, offer a forced start.
+      if (status === 409 && window.confirm(`${msg}\n\nForce start anyway? This overwrites whatever is currently on the line.`)) {
+        try {
+          await axios.post(`${plcBase}/orders/queue/${id}/start?force=true`)
+          toast({ title: 'Order force-started', description: 'Written to the PLC.', variant: 'default' })
+          await fetchQueue()
+          await fetchOrders()
+          return
+        } catch (err2: any) {
+          const msg2 = err2?.response?.data?.error || err2?.message || 'Failed to force start order'
+          toast({ title: 'Start failed', description: msg2, variant: 'destructive' })
+          return
+        }
+      }
+      toast({ title: 'Start failed', description: msg, variant: 'destructive' })
+    }
+    // fetchOrders is a stable useCallback defined later; referenced via closure only.
+  }, [fetchQueue, toast])
 
   const fetchTrucks = useCallback(async () => {
     try {
@@ -975,7 +1017,8 @@ export function Orders() {
       </div>
       <div className="p-6">
         <div className="rounded-md border border-slate-700/30 light:border-gray-200">
-          <Table>
+          <Table className="table-fixed">
+            <ColGroup widths={COLW_INTAKE} />
             <TableHeader>
               <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
                 <TableHead className="text-white light:text-gray-900 font-semibold">RFID</TableHead>
@@ -1055,7 +1098,8 @@ export function Orders() {
       </div>
       <div className="p-6">
         <div className="rounded-md border border-slate-700/30 light:border-gray-200">
-          <Table>
+          <Table className="table-fixed">
+            <ColGroup widths={COLW_OUTLOADING} />
             <TableHeader>
               <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
                 <TableHead className="text-white light:text-gray-900 font-semibold">RFID</TableHead>
@@ -1138,7 +1182,8 @@ export function Orders() {
       </div>
       <div className="p-6">
         <div className="rounded-md border border-slate-700/30 light:border-gray-200 overflow-x-auto">
-          <Table>
+          <Table className="table-fixed">
+            <ColGroup widths={COLW_BULK} />
             <TableHeader>
               <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
                 <TableHead className="text-white light:text-gray-900 font-semibold">Source Silo (Material)</TableHead>
@@ -1212,7 +1257,8 @@ export function Orders() {
       </div>
       <div className="p-6">
         <div className="rounded-md border border-slate-700/30 light:border-gray-200 overflow-x-auto">
-          <Table>
+          <Table className="table-fixed">
+            <ColGroup widths={COLW_PIT} />
             <TableHeader>
               <TableRow className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/50 light:hover:bg-gray-50">
                   <TableHead className="text-white light:text-gray-900 font-semibold">Pit No</TableHead>
@@ -1270,6 +1316,30 @@ export function Orders() {
   );
   };
 
+  // RFIDs currently in use: locked in the queue (rfid_used) OR loaded as a live
+  // PLC order badge (covers orders created outside the queue). These must not be
+  // selectable for a new order until they free up.
+  const getInUseRfids = (): Set<string> => {
+    const s = new Set<string>();
+    const add = (arr: any[]) =>
+      arr.forEach((o) => {
+        const b = String(o?.badgeNo ?? '').trim();
+        if (b && b !== '0') s.add(b);
+      });
+    add(intakeLine1Data);
+    add(intakeLine2Data);
+    add(mineralIntakeData);
+    add(outloading1Data);
+    add(outloading2Data);
+    add(outloading3Data);
+    // Any RFID locked to an open queue order
+    queueItems.forEach((q) => {
+      const r = String(q?.rfidNumber ?? '').trim();
+      if (r) s.add(r);
+    });
+    return s;
+  };
+
   // Map a tab to the queue's (order_type, line) so we can filter waiting orders.
   const queueMatchForTab = (tab: string): { t: string; l: number } | null => {
     switch (tab) {
@@ -1304,6 +1374,122 @@ export function Orders() {
       return map[status] || 'text-slate-400 bg-slate-500/10 border-slate-500/30';
     };
 
+    // Mirror the live-order table columns for this line family so the two
+    // stacked tables line up column-for-column.
+    const fam =
+      match.t === 'outloading' ? 'outloading'
+      : match.t === 'bulk' ? 'bulk'
+      : match.t === 'pit' ? 'pit'
+      : 'intake';
+    const widths =
+      fam === 'outloading' ? COLW_OUTLOADING
+      : fam === 'bulk' ? COLW_BULK
+      : fam === 'pit' ? COLW_PIT
+      : COLW_INTAKE;
+    const headers =
+      fam === 'outloading'
+        ? ['RFID', 'Source/Line Material', 'Declared Quantity_KG', 'Dest. Selection', 'Destination 1 (Material)', 'Destination 2 (Material)', 'Active Destination (Material)', 'Status Word', 'Actions']
+        : fam === 'bulk'
+        ? ['Source Silo (Material)', 'Destination 1 (Material)', 'Destination 2 (Material)', 'CC25 Sel', 'Weight Quantity', 'Scale Sel', 'Status', 'Actions']
+        : fam === 'pit'
+        ? ['Pit No', 'Raw Code', 'Destination 1 (Material)', 'Destination 2 (Material)', 'Weight Quantity', 'Scale Sel', 'Status', 'Actions']
+        : ['RFID', 'Source/Line Material', 'Declared Quantity_KG', 'Destination 1 (Material)', 'Destination 2 (Material)', 'Active Destination (Material)', 'Status Word', 'Actions'];
+
+    const siloCell = (silo: any, key: string) => (
+      <TableCell key={key} className="text-slate-300 light:text-gray-700">
+        <div className="flex flex-col">
+          <span className="text-xs text-slate-400 light:text-gray-500">Silo {silo || '-'}</span>
+          <span className="font-medium">{getMaterialNameForSilo(silo)}</span>
+        </div>
+      </TableCell>
+    );
+    const qtyCell = (q: any) => (
+      <TableCell key="qty">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 light:bg-yellow-100 border border-yellow-500/20 light:border-yellow-300 text-yellow-400 light:text-yellow-600">
+          {q.declaredQuantityKG || 0}
+        </span>
+      </TableCell>
+    );
+    const statusCell = (q: any) => (
+      <TableCell key="status">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${badge(q.queueStatus)}`}>
+          {q.queueStatus}
+        </span>
+      </TableCell>
+    );
+    const actionsCell = (q: any) => (
+      <TableCell key="actions">
+        {(q.queueStatus === 'WAITING' || q.queueStatus === 'DISPATCHED') ? (
+          <div className="flex items-center gap-1 flex-nowrap">
+            {q.queueStatus === 'WAITING' && (
+              <Button size="sm" variant="outline" className={`${ORDER_BTN_SM} whitespace-nowrap`} onClick={() => startQueuedOrder(q.id)}>
+                <CheckCircle className="h-3 w-3 mr-1" /> Start
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs px-2 py-1 whitespace-nowrap bg-red-600 hover:bg-red-700 text-white light:bg-red-600 light:hover:bg-red-700 light:text-white"
+              onClick={() => cancelQueuedOrder(q.id)}
+            >
+              <X className="h-3 w-3 mr-1" /> Cancel
+            </Button>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-500 light:text-gray-400">—</span>
+        )}
+      </TableCell>
+    );
+
+    const renderRowCells = (q: any) => {
+      if (fam === 'outloading' || fam === 'intake') {
+        const cells = [
+          <TableCell key="rfid" className="text-cyan-400 light:text-blue-600 font-medium">{q.rfidNumber || q.badgeNo || '-'}</TableCell>,
+          <TableCell key="src" className="text-white light:text-gray-900">
+            <div className="flex flex-col">
+              <span className="text-xs text-slate-400 light:text-gray-500">{q.materialCode || '-'}</span>
+              <span className="font-medium">{q.materialName || getMaterialNameFromCode(q.materialCode)}</span>
+            </div>
+          </TableCell>,
+          qtyCell(q),
+        ];
+        if (fam === 'outloading') {
+          cells.push(
+            <TableCell key="destsel" className="text-slate-300 light:text-gray-700">{formatDestSelLabel(q.destSel)}</TableCell>
+          );
+        }
+        cells.push(siloCell(q.destinationSilo1, 'd1'));
+        cells.push(siloCell(q.destinationSilo2, 'd2'));
+        cells.push(siloCell(q.activeDestination, 'ad'));
+        cells.push(statusCell(q));
+        cells.push(actionsCell(q));
+        return cells;
+      }
+      if (fam === 'bulk') {
+        return [
+          siloCell(q.sourceSilo, 'src'),
+          siloCell(q.destinationSilo1, 'd1'),
+          siloCell(q.destinationSilo2, 'd2'),
+          <TableCell key="cc25" className="text-slate-300 light:text-gray-700">{q.cc25Sel || '-'}</TableCell>,
+          qtyCell(q),
+          <TableCell key="scale" className="text-slate-300 light:text-gray-700">{q.scaleSel || '-'}</TableCell>,
+          statusCell(q),
+          actionsCell(q),
+        ];
+      }
+      // pit
+      return [
+        <TableCell key="pit" className="text-cyan-400 light:text-blue-600 font-medium">{q.pitNo || '-'}</TableCell>,
+        <TableCell key="raw" className="text-white light:text-gray-900">{q.rawCode || q.materialCode || '-'}</TableCell>,
+        siloCell(q.destinationSilo1, 'd1'),
+        siloCell(q.destinationSilo2, 'd2'),
+        qtyCell(q),
+        <TableCell key="scale" className="text-slate-300 light:text-gray-700">{q.scaleSel || '-'}</TableCell>,
+        statusCell(q),
+        actionsCell(q),
+      ];
+    };
+
     return (
       <div className="bg-slate-950/50 light:bg-white border border-slate-700/30 light:border-gray-200 rounded-lg backdrop-blur-sm light:shadow-lg mt-4">
         <div className="p-6 border-b border-slate-700/30 light:border-gray-200 flex items-center justify-between">
@@ -1321,45 +1507,19 @@ export function Orders() {
             </div>
           ) : (
             <div className="rounded-md border border-slate-700/30 light:border-gray-200">
-              <Table>
+              <Table className="table-fixed">
+                <ColGroup widths={widths} />
                 <TableHeader>
                   <TableRow className="border-slate-700/30 light:border-gray-200">
-                    <TableHead className="text-white light:text-gray-900 font-semibold">#</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">RFID</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Material</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Qty (KG)</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Dest 1</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Dest 2</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Status</TableHead>
-                    <TableHead className="text-white light:text-gray-900 font-semibold">Actions</TableHead>
+                    {headers.map((h) => (
+                      <TableHead key={h} className="text-white light:text-gray-900 font-semibold">{h}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[...dispatched, ...waiting].map((q) => (
-                    <TableRow key={q.id} className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50">
-                      <TableCell className="text-slate-300 light:text-gray-700">{q.queuePosition ?? '-'}</TableCell>
-                      <TableCell className="text-cyan-400 light:text-blue-600 font-medium">{q.rfidNumber || q.badgeNo || '-'}</TableCell>
-                      <TableCell className="text-white light:text-gray-900">{q.materialName || q.materialCode || q.sourceSilo || q.pitNo || '-'}</TableCell>
-                      <TableCell className="text-slate-300 light:text-gray-700">{q.declaredQuantityKG || 0}</TableCell>
-                      <TableCell className="text-slate-300 light:text-gray-700">{q.destinationSilo1 || '-'}</TableCell>
-                      <TableCell className="text-slate-300 light:text-gray-700">{q.destinationSilo2 || '-'}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${badge(q.queueStatus)}`}>
-                          {q.queueStatus}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {(q.queueStatus === 'WAITING' || q.queueStatus === 'DISPATCHED') ? (
-                          <Button
-                            className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
-                            onClick={() => cancelQueuedOrder(q.id)}
-                          >
-                            <X className="h-3 w-3 mr-1" /> Cancel
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-slate-500">—</span>
-                        )}
-                      </TableCell>
+                  {[...dispatched, ...waiting].map((q, index) => (
+                    <TableRow key={q.id} className={`border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-slate-900/20 light:bg-gray-50' : 'bg-slate-800/10 light:bg-gray-100'}`}>
+                      {renderRowCells(q)}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1433,12 +1593,14 @@ export function Orders() {
         </div>
 
         <div className="flex gap-2 mb-4">
+          {/* RFID Assign temporarily disabled (feature kept for later re-enable)
           <Button
             className={ORDER_BTN}
             onClick={() => setShowAssignModal(true)}
           >
             <Radio className="h-4 w-4 mr-2" /> RFID Assign
           </Button>
+          */}
           <Button
             className={ORDER_BTN}
             onClick={() => {
@@ -1651,12 +1813,22 @@ export function Orders() {
                                 </SelectItem>
                               ))
                             ) : field.name === 'badgeNo' ? (
-                              // Only available RFID tags (a tag stays locked until its order completes)
-                              rfidConfigs.filter((rfid) => !rfid.rfid_used).map((rfid) => (
-                                <SelectItem key={rfid.id} value={rfid.rfid_number}>
-                                  {rfid.rfid_number} (Available)
-                                </SelectItem>
-                              ))
+                              // Only available RFID tags: not locked in the queue and not
+                              // currently loaded on a live PLC order.
+                              (() => {
+                                const inUse = getInUseRfids();
+                                const available = rfidConfigs.filter(
+                                  (rfid) => !rfid.rfid_used && !inUse.has(String(rfid.rfid_number))
+                                );
+                                if (available.length === 0) {
+                                  return <SelectItem value="none" disabled>No RFID available</SelectItem>;
+                                }
+                                return available.map((rfid) => (
+                                  <SelectItem key={rfid.id} value={rfid.rfid_number}>
+                                    {rfid.rfid_number} (Available)
+                                  </SelectItem>
+                                ));
+                              })()
                             ) : field.name === 'destSel' ? (
                               <>
                                 <SelectItem value="0">Bulk</SelectItem>

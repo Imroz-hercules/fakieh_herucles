@@ -1479,6 +1479,64 @@ def _process_queue_line(ctx: Dict[str, Any], now) -> None:
         _dispatch_next(ctx, now)
 
 
+def _reconcile_rfid_usage(contexts: List[Dict[str, Any]]) -> None:
+    """Keep RFIDConfig.rfid_used in sync with the real PLC state each poll.
+
+    A tag is considered "in use" when it is either loaded on a live PLC line
+    (badge present) or attached to an open queue row (WAITING/DISPATCHED/RUNNING).
+    Any tag marked used that is neither is released so it becomes selectable again.
+    """
+    from models.order_queue import OrderQueue, QUEUE_WAITING, QUEUE_DISPATCHED, QUEUE_RUNNING
+
+    # 1) Badges currently loaded on the PLC (RFID-based lines only).
+    live_labels: Dict[str, str] = {}
+    for ctx in contexts:
+        if ctx.get("order_type") not in ("intake", "mineral", "outloading"):
+            continue
+        badge = _normalize_rfid(ctx.get("badge"))
+        if badge and badge != "0":
+            live_labels[badge] = f"LIVE-{ctx['order_type']}-{ctx['line']}"
+
+    # 2) RFIDs held by any open queue row (must never be released here).
+    queue_rfids = set()
+    open_rows = (
+        OrderQueue.query
+        .filter(OrderQueue.queue_status.in_([QUEUE_WAITING, QUEUE_DISPATCHED, QUEUE_RUNNING]))
+        .all()
+    )
+    for r in open_rows:
+        n = _normalize_rfid(r.rfid_number)
+        if n:
+            queue_rfids.add(n)
+
+    try:
+        # 3) Lock every live badge (create a config row if we've never seen it).
+        for badge, label in live_labels.items():
+            cfg = RFIDConfig.query.filter_by(rfid_number=badge).first()
+            if not cfg:
+                cfg = RFIDConfig(rfid_number=badge, rfid_used=True, rfid_linked_to_order=label)
+                db.session.add(cfg)
+                continue
+            cfg.rfid_used = True
+            # Don't clobber a queue-owned label; otherwise reflect the live line.
+            if not (cfg.rfid_linked_to_order or "").startswith("QUEUE-"):
+                cfg.rfid_linked_to_order = label
+
+        # 4) Release tags that are used but no longer live and not queued.
+        used_cfgs = RFIDConfig.query.filter(RFIDConfig.rfid_used.is_(True)).all()
+        for cfg in used_cfgs:
+            n = _normalize_rfid(cfg.rfid_number)
+            if n in live_labels or n in queue_rfids:
+                continue
+            cfg.rfid_used = False
+            cfg.rfid_linked_to_order = None
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"[QUEUE] RFID reconciliation failed: {e}")
+
+
 def process_order_queue(contexts: List[Dict[str, Any]]) -> None:
     """Run the queue state machine for every PLC line (called each poll)."""
     with _QUEUE_LOCK:
@@ -1488,13 +1546,20 @@ def process_order_queue(contexts: List[Dict[str, Any]]) -> None:
             except Exception as e:
                 db.session.rollback()
                 print(f"[QUEUE] error processing line {ctx.get('order_type')}/{ctx.get('line')}: {e}")
+        try:
+            _reconcile_rfid_usage(contexts)
+        except Exception as e:
+            db.session.rollback()
+            print(f"[QUEUE] RFID reconciliation error: {e}")
 
 
 def _queue_ctx(order_type: str, db_no: int, line: int, lines_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Extract PLC status + scanned RFID for a line from its rendered tag dict."""
+    badge = ""
     if order_type in ("intake", "mineral", "outloading"):
         status = int(_nz(lines_dict, f"L{line}_StatusWord", 0) or 0)
         scanned = _nz(lines_dict, f"L{line}_RFID_BadgeReading")
+        badge = _normalize_rfid(_nz(lines_dict, f"L{line}_BadgeNo"))
     elif order_type == "bulk":
         status = int(_nz(lines_dict, "BulkLine_Status", 0) or 0)
         scanned = None
@@ -1503,7 +1568,8 @@ def _queue_ctx(order_type: str, db_no: int, line: int, lines_dict: Dict[str, Any
         scanned = None
     else:
         status, scanned = 0, None
-    return {"order_type": order_type, "db_no": db_no, "line": line, "status": status, "scanned_rfid": scanned}
+    return {"order_type": order_type, "db_no": db_no, "line": line,
+            "status": status, "scanned_rfid": scanned, "badge": badge}
 
 
 def _execute_plant_orders() -> Dict[str, Any]:
@@ -2764,6 +2830,66 @@ def list_order_queue():
                       OrderQueue.queue_position.asc(),
                       OrderQueue.created_at.asc()).all()
     return jsonify({"items": [r.to_dict() for r in rows], "total": len(rows)})
+
+
+@plc_bp.route("/orders/queue/<int:queue_id>/start", methods=["POST"])
+def start_queued_order(queue_id: int):
+    """Manually dispatch a WAITING order to the PLC now (bypass the RFID scan).
+
+    Guards against overwriting a running order: the PLC line must be Idle and no
+    other queue order may be active on that line, unless ?force=true is passed.
+    """
+    from models.order_queue import OrderQueue, QUEUE_WAITING, QUEUE_DISPATCHED, ACTIVE_STATUSES
+
+    if DEMO_MODE or not _snap7_loaded:
+        return jsonify({"error": "snap7 missing or DEMO_MODE=true"}), 503
+
+    row = OrderQueue.query.get(queue_id)
+    if not row:
+        return jsonify({"error": "Queue item not found"}), 404
+    if row.queue_status != QUEUE_WAITING:
+        return jsonify({"error": f"Only WAITING orders can be started (status={row.queue_status})"}), 409
+
+    force = _force_enabled(request)
+
+    with _QUEUE_LOCK:
+        # Another queued order already occupying this line?
+        active = (
+            OrderQueue.query
+            .filter(OrderQueue.order_type == row.order_type,
+                    OrderQueue.line == row.line,
+                    OrderQueue.queue_status.in_(list(ACTIVE_STATUSES)))
+            .first()
+        )
+        if active and not force:
+            return jsonify({"error": f"Line already has an active order (#{active.id}). Use ?force=true to override."}), 409
+
+        m = load_map_from_pg(row.db_no)
+        if row.order_type == "outloading":
+            area, ln = "outloading", row.line
+        elif row.order_type == "bulk":
+            area, ln = "bulk", None
+        elif row.order_type == "pit":
+            area, ln = "pit", None
+        else:
+            area, ln = "intake", row.line
+
+        st = _read_status(row.db_no, m, area, ln)
+        if (st is not None) and (st != 1) and not force:
+            return jsonify({"error": f"Line not Idle (status={st}). Use ?force=true to override."}), 409
+
+        try:
+            kvs = _order_kvs(row)
+            _write_tags(row.db_no, m, kvs)
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": f"PLC write failed: {e}"}), 400
+
+        row.queue_status = QUEUE_DISPATCHED
+        row.dispatched_at = datetime.now()
+        db.session.commit()
+
+    return jsonify({"ok": True, "order": row.to_dict()})
 
 
 @plc_bp.route("/orders/queue/<int:queue_id>/cancel", methods=["POST"])
