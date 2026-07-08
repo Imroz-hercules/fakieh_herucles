@@ -1754,6 +1754,77 @@ def fetch_plant_orders_snapshot() -> Dict[str, Any]:
         return copy.deepcopy(payload)
 
 
+# ─────────── Always-on queue dispatch (independent of the UI broadcast) ───────────
+# The dispatcher must keep running even when nobody has the Orders page open / the
+# websocket broadcast is stopped. This cycle is driven by the background scheduler
+# (see scheduler.start_queue_dispatcher) so queued orders auto-start after restarts
+# and regardless of the UI. A Postgres advisory lock (opt-in) ensures only one
+# worker acts per cycle in multi-worker deployments.
+_QUEUE_MULTIWORKER_LOCK = os.getenv("QUEUE_MULTIWORKER_LOCK", "0").lower() in ("1", "true", "yes")
+_QUEUE_ADVISORY_LOCK_KEY = int(os.getenv("QUEUE_ADVISORY_LOCK_KEY", "728312001"))
+
+
+def _acquire_dispatch_lock():
+    """Try to take the cross-process advisory lock.
+
+    Returns the raw connection holding the lock, the sentinel "NO_PG" when the
+    advisory lock isn't available (so we still run single-process), or None when
+    another worker currently holds it (so this cycle should be skipped).
+    """
+    try:
+        raw = db.engine.raw_connection()
+        cur = raw.cursor()
+        cur.execute("SELECT pg_try_advisory_lock(%s)", (_QUEUE_ADVISORY_LOCK_KEY,))
+        got = cur.fetchone()[0]
+        cur.close()
+        if got:
+            return raw
+        raw.close()
+        return None
+    except Exception as e:
+        print(f"[QUEUE] advisory lock unavailable ({e}); running without it")
+        return "NO_PG"
+
+
+def _release_dispatch_lock(raw) -> None:
+    if raw in (None, "NO_PG"):
+        return
+    try:
+        cur = raw.cursor()
+        cur.execute("SELECT pg_advisory_unlock(%s)", (_QUEUE_ADVISORY_LOCK_KEY,))
+        cur.close()
+        raw.commit()
+    except Exception:
+        pass
+    finally:
+        try:
+            raw.close()
+        except Exception:
+            pass
+
+
+def run_queue_dispatch_cycle() -> None:
+    """One always-on dispatch cycle: read the PLC and process the order queue.
+
+    Safe to call from the background scheduler on an interval. It reuses the same
+    snapshot path as the broadcast (so lifecycle + snapshot cache stay fresh), and
+    is idempotent thanks to the in-process _QUEUE_LOCK and the optional PG lock.
+    """
+    if DEMO_MODE or not _snap7_loaded:
+        return
+
+    lock = _acquire_dispatch_lock() if _QUEUE_MULTIWORKER_LOCK else "NO_PG"
+    if lock is None:
+        return  # another worker owns this cycle
+
+    try:
+        fetch_plant_orders_snapshot()
+    except Exception as e:
+        print(f"[QUEUE] dispatch cycle failed: {e}")
+    finally:
+        _release_dispatch_lock(lock)
+
+
 @plc_bp.route("/plant/orders")
 def plant_orders():
     """HTTP: returns live plant orders; uses cache while PLC broadcast is active."""

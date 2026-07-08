@@ -7,6 +7,7 @@ Jobs run inside the Flask app context so SQLAlchemy works in the background.
 """
 
 import logging
+import os
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -73,6 +74,46 @@ def rebuild_scheduler_jobs():
             logger.info('Scheduler: registered rule %s (%s %02d:%02d)', rule_id, schedule_type, hour, minute)
         except Exception as e:
             logger.error('Scheduler: failed to register rule %s: %s', rule_id, e)
+
+
+def _run_queue_dispatch():
+    """Always-on order-queue dispatch, independent of the websocket broadcast."""
+    if _app is None:
+        return
+    with _app.app_context():
+        try:
+            from routes.plc_routes import run_queue_dispatch_cycle
+            run_queue_dispatch_cycle()
+        except Exception as e:
+            logger.error('Queue dispatch cycle error: %s', e, exc_info=True)
+
+
+def start_queue_dispatcher(app, interval_seconds=None):
+    """Register the always-on order-queue dispatcher on an interval.
+
+    This makes waiting orders auto-start after restarts and regardless of whether
+    anyone has the Orders page open or the broadcast toggle on.
+    """
+    global _scheduler, _app
+    _app = app
+    if _scheduler is None:
+        _scheduler = BackgroundScheduler(daemon=True)
+        _scheduler.start()
+        logger.info('Scheduler started (for queue dispatcher)')
+
+    interval = interval_seconds or float(os.getenv('QUEUE_DISPATCH_INTERVAL_SEC', '2'))
+    _scheduler.add_job(
+        _run_queue_dispatch,
+        trigger='interval',
+        seconds=interval,
+        id='queue_dispatch',
+        replace_existing=True,
+        max_instances=1,      # never overlap cycles
+        coalesce=True,        # collapse any missed runs into one
+        misfire_grace_time=30,
+    )
+    logger.info('Queue dispatcher job registered (every %ss)', interval)
+    return _scheduler
 
 
 def start_scheduler(app):

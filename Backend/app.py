@@ -173,6 +173,14 @@ if __name__ == '__main__':
             start_scheduler(app)
         except Exception as _sched_err:
             print(f"Distribution scheduler not started: {_sched_err}")
-        
+
+        # Always-on order-queue dispatcher: auto-starts waiting orders regardless
+        # of the websocket broadcast / UI state, and survives restarts.
+        try:
+            from scheduler import start_queue_dispatcher
+            start_queue_dispatcher(app)
+        except Exception as _queue_disp_err:
+            print(f"Queue dispatcher not started: {_queue_disp_err}")
+
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, debug=False, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
