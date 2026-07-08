@@ -159,6 +159,22 @@ def get_configs():
         }
     )
 
+@rfid_bp.route('/available', methods=['GET'])
+def get_available_rfids():
+    """List RFID tags that are not currently locked to an open order.
+
+    Used by the Orders create form so a tag linked to a waiting/running order
+    does not appear as selectable for another order until it completes.
+    """
+    configs = (
+        RFIDConfig.query
+        .filter(RFIDConfig.rfid_used.is_(False))
+        .order_by(RFIDConfig.rfid_number.asc())
+        .all()
+    )
+    return jsonify({"items": [c.to_dict() for c in configs], "total": len(configs)})
+
+
 @rfid_bp.route('/config', methods=['POST'])
 def add_config():
     try:

@@ -443,6 +443,7 @@ export function Orders() {
   const [ptLineData, setPtLineData] = useState<any[]>([])
   const [binMaterials, setBinMaterials] = useState<any[]>([])
   const [rfidConfigs, setRfidConfigs] = useState<any[]>([])
+  const [queueItems, setQueueItems] = useState<any[]>([])
   const [trucks, setTrucks] = useState<Array<{ id: number; license: string; model: string }>>([])
   const [clients, setClients] = useState<Array<{ id: number; name: string; phone: string }>>([])
   
@@ -472,6 +473,28 @@ export function Orders() {
       
     }
   }, [])
+
+  const fetchQueue = useCallback(async () => {
+    try {
+      const response = await axios.get(`${plcBase}/orders/queue`)
+      const body = response.data
+      setQueueItems(Array.isArray(body) ? body : body?.items ?? [])
+    } catch (error) {
+      // keep previous queue on transient error
+    }
+  }, [])
+
+  const cancelQueuedOrder = useCallback(async (id: number) => {
+    try {
+      await axios.post(`${plcBase}/orders/queue/${id}/cancel`)
+      toast({ title: 'Order cancelled', description: 'Removed from waiting list.', variant: 'default' })
+      await fetchQueue()
+      await fetchRfidConfigs()
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Failed to cancel order'
+      toast({ title: 'Cancel failed', description: msg, variant: 'destructive' })
+    }
+  }, [fetchQueue, fetchRfidConfigs, toast])
 
   const fetchTrucks = useCallback(async () => {
     try {
@@ -676,14 +699,18 @@ export function Orders() {
   useEffect(() => {
     // Initial fetch
     fetchOrders()
+    fetchQueue()
     fetchBinMaterials()
     fetchRfidConfigs()
     fetchTrucks()
     fetchClients()
     checkBroadcastStatus()
 
-    // Set up real-time updates every 5 seconds for live PLC status
-    const interval = setInterval(fetchOrders, 5000)
+    // Set up real-time updates every 5 seconds for live PLC status + queue
+    const interval = setInterval(() => {
+      fetchOrders()
+      fetchQueue()
+    }, 5000)
 
     // Cleanup interval on component unmount
     return () => clearInterval(interval)
@@ -709,33 +736,42 @@ export function Orders() {
     setEditModal(true)
   }
 
-  // Function to create orders in both PLC and database
+  // Enqueue an order into the live queue (WAITING). It is NOT written to the PLC
+  // here — the backend dispatcher writes it to the PLC line when the line is Idle
+  // and the scanned RFID matches. This allows queuing multiple orders per line.
   const createOrderComprehensive = async (orderType: OrderType, item: any, line?: number, isMineralOrder: boolean = false) => {
     try {
+      const base = payloadFor(orderType, item) as any;
+      const rfidNumber = item.badgeNo ?? base.badge_no ?? '';
+      const materialName = base.material_code
+        ? getMaterialNameFromCode(String(base.material_code))
+        : (base.raw_code ? getMaterialNameFromCode(String(base.raw_code)) : '');
+
       const payload = {
         order_type: orderType,
         line: line,
-        is_mineral_order: isMineralOrder,
-        ...payloadFor(orderType, item)
+        is_mineral: isMineralOrder,
+        rfid_number: rfidNumber,
+        material_name: materialName,
+        ...base,
       };
-      
-      const { data } = await axios.post(`${plcBase}/orders/create`, payload);
+
+      const { data } = await axios.post(`${plcBase}/orders/enqueue`, payload);
 
       if (data?.ok) {
-        const plcStatus = data.plc_success ? '✅' : '❌';
-        const dbStatus = data.db_success ? '✅' : '❌';
-        const dbOrderId = data.db_order_id ? ` (DB ID: ${data.db_order_id})` : '';
-        
+        const pos = data.order?.queuePosition;
         toast({
-          title: "Order Created Successfully! 🎉",
-          description: `PLC: ${plcStatus} | Database: ${dbStatus}${dbOrderId}`,
+          title: "Order Queued 🕒",
+          description: `Added to waiting list${pos ? ` (position ${pos})` : ''}. It will start when the line is free and its RFID is scanned.`,
           variant: "default",
         });
+        await fetchQueue();
+        await fetchRfidConfigs();
         return true;
       } else {
         toast({
-          title: "Order Creation Failed",
-          description: `Failed to create order: ${JSON.stringify(data)}`,
+          title: "Order Queue Failed",
+          description: `Failed to queue order: ${JSON.stringify(data)}`,
           variant: "destructive",
         });
         return false;
@@ -1234,6 +1270,107 @@ export function Orders() {
   );
   };
 
+  // Map a tab to the queue's (order_type, line) so we can filter waiting orders.
+  const queueMatchForTab = (tab: string): { t: string; l: number } | null => {
+    switch (tab) {
+      case 'intake-line-1': return { t: 'intake', l: 1 };
+      case 'intake-line-2': return { t: 'intake', l: 2 };
+      case 'mineral-intake': return { t: 'mineral', l: 3 };
+      case 'outloading-1': return { t: 'outloading', l: 1 };
+      case 'outloading-2': return { t: 'outloading', l: 2 };
+      case 'outloading-3': return { t: 'outloading', l: 3 };
+      case 'bulk-line': return { t: 'bulk', l: 0 };
+      case 'pt-line': return { t: 'pit', l: 0 };
+      default: return null;
+    }
+  };
+
+  const renderWaitingPanel = (tab: string) => {
+    const match = queueMatchForTab(tab);
+    if (!match) return null;
+    const items = queueItems
+      .filter((q) => q.orderType === match.t && Number(q.line) === match.l)
+      .sort((a, b) => (a.queuePosition || 0) - (b.queuePosition || 0));
+
+    const waiting = items.filter((q) => q.queueStatus === 'WAITING');
+    const dispatched = items.filter((q) => q.queueStatus === 'DISPATCHED' || q.queueStatus === 'RUNNING');
+
+    const badge = (status: string) => {
+      const map: Record<string, string> = {
+        WAITING: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+        DISPATCHED: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
+        RUNNING: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
+      };
+      return map[status] || 'text-slate-400 bg-slate-500/10 border-slate-500/30';
+    };
+
+    return (
+      <div className="bg-slate-950/50 light:bg-white border border-slate-700/30 light:border-gray-200 rounded-lg backdrop-blur-sm light:shadow-lg mt-4">
+        <div className="p-6 border-b border-slate-700/30 light:border-gray-200 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white light:text-gray-900 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-amber-400" /> Waiting Orders
+            <span className="text-xs font-normal text-slate-400 light:text-gray-500">
+              ({waiting.length} waiting{dispatched.length ? `, ${dispatched.length} in progress` : ''})
+            </span>
+          </h3>
+        </div>
+        <div className="p-6">
+          {items.length === 0 ? (
+            <div className="text-sm text-slate-400 light:text-gray-500 text-center py-4">
+              No queued orders. Use “Add Order” to queue one — it starts automatically when the line is free and its RFID is scanned.
+            </div>
+          ) : (
+            <div className="rounded-md border border-slate-700/30 light:border-gray-200">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-slate-700/30 light:border-gray-200">
+                    <TableHead className="text-white light:text-gray-900 font-semibold">#</TableHead>
+                    <TableHead className="text-white light:text-gray-900 font-semibold">RFID</TableHead>
+                    <TableHead className="text-white light:text-gray-900 font-semibold">Material</TableHead>
+                    <TableHead className="text-white light:text-gray-900 font-semibold">Qty (KG)</TableHead>
+                    <TableHead className="text-white light:text-gray-900 font-semibold">Dest 1</TableHead>
+                    <TableHead className="text-white light:text-gray-900 font-semibold">Dest 2</TableHead>
+                    <TableHead className="text-white light:text-gray-900 font-semibold">Status</TableHead>
+                    <TableHead className="text-white light:text-gray-900 font-semibold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...dispatched, ...waiting].map((q) => (
+                    <TableRow key={q.id} className="border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50">
+                      <TableCell className="text-slate-300 light:text-gray-700">{q.queuePosition ?? '-'}</TableCell>
+                      <TableCell className="text-cyan-400 light:text-blue-600 font-medium">{q.rfidNumber || q.badgeNo || '-'}</TableCell>
+                      <TableCell className="text-white light:text-gray-900">{q.materialName || q.materialCode || q.sourceSilo || q.pitNo || '-'}</TableCell>
+                      <TableCell className="text-slate-300 light:text-gray-700">{q.declaredQuantityKG || 0}</TableCell>
+                      <TableCell className="text-slate-300 light:text-gray-700">{q.destinationSilo1 || '-'}</TableCell>
+                      <TableCell className="text-slate-300 light:text-gray-700">{q.destinationSilo2 || '-'}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${badge(q.queueStatus)}`}>
+                          {q.queueStatus}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {(q.queueStatus === 'WAITING' || q.queueStatus === 'DISPATCHED') ? (
+                          <Button
+                            className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                            onClick={() => cancelQueuedOrder(q.id)}
+                          >
+                            <X className="h-3 w-3 mr-1" /> Cancel
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-slate-500">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <WaterSystemLayout 
       title="Orders Management" 
@@ -1514,10 +1651,10 @@ export function Orders() {
                                 </SelectItem>
                               ))
                             ) : field.name === 'badgeNo' ? (
-                              // RFID configs for badge number
-                              rfidConfigs.map((rfid) => (
+                              // Only available RFID tags (a tag stays locked until its order completes)
+                              rfidConfigs.filter((rfid) => !rfid.rfid_used).map((rfid) => (
                                 <SelectItem key={rfid.id} value={rfid.rfid_number}>
-                                  {rfid.rfid_number} {rfid.rfid_used ? '(Used)' : '(Available)'}
+                                  {rfid.rfid_number} (Available)
                                 </SelectItem>
                               ))
                             ) : field.name === 'destSel' ? (
@@ -2273,34 +2410,42 @@ export function Orders() {
 
           <TabsContent value="intake-line-1" className="space-y-4">
             {renderIntakeTable(intakeLine1Data, "Intake Line 1 Orders", "intake-line-1")}
+            {renderWaitingPanel("intake-line-1")}
           </TabsContent>
 
           <TabsContent value="intake-line-2" className="space-y-4">
             {renderIntakeTable(intakeLine2Data, "Intake Line 2 Orders", "intake-line-2")}
+            {renderWaitingPanel("intake-line-2")}
           </TabsContent>
 
           <TabsContent value="mineral-intake" className="space-y-4">
             {renderIntakeTable(mineralIntakeData, "Mineral Intake Orders", "mineral-intake")}
+            {renderWaitingPanel("mineral-intake")}
           </TabsContent>
 
           <TabsContent value="outloading-1" className="space-y-4">
             {renderOutloadingTable(outloading1Data, "Outloading 1 Orders", "outloading-1")}
+            {renderWaitingPanel("outloading-1")}
           </TabsContent>
 
           <TabsContent value="outloading-2" className="space-y-4">
             {renderOutloadingTable(outloading2Data, "Outloading 2 Orders", "outloading-2")}
+            {renderWaitingPanel("outloading-2")}
           </TabsContent>
 
           <TabsContent value="outloading-3" className="space-y-4">
             {renderOutloadingTable(outloading3Data, "Outloading 3 Orders", "outloading-3")}
+            {renderWaitingPanel("outloading-3")}
           </TabsContent>
 
           <TabsContent value="bulk-line" className="space-y-4">
             {renderBulkLineTable(bulkLineData, "Bulk Line Orders")}
+            {renderWaitingPanel("bulk-line")}
           </TabsContent>
 
           <TabsContent value="pt-line" className="space-y-4">
             {renderPTLineTable(ptLineData, "PIT Line Orders")}
+            {renderWaitingPanel("pt-line")}
           </TabsContent>
         </Tabs>
 

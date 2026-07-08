@@ -1269,6 +1269,243 @@ def db_orders(db_no: int):
         }
     return jsonify(resp)
 
+# ══════════════════════════════════════════════════════════════════════════
+# Live Order Queue — multi-order creation + sequential RFID-matched dispatch
+# ══════════════════════════════════════════════════════════════════════════
+# Orders are enqueued as WAITING rows (never written to the PLC at create time).
+# A single dispatcher writes exactly ONE order per PLC line, only when that line
+# is Idle and (for RFID lines) the scanned tag matches a waiting order. This
+# structurally prevents a second order from overwriting a running order's tags.
+
+# Strict RFID matching: only dispatch a waiting order when the PLC-scanned RFID
+# matches it. Set QUEUE_STRICT_RFID=0 to fall back to FIFO when no tag is scanned.
+QUEUE_STRICT_RFID = os.getenv("QUEUE_STRICT_RFID", "1").lower() in ("1", "true", "yes")
+
+_QUEUE_LOCK = threading.RLock()
+
+
+def _q_int(v, default: int = 0) -> int:
+    """Coerce a possibly-string/float value to int for PLC INT tags."""
+    try:
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return default
+        return int(float(v))
+    except (TypeError, ValueError):
+        return default
+
+
+def _q_float(v, default: float = 0.0) -> float:
+    try:
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return default
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_rfid(v) -> str:
+    """Normalize an RFID value (REAL from PLC, or string) to a comparable string."""
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        v = v.strip()
+        if v == "":
+            return ""
+        try:
+            return str(int(float(v)))
+        except ValueError:
+            return v
+    try:
+        return str(int(round(float(v))))
+    except (TypeError, ValueError):
+        return str(v)
+
+
+def _order_kvs(row) -> Dict[str, Any]:
+    """Build the PLC tag dict for a queued order row (same tags used at create)."""
+    ot = row.order_type
+    if ot in ("intake", "mineral"):
+        ln = row.line
+        return {
+            f"L{ln}_BadgeNo":               _q_int(row.badge_no),
+            f"L{ln}_SourceRawMaterialCode": row.material_code or "",
+            f"L{ln}_DeclaredQuantity_KG":   _q_float(row.declared_qty_kg),
+            f"L{ln}_DestinationSilo1":      _q_int(row.dest1),
+            f"L{ln}_DestinationSilo2":      _q_int(row.dest2),
+        }
+    if ot == "outloading":
+        ln = row.line
+        return {
+            f"L{ln}_BadgeNo":               _q_int(row.badge_no),
+            f"L{ln}_SourceRawMaterialCode": row.material_code or "",
+            f"L{ln}_DeclaredQuantity_KG":   _q_float(row.declared_qty_kg),
+            f"L{ln}_DestinationSilo1":      _q_int(row.dest1),
+            f"L{ln}_DestinationSilo2":      _q_int(row.dest2),
+            f"L{ln}_DEST_SEL":              _q_int(row.dest_sel),
+        }
+    if ot == "bulk":
+        return {
+            "BulkLine_Source_Silo":     _q_int(row.source_silo),
+            "BulkLine_DEST_1":          _q_int(row.dest1),
+            "BulkLine_DEST_2":          _q_int(row.dest2),
+            "BulkLine_CC25_Sel":        _q_int(row.cc25_sel),
+            "BulkLine_Weight_Quantity": _q_float(row.declared_qty_kg),
+            "BulkLine_Scale_Selection": _q_int(row.scale_sel),
+        }
+    if ot == "pit":
+        return {
+            "PitLine_Pit_Number":      _q_int(row.pit_no),
+            "PitLine_RawMaterialCode": row.raw_code or "",
+            "PitLine_DEST_1":          _q_int(row.dest1),
+            "PitLine_DEST_2":          _q_int(row.dest2),
+            "PitLine_Weight_Quantity": _q_float(row.declared_qty_kg),
+            "PitLine_Scale_Selection": _q_int(row.scale_sel),
+        }
+    raise ValueError(f"Unknown order_type: {ot}")
+
+
+def _release_rfid(rfid_number: Optional[str]) -> None:
+    """Unlock an RFID tag so it can be used by a new order."""
+    if not rfid_number:
+        return
+    try:
+        cfg = RFIDConfig.query.filter_by(rfid_number=str(rfid_number)).first()
+        if cfg and cfg.rfid_used:
+            cfg.rfid_used = False
+            cfg.rfid_linked_to_order = None
+    except Exception as e:
+        _vlog(f"[QUEUE] Failed releasing RFID {rfid_number}: {e}")
+
+
+def _complete_queue_row(row, now) -> None:
+    from models.order_queue import QUEUE_COMPLETED
+    row.queue_status = QUEUE_COMPLETED
+    row.completed_at = now
+    _release_rfid(row.rfid_number)
+    db.session.commit()
+    _vlog(f"[QUEUE] ✅ Completed queue #{row.id} ({row.order_type} line {row.line}), RFID {row.rfid_number} released")
+
+
+def _dispatch_next(ctx: Dict[str, Any], now) -> bool:
+    """Write the next matching WAITING order for this line onto the PLC."""
+    from models.order_queue import OrderQueue, QUEUE_WAITING, QUEUE_DISPATCHED
+
+    order_type = ctx["order_type"]
+    line = ctx["line"]
+
+    waiting = (
+        OrderQueue.query
+        .filter(OrderQueue.order_type == order_type,
+                OrderQueue.line == line,
+                OrderQueue.queue_status == QUEUE_WAITING)
+        .order_by(OrderQueue.queue_position.asc(), OrderQueue.created_at.asc())
+        .all()
+    )
+    if not waiting:
+        return False
+
+    is_rfid_line = order_type in ("intake", "mineral", "outloading")
+    scanned = _normalize_rfid(ctx.get("scanned_rfid")) if is_rfid_line else ""
+
+    target = None
+    if is_rfid_line:
+        if scanned:
+            for w in waiting:
+                if _normalize_rfid(w.rfid_number) == scanned:
+                    target = w
+                    break
+            if target is None and QUEUE_STRICT_RFID:
+                _vlog(f"[QUEUE] line {line}: scanned RFID {scanned} matches no waiting order")
+                return False
+        if target is None and QUEUE_STRICT_RFID:
+            # No tag scanned yet → wait for a truck to present its RFID.
+            return False
+
+    if target is None:
+        target = waiting[0]  # FIFO (bulk/pit, or non-strict mode)
+
+    try:
+        m = load_map_from_pg(target.db_no)
+        kvs = _order_kvs(target)
+        _write_tags(target.db_no, m, kvs)
+    except Exception as e:
+        db.session.rollback()
+        print(f"[QUEUE] ❌ PLC write failed dispatching queue #{target.id}: {e}")
+        return False
+
+    target.queue_status = QUEUE_DISPATCHED
+    target.dispatched_at = now
+    db.session.commit()
+    _vlog(f"[QUEUE] 🚚 Dispatched queue #{target.id} ({order_type} line {line}) RFID {target.rfid_number}")
+    return True
+
+
+def _process_queue_line(ctx: Dict[str, Any], now) -> None:
+    from models.order_queue import OrderQueue, QUEUE_RUNNING, ACTIVE_STATUSES
+
+    order_type = ctx["order_type"]
+    line = ctx["line"]
+    status = int(ctx.get("status") or 0)
+
+    active = (
+        OrderQueue.query
+        .filter(OrderQueue.order_type == order_type,
+                OrderQueue.line == line,
+                OrderQueue.queue_status.in_(list(ACTIVE_STATUSES)))
+        .order_by(OrderQueue.dispatched_at.asc())
+        .first()
+    )
+
+    if active:
+        if status in (2, 3, 4, 5, 6, 7, 8, 12):
+            # Line has left Idle → the dispatched order is now running.
+            if active.queue_status != QUEUE_RUNNING:
+                active.queue_status = QUEUE_RUNNING
+                active.started_at = active.started_at or now
+                db.session.commit()
+            return
+        if status == 1:
+            if active.queue_status == QUEUE_RUNNING:
+                # Was running, now back to Idle → complete it and free the line.
+                _complete_queue_row(active, now)
+                # fall through to dispatch the next waiting order
+            else:
+                # DISPATCHED but still Idle → waiting for operator/PLC to start.
+                return
+        else:
+            return
+
+    if status == 1:
+        _dispatch_next(ctx, now)
+
+
+def process_order_queue(contexts: List[Dict[str, Any]]) -> None:
+    """Run the queue state machine for every PLC line (called each poll)."""
+    with _QUEUE_LOCK:
+        for ctx in contexts:
+            try:
+                _process_queue_line(ctx, datetime.now())
+            except Exception as e:
+                db.session.rollback()
+                print(f"[QUEUE] error processing line {ctx.get('order_type')}/{ctx.get('line')}: {e}")
+
+
+def _queue_ctx(order_type: str, db_no: int, line: int, lines_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract PLC status + scanned RFID for a line from its rendered tag dict."""
+    if order_type in ("intake", "mineral", "outloading"):
+        status = int(_nz(lines_dict, f"L{line}_StatusWord", 0) or 0)
+        scanned = _nz(lines_dict, f"L{line}_RFID_BadgeReading")
+    elif order_type == "bulk":
+        status = int(_nz(lines_dict, "BulkLine_Status", 0) or 0)
+        scanned = None
+    elif order_type == "pit":
+        status = int(_nz(lines_dict, "PitLine_Status", 0) or 0)
+        scanned = None
+    else:
+        status, scanned = 0, None
+    return {"order_type": order_type, "db_no": db_no, "line": line, "status": status, "scanned_rfid": scanned}
+
+
 def _execute_plant_orders() -> Dict[str, Any]:
     """
     Reads live orders from PLC, updates DB with lifecycle timestamps.
@@ -1280,11 +1517,14 @@ def _execute_plant_orders() -> Dict[str, Any]:
     payload: Dict[str, Any] = {}
     mineral_orders = []  # Initialize mineral_orders at the beginning
     legacy_mineral_orders = []  # Initialize legacy_mineral_orders
+    queue_contexts: List[Dict[str, Any]] = []  # per-line status for the order queue dispatcher
 
     # DB1 Intake (Regular intake lines 1 & 2, plus legacy mineral orders)
     m1 = load_map_from_pg(1); b1 = read_db_bytes(1, _needed_bytes(m1))
     if b1:
         l1 = render_lines(b1, m1["line_tags"])
+        queue_contexts.append(_queue_ctx("intake", 1, 1, l1))
+        queue_contexts.append(_queue_ctx("intake", 1, 2, l1))
         # Check all lines for intake orders
         all_intake = [r for r in (_intake_row(l1, k) for k in (1,2)) if r]
         _vlog(f"[DEBUG] All intake orders from DB1: {all_intake}")
@@ -1315,6 +1555,7 @@ def _execute_plant_orders() -> Dict[str, Any]:
     m3 = load_map_from_pg(3); b3 = read_db_bytes(3, _needed_bytes(m3))
     if b3:
         l3 = render_lines(b3, m3["line_tags"])
+        queue_contexts.append(_queue_ctx("mineral", 3, 3, l3))
         # Check line 3 for mineral orders (mineral orders use line 3, not line 1)
         db3_mineral_orders = [r for r in (_intake_row(l3, k) for k in (3,)) if r]
         _vlog(f"[DEBUG] Mineral orders from DB3 (line 3): {db3_mineral_orders}")
@@ -1333,6 +1574,8 @@ def _execute_plant_orders() -> Dict[str, Any]:
     m2 = load_map_from_pg(2); b2 = read_db_bytes(2, _needed_bytes(m2))
     if b2:
         l2 = render_lines(b2, m2["line_tags"])
+        for _ol in (1, 2, 3):
+            queue_contexts.append(_queue_ctx("outloading", 2, _ol, l2))
         outloading_raw = [r for r in (_intake_row(l2, k) for k in (1,2,3)) if r]
         payload["outloading"] = outloading_raw
         _vlog(f"[DEBUG] DB2 Outloading: Found {len(outloading_raw)} outloading orders")
@@ -1345,6 +1588,8 @@ def _execute_plant_orders() -> Dict[str, Any]:
     m4 = load_map_from_pg(4); b4 = read_db_bytes(4, _needed_bytes(m4))
     if b4:
         l4 = render_lines(b4, m4["line_tags"])
+        queue_contexts.append(_queue_ctx("bulk", 4, 0, l4))
+        queue_contexts.append(_queue_ctx("pit", 4, 0, l4))
         payload["bulk"] = {
             "line": "Bulk",
             "source_silo": _nz(l4,"BulkLine_Source_Silo"),
@@ -1420,6 +1665,12 @@ def _execute_plant_orders() -> Dict[str, Any]:
         _vlog(f"[DEBUG] Successfully updated database with lifecycle tracking")
     except Exception as e:
         print(f"[ERROR] Failed to update database with lifecycle tracking: {e}")
+
+    # 🔹 Live order queue: dispatch next waiting order to any Idle line
+    try:
+        process_order_queue(queue_contexts)
+    except Exception as e:
+        print(f"[ERROR] Order queue processing failed: {e}")
 
     return payload
 
@@ -2378,6 +2629,169 @@ def clear_mineral_orders():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@plc_bp.route("/orders/enqueue", methods=["POST"])
+def enqueue_order():
+    """
+    Add an order to the live queue as WAITING (does NOT write to the PLC).
+    The dispatcher later writes it to the PLC when the line is Idle and the
+    scanned RFID matches. Multiple orders can be queued per line.
+
+    Body: order_type, line, rfid_number, badge_no, material_code, material_name,
+          declared_qty_kg, dest1, dest2, dest_sel, source_silo, cc25_sel,
+          scale_sel, pit_no, raw_code, truck_id, client_id
+    """
+    from sqlalchemy import func
+    from models.order_queue import OrderQueue, QUEUE_WAITING
+
+    data = request.get_json(force=True) or {}
+    order_type = str(data.get("order_type") or "").lower()
+    line = _q_int(data.get("line"), 0)
+    rfid = str(data.get("rfid_number") or "").strip()
+
+    dest1 = _q_int(data.get("dest1"))
+    dest2 = _q_int(data.get("dest2"))
+
+    # Resolve effective order type + PLC routing
+    if order_type == "intake":
+        is_mineral = (401 <= dest1 <= 408) or (401 <= dest2 <= 408) or line == 3 or bool(data.get("is_mineral"))
+        if is_mineral:
+            eff_type, db_no, line = "mineral", 3, 3
+        else:
+            eff_type, db_no = "intake", 1
+    elif order_type == "mineral":
+        eff_type, db_no, line = "mineral", 3, 3
+    elif order_type == "outloading":
+        eff_type, db_no = "outloading", 2
+    elif order_type == "bulk":
+        eff_type, db_no, line = "bulk", 4, 0
+    elif order_type == "pit":
+        eff_type, db_no, line = "pit", 4, 0
+    else:
+        return jsonify({"error": f"Unknown order_type: {order_type}"}), 400
+
+    rfid_required = eff_type in ("intake", "mineral", "outloading")
+    if rfid_required and not rfid:
+        return jsonify({"error": "rfid_number is required for this order type"}), 400
+
+    # RFID lock: a tag linked to an open order cannot be reused
+    cfg = None
+    if rfid:
+        cfg = RFIDConfig.query.filter_by(rfid_number=rfid).first()
+        if not cfg:
+            cfg = RFIDConfig(rfid_number=rfid, rfid_used=False, rfid_linked_to_order=None)
+            db.session.add(cfg)
+            db.session.flush()
+        if cfg.rfid_used:
+            return jsonify({"error": "RFID already in use", "rfid_number": rfid}), 409
+
+    # Next queue position for this line
+    max_pos = (
+        db.session.query(func.max(OrderQueue.queue_position))
+        .filter(OrderQueue.order_type == eff_type,
+                OrderQueue.line == line,
+                OrderQueue.queue_status == QUEUE_WAITING)
+        .scalar()
+    )
+    position = (max_pos or 0) + 1
+
+    row = OrderQueue(
+        order_type=eff_type,
+        db_no=db_no,
+        line=line,
+        rfid_number=rfid or None,
+        queue_status=QUEUE_WAITING,
+        queue_position=position,
+        badge_no=str(data.get("badge_no") or "") or None,
+        material_code=str(data.get("material_code") or "") or None,
+        material_name=str(data.get("material_name") or "") or None,
+        declared_qty_kg=_q_float(data.get("declared_qty_kg")),
+        dest1=str(data.get("dest1") or "") or None,
+        dest2=str(data.get("dest2") or "") or None,
+        dest_sel=str(data.get("dest_sel") or "") or None,
+        source_silo=str(data.get("source_silo") or "") or None,
+        cc25_sel=str(data.get("cc25_sel") or "") or None,
+        scale_sel=str(data.get("scale_sel") or "") or None,
+        pit_no=str(data.get("pit_no") or "") or None,
+        raw_code=str(data.get("raw_code") or "") or None,
+        truck_id=_q_int(data.get("truck_id")) or None,
+        client_id=_q_int(data.get("client_id")) or None,
+    )
+    db.session.add(row)
+    db.session.flush()
+
+    if cfg is not None:
+        cfg.rfid_used = True
+        cfg.rfid_linked_to_order = f"QUEUE-{row.id}"
+
+    if rfid and row.truck_id:
+        try:
+            db.session.add(RFIDLog(
+                rfid_number=rfid,
+                truck_id=row.truck_id,
+                order_ref=f"QUEUE-{row.id}",
+                sent_to_plc=False,
+                plc_payload={"note": "enqueued", "order_type": eff_type, "line": line},
+            ))
+        except Exception:
+            pass
+
+    db.session.commit()
+    return jsonify({"ok": True, "order": row.to_dict()}), 201
+
+
+@plc_bp.route("/orders/queue", methods=["GET"])
+def list_order_queue():
+    """List queued orders. Query params: order_type, line, status, include_done."""
+    from models.order_queue import OrderQueue, OPEN_STATUSES
+
+    q = OrderQueue.query
+    order_type = request.args.get("order_type")
+    line = request.args.get("line")
+    status = request.args.get("status")
+    include_done = request.args.get("include_done", "").lower() in ("1", "true", "yes")
+
+    if order_type:
+        q = q.filter(OrderQueue.order_type == order_type.lower())
+    if line is not None and line != "":
+        q = q.filter(OrderQueue.line == _q_int(line))
+    if status:
+        q = q.filter(OrderQueue.queue_status == status.upper())
+    elif not include_done:
+        q = q.filter(OrderQueue.queue_status.in_(list(OPEN_STATUSES)))
+
+    rows = q.order_by(OrderQueue.line.asc(),
+                      OrderQueue.queue_position.asc(),
+                      OrderQueue.created_at.asc()).all()
+    return jsonify({"items": [r.to_dict() for r in rows], "total": len(rows)})
+
+
+@plc_bp.route("/orders/queue/<int:queue_id>/cancel", methods=["POST"])
+def cancel_queued_order(queue_id: int):
+    """Cancel a WAITING or DISPATCHED (not yet started) order and release its RFID."""
+    from models.order_queue import OrderQueue, QUEUE_WAITING, QUEUE_DISPATCHED, QUEUE_CANCELLED
+
+    row = OrderQueue.query.get(queue_id)
+    if not row:
+        return jsonify({"error": "Queue item not found"}), 404
+
+    if row.queue_status not in (QUEUE_WAITING, QUEUE_DISPATCHED):
+        return jsonify({"error": f"Cannot cancel order in status {row.queue_status}"}), 409
+
+    with _QUEUE_LOCK:
+        # If already written to the PLC, clear the line's tags.
+        if row.queue_status == QUEUE_DISPATCHED and row.order_type in ("intake", "mineral", "outloading"):
+            try:
+                _clear_plc_tags(row.db_no, row.line)
+            except Exception as e:
+                _vlog(f"[QUEUE] clear tags on cancel failed: {e}")
+
+        row.queue_status = QUEUE_CANCELLED
+        _release_rfid(row.rfid_number)
+        db.session.commit()
+
+    return jsonify({"ok": True, "order": row.to_dict()})
+
 
 @plc_bp.route("/orders/create", methods=["POST"])
 def create_order_comprehensive():

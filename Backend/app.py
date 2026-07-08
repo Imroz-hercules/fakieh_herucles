@@ -34,6 +34,7 @@ from routes.truck_entry_routes import truck_entry_bp
 from models.distribution import DistributionRule, SystemSetting
 from models.client import Client
 from models.truck_weigh_order import TruckWeighOrder
+from models.order_queue import OrderQueue
 from background_sync import start_silo_sync
 
 app = Flask(__name__)
@@ -156,6 +157,12 @@ if __name__ == '__main__':
             ensure_truck_weigh_orders_table()
         except Exception as _truck_weigh_err:
             print(f"Truck weigh orders migration skipped: {_truck_weigh_err}")
+
+        try:
+            from models.order_queue import ensure_order_queue_table
+            ensure_order_queue_table()
+        except Exception as _order_queue_err:
+            print(f"Order queue migration skipped: {_order_queue_err}")
         
         # Start background silo sync task (in-process; avoids HTTP self-call)
         start_silo_sync(app)
