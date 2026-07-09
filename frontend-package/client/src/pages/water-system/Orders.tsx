@@ -1496,14 +1496,14 @@ export function Orders() {
           <h3 className="text-lg font-semibold text-white light:text-gray-900 flex items-center gap-2">
             <Clock className="h-4 w-4 text-amber-400" /> Waiting Orders
             <span className="text-xs font-normal text-slate-400 light:text-gray-500">
-              ({waiting.length} waiting{dispatched.length ? `, ${dispatched.length} in progress` : ''})
+              ({waiting.length} waiting{dispatched.length ? `, ${dispatched.length} in progress above` : ''})
             </span>
           </h3>
         </div>
         <div className="p-6">
-          {items.length === 0 ? (
+          {waiting.length === 0 ? (
             <div className="text-sm text-slate-400 light:text-gray-500 text-center py-4">
-              No queued orders. Use “Add Order” to queue one — it starts automatically when the line is free and its RFID is scanned.
+              No waiting orders. Use “Add Order” to queue one — it starts automatically when the line is free and its RFID is scanned.
             </div>
           ) : (
             <div className="rounded-md border border-slate-700/30 light:border-gray-200">
@@ -1517,7 +1517,7 @@ export function Orders() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[...dispatched, ...waiting].map((q, index) => (
+                  {waiting.map((q, index) => (
                     <TableRow key={q.id} className={`border-slate-700/30 light:border-gray-200 hover:bg-slate-800/30 light:hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-slate-900/20 light:bg-gray-50' : 'bg-slate-800/10 light:bg-gray-100'}`}>
                       {renderRowCells(q)}
                     </TableRow>

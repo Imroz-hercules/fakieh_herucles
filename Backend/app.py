@@ -163,6 +163,12 @@ if __name__ == '__main__':
             ensure_order_queue_table()
         except Exception as _order_queue_err:
             print(f"Order queue migration skipped: {_order_queue_err}")
+
+        try:
+            from models.orders import ensure_order_truck_client_columns
+            ensure_order_truck_client_columns()
+        except Exception as _order_cols_err:
+            print(f"Order truck/client column migration skipped: {_order_cols_err}")
         
         # Start background silo sync task (in-process; avoids HTTP self-call)
         start_silo_sync(app)

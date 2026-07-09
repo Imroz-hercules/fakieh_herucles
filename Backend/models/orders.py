@@ -269,3 +269,39 @@ class PTLineOrder(db.Model):
             'truckId': self.truck_id,
             'clientId': self.client_id,
         }
+
+
+def ensure_order_truck_client_columns():
+    """Add truck_id/client_id to order tables on existing installs (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    db.create_all()
+    insp = inspect(db.engine)
+    tables = (
+        "intake_orders",
+        "outloading_orders",
+        "bulk_line_orders",
+        "pt_line_orders",
+    )
+    statements = []
+    for table in tables:
+        if not insp.has_table(table):
+            continue
+        cols = {c["name"] for c in insp.get_columns(table)}
+        if "truck_id" not in cols:
+            statements.append(
+                f"ALTER TABLE {table} ADD COLUMN truck_id INTEGER"
+            )
+        if "client_id" not in cols:
+            statements.append(
+                f"ALTER TABLE {table} ADD COLUMN client_id INTEGER"
+            )
+    if not statements:
+        return
+    try:
+        for stmt in statements:
+            db.session.execute(text(stmt))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
