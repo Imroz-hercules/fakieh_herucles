@@ -117,20 +117,22 @@ export default function FakiehDashboard() {
     return new Date(Math.max(...dates.map(date => (date as Date).getTime())))
   }, [batchMaterials])
 
-  // Today's batch count by hour 0-23 (Saudi time, from dedicated API)
+  // Today's batch count by hour (0 through current hour)
   const hourlyBatchCountData = React.useMemo(() => {
-    const defaultLabels = Array.from({ length: 24 }, (_, i) => String(i))
-    let labels = hourlyBatchCounts.labels.length === 24
-      ? hourlyBatchCounts.labels
+    const currentHour = getSaudiPartsForInstant(new Date()).hour
+    const hourCount = currentHour + 1
+    const defaultLabels = Array.from({ length: hourCount }, (_, i) => String(i))
+    let labels = hourlyBatchCounts.labels.length >= hourCount
+      ? hourlyBatchCounts.labels.slice(0, hourCount)
       : defaultLabels
-    let counts = hourlyBatchCounts.counts.length === 24
-      ? hourlyBatchCounts.counts
+    let counts = hourlyBatchCounts.counts.length >= hourCount
+      ? hourlyBatchCounts.counts.slice(0, hourCount)
       : defaultLabels.map(() => 0)
 
     // Fallback when API unavailable: derive today's distinct batches from loaded materials
     if (counts.every((c) => c === 0) && batchMaterials.length > 0) {
       const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ })
-      const buckets: Set<string>[] = Array.from({ length: 24 }, () => new Set())
+      const buckets: Set<string>[] = Array.from({ length: hourCount }, () => new Set())
       batchMaterials.forEach((item) => {
         const batchDate = parseUtcDate(item['Batch Act Start'] || '')
         if (!batchDate) return
@@ -140,7 +142,7 @@ export default function FakiehDashboard() {
         const hour = Number(
           batchDate.toLocaleString('en-US', { timeZone: BUSINESS_TZ, hour: 'numeric', hour12: false })
         )
-        if (hour >= 0 && hour < 24) buckets[hour].add(String(guid))
+        if (hour >= 0 && hour <= currentHour) buckets[hour].add(String(guid))
       })
       const derived = buckets.map((s) => s.size)
       if (derived.some((c) => c > 0)) {
@@ -438,7 +440,7 @@ export default function FakiehDashboard() {
         callbacks: {
           title: function(items: any[]) {
             const hour = items[0]?.label ?? ''
-            return `Hour ${hour} (Saudi)`
+            return `Hour ${hour}`
           },
           label: function(context: any) {
             return `${context.dataset.label}: ${context.parsed.y} batches`
@@ -677,9 +679,9 @@ export default function FakiehDashboard() {
       const response = await fetch('/api/sqlserver/batch-hourly-count?mode=today')
       if (!response.ok) return
       const data = await response.json()
-      if (data.success && Array.isArray(data.counts) && data.counts.length === 24) {
+      if (data.success && Array.isArray(data.counts) && data.counts.length > 0) {
         setHourlyBatchCounts({
-          labels: data.labels ?? Array.from({ length: 24 }, (_, i) => String(i)),
+          labels: data.labels ?? [],
           counts: data.counts,
         })
       }
@@ -1089,7 +1091,7 @@ export default function FakiehDashboard() {
               <h3 className="text-lg font-semibold text-white light:text-gray-900">Today Batch Count by Hour</h3>
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-cyan-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-cyan-400 font-medium">Hours 0–23 (Saudi)</span>
+                <span className="text-xs text-cyan-400 font-medium">Today</span>
               </div>
             </div>
             <div className="relative h-64">

@@ -251,11 +251,18 @@ def get_batch_hourly_count():
                 hour = _naive_utc_to_saudi_hour(batch_start)
                 counts[hour] += 1
 
+        if mode != "rolling":
+            now_saudi = datetime.now(UTC).astimezone(BUSINESS_TZ)
+            current_hour = now_saudi.hour
+            labels = [str(h) for h in range(current_hour + 1)]
+            counts = counts[: current_hour + 1]
+
         return jsonify(
             {
                 "success": True,
                 "mode": mode,
                 "hours": len(counts),
+                "current_hour": labels[-1] if labels else "0",
                 "labels": labels,
                 "counts": counts,
                 "total_batches": sum(counts),
