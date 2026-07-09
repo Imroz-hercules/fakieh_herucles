@@ -455,12 +455,10 @@ export function Storage() {
                           {silo.material_code || "—"}
                         </TableCell>
                         <TableCell className="text-slate-300 light:text-gray-700 tabular-nums">
-                          {silo.quantity_kg != null
-                            ? silo.quantity_kg.toLocaleString(undefined, {
-                                maximumFractionDigits: 1,
-                                minimumFractionDigits: 0,
-                              })
-                            : "—"}
+                          {(silo.quantity_kg ?? 0).toLocaleString(undefined, {
+                            maximumFractionDigits: 1,
+                            minimumFractionDigits: 0,
+                          })}
                         </TableCell>
                         <TableCell>
                           <span

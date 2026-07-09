@@ -415,34 +415,44 @@ def read_db_bytes(db_no: int, required_len: int) -> Optional[bytearray]:
     if cached and cached >= required_len:
         try_order = [cached] + [s for s in (cached+32, cached+64, cached+128) if s > cached]
     else:
-        # Start with a size that can handle status words at high offsets
-        start_size = 64 if required_len <= 1024 else min(2048, required_len)
-        try_order = _sizes_to_try(start_size)
+        # Prefer sizes >= required_len so DB5 qty reads don't stop at 64 bytes
+        all_sizes = _sizes_to_try(max(64, min(required_len, 512)))
+        at_least = sorted(s for s in all_sizes if s >= required_len)
+        below = sorted((s for s in all_sizes if s < required_len), reverse=True)
+        try_order = at_least + below
 
-    # Always ensure we try the required length
+    # Always ensure we try the required length first
     if required_len not in try_order:
-        try_order.append(required_len)
+        try_order.insert(0, required_len)
 
+    best: Optional[bytearray] = None
+    best_len = 0
     for ln in try_order:
+        if best_len >= required_len:
+            break
         try:
             with CLIENT_LOCK:
                 data = cli.db_read(db_no, 0, max(2, ln))
-            _remember_good(db_no, ln)
-            return bytearray(data)
+            buf = bytearray(data)
+            if len(buf) > best_len:
+                best = buf
+                best_len = len(buf)
+                _remember_good(db_no, ln)
         except Exception as e:
             error_msg = str(e).lower()
             if "out of range" in error_msg:
                 continue
             elif "connection reset" in error_msg or "tcp" in error_msg:
-                # TCP connection issue - reset client and mark absent
                 print(f"[PLC] TCP connection error for DB{db_no}: {e}")
                 CLIENT = None
                 _set_absent(db_no)
                 return None
             else:
-                # Other errors - just return None for this attempt
                 print(f"[PLC] Read error for DB{db_no}: {e}")
             return None
+
+    if best is not None:
+        return best
 
     # mark absent if even 2 bytes fail
     try:
@@ -546,6 +556,18 @@ def fetch_silo_qty_from_plc() -> Dict[int, float]:
     if not b:
         return {}
     return render_silo_qty(b, m["qty_map"])
+
+def _resolve_silo_qty(
+    silo_no: int,
+    qty_live: Optional[Dict[int, float]],
+    db_qty,
+) -> float:
+    """Live PLC qty when present, else DB snapshot, else 0."""
+    if qty_live is not None and silo_no in qty_live:
+        return float(qty_live[silo_no])
+    if db_qty is not None:
+        return float(db_qty)
+    return 0.0
 
 STATUS_MAP = {
     0: {"label": "No Status", "kind": "inactive"},
@@ -2489,10 +2511,7 @@ def silos_from_db_under_plc_prefix():
     out = []
     for r in rows:
         silo_no = int(r.silo_no)
-        if qty_live:
-            qty = qty_live.get(silo_no)
-        else:
-            qty = float(r.quantity_kg) if r.quantity_kg is not None else None
+        qty = _resolve_silo_qty(silo_no, qty_live or None, r.quantity_kg)
         out.append({
             "siloNo":       silo_no,
             "dbNo":         int(r.db_no) if r.db_no is not None else None,
@@ -2529,11 +2548,7 @@ def api_silos():
             "materialName": r.material_name or "",
             "hlActive":     bool(r.hl_active),
             "lockActive":   bool(r.lock_active),
-            "quantityKg":   (
-                qty_live.get(int(r.silo_no))
-                if qty_live
-                else (float(r.quantity_kg) if r.quantity_kg is not None else None)
-            ),
+            "quantityKg":   _resolve_silo_qty(int(r.silo_no), qty_live or None, r.quantity_kg),
             "updatedAt":    r.updated_at.isoformat() if r.updated_at else None,
         }
         for r in rows
