@@ -74,6 +74,10 @@ export default function FakiehDashboard() {
   // New state variables for API data
   const [totalOrders, setTotalOrders] = useState(0)
   const [totalTrucks, setTotalTrucks] = useState(0)
+  const [hourlyBatchCounts, setHourlyBatchCounts] = useState<{ labels: string[]; counts: number[] }>({
+    labels: [],
+    counts: [],
+  })
   
   // Computed KPI values from SQL Server data
   const activeBatches = batchMaterials.filter(item => !item['Batch Act End']).length
@@ -113,75 +117,42 @@ export default function FakiehDashboard() {
     return new Date(Math.max(...dates.map(date => (date as Date).getTime())))
   }, [batchMaterials])
 
-  // Chart data and configuration
-  const productionTrendData = React.useMemo(() => {
-    if (batchMaterials.length === 0) {
-      return {
-        labels: ['No Data'],
-        datasets: [{
-          label: 'Production Output (tons)',
-          data: [0],
-          borderColor: '#0891b2',
-          backgroundColor: 'rgba(8, 145, 178, 0.1)',
-          borderWidth: 3,
-          fill: true,
-          tension: 0.4,
-          pointBackgroundColor: '#0891b2',
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 2,
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          pointHoverBackgroundColor: '#ffffff',
-          pointHoverBorderColor: '#0891b2',
-          pointHoverBorderWidth: 3,
-        }]
+  // Today's batch count by hour 0-23 (Saudi time, from dedicated API)
+  const hourlyBatchCountData = React.useMemo(() => {
+    const defaultLabels = Array.from({ length: 24 }, (_, i) => String(i))
+    let labels = hourlyBatchCounts.labels.length === 24
+      ? hourlyBatchCounts.labels
+      : defaultLabels
+    let counts = hourlyBatchCounts.counts.length === 24
+      ? hourlyBatchCounts.counts
+      : defaultLabels.map(() => 0)
+
+    // Fallback when API unavailable: derive today's distinct batches from loaded materials
+    if (counts.every((c) => c === 0) && batchMaterials.length > 0) {
+      const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ })
+      const buckets: Set<string>[] = Array.from({ length: 24 }, () => new Set())
+      batchMaterials.forEach((item) => {
+        const batchDate = parseUtcDate(item['Batch Act Start'] || '')
+        if (!batchDate) return
+        if (batchDate.toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ }) !== todayKey) return
+        const guid = item['Batch GUID']
+        if (!guid) return
+        const hour = Number(
+          batchDate.toLocaleString('en-US', { timeZone: BUSINESS_TZ, hour: 'numeric', hour12: false })
+        )
+        if (hour >= 0 && hour < 24) buckets[hour].add(String(guid))
+      })
+      const derived = buckets.map((s) => s.size)
+      if (derived.some((c) => c > 0)) {
+        counts = derived
       }
     }
-
-    // Group batch materials by date and calculate daily production
-    const dailyProduction = new Map()
-    
-    batchMaterials.forEach(item => {
-      let quantity = item['Quantity'] || 0
-      // Convert to tons if quantity > 1000 (likely kg)
-      if (quantity > 1000) {
-        quantity = quantity / 1000
-      }
-      
-              // Get the date from Batch Act Start, Batch Act End, or Batch Transfer Time
-        const dateStr = item['Batch Act Start'] || item['Batch Act End'] || item['Batch Transfer Time']
-        if (dateStr) {
-          const date = parseUtcDate(dateStr)
-          if (date) {
-            const dateKey = date.toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ })
-
-            if (dailyProduction.has(dateKey)) {
-              dailyProduction.set(dateKey, dailyProduction.get(dateKey)! + quantity)
-            } else {
-              dailyProduction.set(dateKey, quantity)
-            }
-          }
-        }
-    })
-
-    // Sort by date and get the last 7 days
-    const sortedDates = Array.from(dailyProduction.keys()).sort()
-    const last7Days = sortedDates.slice(-7)
-    
-    // Format dates for display
-    const labels = last7Days.map(dateStr => {
-      const [y, m, d] = dateStr.split('-').map(Number)
-      const noonUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
-      return noonUtc.toLocaleDateString('en-US', { timeZone: BUSINESS_TZ, month: '2-digit', day: '2-digit' })
-    })
-    
-    const data = last7Days.map(dateStr => dailyProduction.get(dateStr) || 0)
 
     return {
       labels,
       datasets: [{
-        label: 'Production Output (tons)',
-        data,
+        label: 'Batch Count',
+        data: counts,
         borderColor: '#0891b2',
         backgroundColor: 'rgba(8, 145, 178, 0.1)',
         borderWidth: 3,
@@ -190,14 +161,14 @@ export default function FakiehDashboard() {
         pointBackgroundColor: '#0891b2',
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
-        pointRadius: 6,
-        pointHoverRadius: 8,
+        pointRadius: 4,
+        pointHoverRadius: 6,
         pointHoverBackgroundColor: '#ffffff',
         pointHoverBorderColor: '#0891b2',
         pointHoverBorderWidth: 3,
-      }]
+      }],
     }
-  }, [batchMaterials])
+  }, [hourlyBatchCounts, batchMaterials])
 
   // Calculate material distribution from SQL Server data
   const materialDistribution = React.useMemo(() => {
@@ -432,7 +403,7 @@ export default function FakiehDashboard() {
     }
   }, [batchMaterials])
 
-  const chartOptions: any = {
+  const hourlyChartOptions: any = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -464,6 +435,15 @@ export default function FakiehDashboard() {
           size: 13
         },
         padding: 12,
+        callbacks: {
+          title: function(items: any[]) {
+            const hour = items[0]?.label ?? ''
+            return `Hour ${hour} (Saudi)`
+          },
+          label: function(context: any) {
+            return `${context.dataset.label}: ${context.parsed.y} batches`
+          }
+        }
       }
     },
     scales: {
@@ -475,12 +455,18 @@ export default function FakiehDashboard() {
         ticks: {
           color: '#94a3b8',
           font: {
-            size: 11,
+            size: 9,
             weight: 'normal'
-          }
+          },
+          maxRotation: 0,
+          minRotation: 0,
+          autoSkip: false,
+          maxTicksLimit: 24,
         }
       },
       y: {
+        beginAtZero: true,
+        suggestedMax: 5,
         grid: {
           color: 'rgba(148, 163, 184, 0.2)',
           drawBorder: false,
@@ -490,6 +476,10 @@ export default function FakiehDashboard() {
           font: {
             size: 11,
             weight: 'normal'
+          },
+          stepSize: 1,
+          callback: function(value: any) {
+            return Number.isInteger(value) ? `${value} batches` : ''
           }
         }
       }
@@ -682,12 +672,32 @@ export default function FakiehDashboard() {
     }
   }
 
+  const fetchHourlyBatchCount = async () => {
+    try {
+      const response = await fetch('/api/sqlserver/batch-hourly-count?mode=today')
+      if (!response.ok) return
+      const data = await response.json()
+      if (data.success && Array.isArray(data.counts) && data.counts.length === 24) {
+        setHourlyBatchCounts({
+          labels: data.labels ?? Array.from({ length: 24 }, (_, i) => String(i)),
+          counts: data.counts,
+        })
+      }
+    } catch {
+      // fallback useMemo derives from batchMaterials when API unavailable
+    }
+  }
+
   // Load data on component mount
   useEffect(() => {
     fetchBatchMaterials()
     fetchTotalCount()
     fetchTotalOrders()
     fetchTotalTrucks()
+    fetchHourlyBatchCount()
+
+    const interval = setInterval(fetchHourlyBatchCount, 60000)
+    return () => clearInterval(interval)
   }, [])
 
   // Fetch total orders count
@@ -1076,14 +1086,14 @@ export default function FakiehDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg p-6 shadow-lg light:shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white light:text-gray-900">Production Trend</h3>
+              <h3 className="text-lg font-semibold text-white light:text-gray-900">Today Batch Count by Hour</h3>
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-cyan-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-cyan-400 font-medium">Live Data</span>
+                <span className="text-xs text-cyan-400 font-medium">Hours 0–23 (Saudi)</span>
               </div>
             </div>
             <div className="relative h-64">
-              <Line data={productionTrendData} options={chartOptions} />
+              <Line data={hourlyBatchCountData} options={hourlyChartOptions} />
               {/* Futuristic overlay elements */}
               <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent"></div>

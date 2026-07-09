@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request
 from sqlalchemy import text
@@ -6,7 +6,9 @@ import logging
 
 from config import SQLSERVER_BATCH_MATERIALS_TABLE, SQLSERVER_DATABASE
 from models import db
-from utils.timezone import format_db_datetime_utc_iso, parse_request_datetime
+from utils.timezone import BUSINESS_TZ, format_db_datetime_utc_iso, parse_request_datetime
+
+UTC = timezone.utc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -162,6 +164,109 @@ def get_batch_materials():
             {
                 "success": False,
                 "error": "Failed to fetch batch materials data",
+                "message": str(e),
+            }
+        ), 500
+
+
+def _naive_utc_to_saudi_hour(dt: datetime) -> int:
+    """Convert naive UTC DB datetime to Saudi calendar hour (0-23)."""
+    if dt.tzinfo is None:
+        aware = dt.replace(tzinfo=UTC)
+    else:
+        aware = dt.astimezone(UTC)
+    return aware.astimezone(BUSINESS_TZ).hour
+
+
+@sqlserver_bp.route("/api/sqlserver/batch-hourly-count", methods=["GET"])
+def get_batch_hourly_count():
+    """Distinct batch count per calendar hour (0-23) for today in Saudi time."""
+    try:
+        mode = (request.args.get("mode") or "today").lower()
+        tbl = SQLSERVER_BATCH_MATERIALS_TABLE
+        labels = [str(h) for h in range(24)]
+        counts = [0] * 24
+
+        if mode == "rolling":
+            hours = request.args.get("hours", 24, type=int)
+            hours = min(max(hours, 1), 48)
+            now_utc = datetime.now(UTC).replace(tzinfo=None)
+            since = now_utc - timedelta(hours=hours)
+            sql = f"""
+                SELECT [Batch GUID], MIN([Batch Act Start]) AS batch_start
+                FROM [{SQLSERVER_DATABASE}].[dbo].[{tbl}]
+                WHERE [Batch Act Start] >= :since
+                  AND [Batch GUID] IS NOT NULL
+                GROUP BY [Batch GUID]
+            """
+            params = {"since": since}
+            window_start_ms = since.replace(tzinfo=UTC).timestamp() * 1000
+            now_ms = now_utc.replace(tzinfo=UTC).timestamp() * 1000
+            bucket_ms = 3600 * 1000
+            counts = [0] * hours
+            labels = []
+            for i in range(hours):
+                bucket_start = now_utc - timedelta(hours=hours - i)
+                saudi = bucket_start.replace(tzinfo=UTC).astimezone(BUSINESS_TZ)
+                labels.append(str(saudi.hour))
+        else:
+            # Calendar today in Saudi Arabia (00:00 – 24:00)
+            now_saudi = datetime.now(UTC).astimezone(BUSINESS_TZ)
+            day_start_saudi = now_saudi.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end_saudi = day_start_saudi + timedelta(days=1)
+            start_utc = day_start_saudi.astimezone(UTC).replace(tzinfo=None)
+            end_utc = day_end_saudi.astimezone(UTC).replace(tzinfo=None)
+            sql = f"""
+                SELECT [Batch GUID], MIN([Batch Act Start]) AS batch_start
+                FROM [{SQLSERVER_DATABASE}].[dbo].[{tbl}]
+                WHERE [Batch Act Start] >= :start_utc
+                  AND [Batch Act Start] < :end_utc
+                  AND [Batch GUID] IS NOT NULL
+                GROUP BY [Batch GUID]
+            """
+            params = {"start_utc": start_utc, "end_utc": end_utc}
+            hours = 24
+            window_start_ms = None
+            now_ms = None
+            bucket_ms = None
+
+        engine = _sqlserver_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+
+        for row in rows:
+            batch_start = row.batch_start
+            if batch_start is None:
+                continue
+            if mode == "rolling":
+                ts = batch_start.replace(tzinfo=UTC).timestamp() * 1000 if batch_start.tzinfo is None else batch_start.astimezone(UTC).timestamp() * 1000
+                if ts < window_start_ms or ts > now_ms:
+                    continue
+                idx = int((ts - window_start_ms) / bucket_ms)
+                if idx >= hours:
+                    idx = hours - 1
+                if idx >= 0:
+                    counts[idx] += 1
+            else:
+                hour = _naive_utc_to_saudi_hour(batch_start)
+                counts[hour] += 1
+
+        return jsonify(
+            {
+                "success": True,
+                "mode": mode,
+                "hours": len(counts),
+                "labels": labels,
+                "counts": counts,
+                "total_batches": sum(counts),
+            }
+        ), 200
+    except Exception as e:
+        logger.error("Error fetching hourly batch count: %s", e)
+        return jsonify(
+            {
+                "success": False,
+                "error": "Failed to fetch hourly batch count",
                 "message": str(e),
             }
         ), 500
