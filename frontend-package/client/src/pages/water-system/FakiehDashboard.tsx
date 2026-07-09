@@ -78,6 +78,10 @@ export default function FakiehDashboard() {
     labels: [],
     counts: [],
   })
+  const [weeklyBatchCounts, setWeeklyBatchCounts] = useState<{ labels: string[]; counts: number[] }>({
+    labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    counts: [0, 0, 0, 0, 0, 0, 0],
+  })
   
   // Computed KPI values from SQL Server data
   const activeBatches = batchMaterials.filter(item => !item['Batch Act End']).length
@@ -268,61 +272,50 @@ export default function FakiehDashboard() {
 
   const materialDistributionData = materialDistribution
 
-    // Weekly Production Bar Chart Data
+    // Weekly batch count for previous calendar week (Mon–Sun)
   const weeklyProductionData = React.useMemo(() => {
-    if (batchMaterials.length === 0) {
-      return {
-        labels: ['No Data'],
-        datasets: [{
-          label: 'Unique Batches',
-          data: [0],
-          backgroundColor: ['rgba(156, 163, 175, 0.8)'],
-          borderColor: ['rgba(156, 163, 175, 1)'],
-          borderWidth: 2,
-          borderRadius: 8,
-          borderSkipped: false,
-          hoverBackgroundColor: ['rgba(156, 163, 175, 1)'],
-          hoverBorderWidth: 3,
-        }]
-      }
+    const dayNames = weeklyBatchCounts.labels.length === 7
+      ? weeklyBatchCounts.labels
+      : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    let data = weeklyBatchCounts.counts.length === 7
+      ? [...weeklyBatchCounts.counts]
+      : dayNames.map(() => 0)
+
+    // Fallback when API unavailable: bucket by date within last week only
+    if (data.every((c) => c === 0) && batchMaterials.length > 0) {
+      const { endDate } = getDefaultDashboardWeekRange()
+      const weekEnd = endDate
+      const weekStart = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000)
+      const buckets: Set<string>[] = Array.from({ length: 7 }, () => new Set())
+      const weekStartKey = weekStart.toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ })
+
+      batchMaterials.forEach((item) => {
+        const batchDate = parseUtcDate(item['Batch Act Start'] || '')
+        if (!batchDate) return
+        if (batchDate < weekStart || batchDate >= weekEnd) return
+        const guid = item['Batch GUID']
+        if (!guid) return
+        const batchDayKey = batchDate.toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ })
+        const [y1, m1, d1] = weekStartKey.split('-').map(Number)
+        const [y2, m2, d2] = batchDayKey.split('-').map(Number)
+        const dayIndex = Math.round(
+          (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / (24 * 60 * 60 * 1000)
+        )
+        if (dayIndex >= 0 && dayIndex < 7) buckets[dayIndex].add(String(guid))
+      })
+      const derived = buckets.map((s) => s.size)
+      if (derived.some((c) => c > 0)) data = derived
     }
 
-    // Count unique batches per weekday (same method as code.jsx)
-    const productionByDaySets: Record<string, Set<string>> = {
-      Monday: new Set(),
-      Tuesday: new Set(),
-      Wednesday: new Set(),
-      Thursday: new Set(),
-      Friday: new Set(),
-      Saturday: new Set(),
-      Sunday: new Set(),
-    };
-
-    batchMaterials.forEach((item) => {
-      const batchDate = parseUtcDate(item["Batch Act Start"] || '')
-      if (batchDate) {
-        const dayOfWeek = batchDate.toLocaleDateString("en-US", { timeZone: BUSINESS_TZ, weekday: "long" });
-        const batchGUID = item["Batch GUID"] || "unknown";
-        if (productionByDaySets.hasOwnProperty(dayOfWeek)) {
-          productionByDaySets[dayOfWeek].add(batchGUID);
-        }
-      }
-    });
-
-    // Convert sets to counts and create data array
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const data = dayNames.map(day => productionByDaySets[day]?.size || 0);
-    
-    // Generate colors dynamically
     const colors = [
-      'rgba(8, 145, 178, 0.8)',    // Cyan
-      'rgba(34, 197, 94, 0.8)',    // Green
-      'rgba(245, 158, 11, 0.8)',   // Yellow
-      'rgba(239, 68, 68, 0.8)',    // Red
-      'rgba(168, 85, 247, 0.8)',   // Purple
-      'rgba(20, 184, 166, 0.8)',   // Teal
-      'rgba(156, 163, 175, 0.8)',  // Gray
-    ];
+      'rgba(8, 145, 178, 0.8)',
+      'rgba(34, 197, 94, 0.8)',
+      'rgba(245, 158, 11, 0.8)',
+      'rgba(239, 68, 68, 0.8)',
+      'rgba(168, 85, 247, 0.8)',
+      'rgba(20, 184, 166, 0.8)',
+      'rgba(156, 163, 175, 0.8)',
+    ]
 
     return {
       labels: dayNames,
@@ -338,7 +331,7 @@ export default function FakiehDashboard() {
         hoverBorderWidth: 3,
       }]
     }
-  }, [batchMaterials])
+  }, [weeklyBatchCounts, batchMaterials])
 
   // Quality Metrics Doughnut Chart Data - Now shows unique products with material counts
   const qualityMetricsData = React.useMemo(() => {
@@ -674,6 +667,22 @@ export default function FakiehDashboard() {
     }
   }
 
+  const fetchWeeklyBatchCount = async () => {
+    try {
+      const response = await fetch('/api/sqlserver/batch-weekly-count')
+      if (!response.ok) return
+      const data = await response.json()
+      if (data.success && Array.isArray(data.counts) && data.counts.length === 7) {
+        setWeeklyBatchCounts({
+          labels: data.labels ?? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+          counts: data.counts,
+        })
+      }
+    } catch {
+      // fallback useMemo derives from batchMaterials when API unavailable
+    }
+  }
+
   const fetchHourlyBatchCount = async () => {
     try {
       const response = await fetch('/api/sqlserver/batch-hourly-count?mode=today')
@@ -697,8 +706,12 @@ export default function FakiehDashboard() {
     fetchTotalOrders()
     fetchTotalTrucks()
     fetchHourlyBatchCount()
+    fetchWeeklyBatchCount()
 
-    const interval = setInterval(fetchHourlyBatchCount, 60000)
+    const interval = setInterval(() => {
+      fetchHourlyBatchCount()
+      fetchWeeklyBatchCount()
+    }, 60000)
     return () => clearInterval(interval)
   }, [])
 
@@ -1146,10 +1159,10 @@ export default function FakiehDashboard() {
           </div>
           <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg p-6 shadow-lg light:shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white light:text-gray-900">Weekly Batch Count</h3>
+              <h3 className="text-lg font-semibold text-white light:text-gray-900">Last Week Batch Count</h3>
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-purple-400 font-medium">Weekly Stats</span>
+                <span className="text-xs text-purple-400 font-medium">Mon – Sun</span>
               </div>
             </div>
             <div className="relative h-64">

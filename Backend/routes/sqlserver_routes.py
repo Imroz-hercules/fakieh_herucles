@@ -178,6 +178,28 @@ def _naive_utc_to_saudi_hour(dt: datetime) -> int:
     return aware.astimezone(BUSINESS_TZ).hour
 
 
+def _naive_utc_to_saudi_dt(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        aware = dt.replace(tzinfo=UTC)
+    else:
+        aware = dt.astimezone(UTC)
+    return aware.astimezone(BUSINESS_TZ)
+
+
+def _last_week_saudi_bounds() -> tuple[datetime, datetime]:
+    """Previous Mon 07:00 → this Mon 07:00 (Saudi), matching dashboard week."""
+    now_saudi = datetime.now(UTC).astimezone(BUSINESS_TZ)
+    monday_offset = now_saudi.weekday()
+    this_monday = (now_saudi - timedelta(days=monday_offset)).replace(
+        hour=7, minute=0, second=0, microsecond=0
+    )
+    if now_saudi < this_monday:
+        this_monday -= timedelta(days=7)
+    week_end = this_monday
+    week_start = week_end - timedelta(days=7)
+    return week_start, week_end
+
+
 @sqlserver_bp.route("/api/sqlserver/batch-hourly-count", methods=["GET"])
 def get_batch_hourly_count():
     """Distinct batch count per calendar hour (0-23) for today in Saudi time."""
@@ -274,6 +296,71 @@ def get_batch_hourly_count():
             {
                 "success": False,
                 "error": "Failed to fetch hourly batch count",
+                "message": str(e),
+            }
+        ), 500
+
+
+@sqlserver_bp.route("/api/sqlserver/batch-weekly-count", methods=["GET"])
+def get_batch_weekly_count():
+    """Distinct batch count per day for the previous calendar week (Mon–Sun)."""
+    try:
+        week_start_saudi, week_end_saudi = _last_week_saudi_bounds()
+        start_utc = week_start_saudi.astimezone(UTC).replace(tzinfo=None)
+        end_utc = week_end_saudi.astimezone(UTC).replace(tzinfo=None)
+        tbl = SQLSERVER_BATCH_MATERIALS_TABLE
+
+        sql = f"""
+            SELECT [Batch GUID], MIN([Batch Act Start]) AS batch_start
+            FROM [{SQLSERVER_DATABASE}].[dbo].[{tbl}]
+            WHERE [Batch Act Start] >= :start_utc
+              AND [Batch Act Start] < :end_utc
+              AND [Batch GUID] IS NOT NULL
+            GROUP BY [Batch GUID]
+        """
+
+        engine = _sqlserver_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(sql), {"start_utc": start_utc, "end_utc": end_utc}
+            ).fetchall()
+
+        labels: list[str] = []
+        buckets: list[set] = [set() for _ in range(7)]
+        week_start_date = week_start_saudi.date()
+
+        for i in range(7):
+            day = week_start_saudi + timedelta(days=i)
+            labels.append(day.strftime("%A"))
+
+        for row in rows:
+            batch_start = row.batch_start
+            guid = row[0]
+            if batch_start is None or guid is None:
+                continue
+            saudi_dt = _naive_utc_to_saudi_dt(batch_start)
+            day_index = (saudi_dt.date() - week_start_date).days
+            if 0 <= day_index < 7:
+                buckets[day_index].add(str(guid))
+
+        counts = [len(b) for b in buckets]
+
+        return jsonify(
+            {
+                "success": True,
+                "labels": labels,
+                "counts": counts,
+                "total_batches": sum(counts),
+                "week_start": week_start_saudi.strftime("%Y-%m-%d"),
+                "week_end": (week_end_saudi - timedelta(days=1)).strftime("%Y-%m-%d"),
+            }
+        ), 200
+    except Exception as e:
+        logger.error("Error fetching weekly batch count: %s", e)
+        return jsonify(
+            {
+                "success": False,
+                "error": "Failed to fetch weekly batch count",
                 "message": str(e),
             }
         ), 500
