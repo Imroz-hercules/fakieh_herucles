@@ -37,7 +37,6 @@ const tabs = [
   "Daily Report",
   "Detailed Report",
   "Material Consumption Report",
-  "Total Material Consumption",
 ];
 
 /** Axios ceiling for large historical payloads (server can exceed 30s on wide ranges). */
@@ -429,7 +428,7 @@ export function BatchHistoricalReports() {
 
   // Fetch daily report data when Detailed Report or Material Consumption Report is active to ensure consistency
   useEffect(() => {
-    if (activeTab === "Detailed Report" || activeTab === "Material Consumption Report" || activeTab === "Total Material Consumption") {
+    if (activeTab === "Detailed Report" || activeTab === "Material Consumption Report") {
       fetchReportData('daily', appliedStartDate, appliedEndDate);
     }
   }, [activeTab, appliedStartDate, appliedEndDate, selectedProduct, selectedBatch, selectedMaterial]);
@@ -888,7 +887,7 @@ export function BatchHistoricalReports() {
       return monthlyData;
     } else if (activeTab === "Daily Report") {
       return dailyData;
-    } else if (activeTab === "Material Consumption Report" || activeTab === "Total Material Consumption") {
+    } else if (activeTab === "Material Consumption Report") {
       return materialData;
     } else {
       return filteredData;
@@ -925,7 +924,7 @@ export function BatchHistoricalReports() {
   }, [dailyData, currentPage, rowsPerPage, activeTab]);
 
   const paginatedMaterialData = useMemo(() => {
-    if (activeTab !== "Material Consumption Report" && activeTab !== "Total Material Consumption") return [];
+    if (activeTab !== "Material Consumption Report") return [];
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
     return materialData.slice(startIndex, endIndex);
@@ -1053,7 +1052,7 @@ export function BatchHistoricalReports() {
   const getTableHeaders = (tabName: string) => {
     switch (tabName) {
       case "Product Batch Summary":
-        return ["Batch Name", "Product Name", "Batch Start", "Batch End", "Batch Quantity", "Material Name", "Material Code", "SetPoint", "Actual", "Order ID"];
+        return ["Batch Name", "Product Name", "Batch Start", "Batch End", "Batch Quantity"];
       case "Weekly":
       case "Monthly":
       case "Daily Report":
@@ -1061,7 +1060,6 @@ export function BatchHistoricalReports() {
       case "Detailed Report":
         return ["Batch", "Material Name", "Code", "Set Point", "Actual", "Err Kg", "Err %"];
       case "Material Consumption Report":
-      case "Total Material Consumption":
         return ["Material Name", "Code", "Planned (kg)", "Actual (kg)", "Difference %"];
       default:
         return [];
@@ -1097,11 +1095,6 @@ export function BatchHistoricalReports() {
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatSaudiTime(item.batchStart, true)}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatSaudiTime(item.batchEnd, true)}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.batchQuantity}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.materialName}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.materialCode}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.setPointFloat?.toFixed(2) || '-'}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.actualValueFloat?.toFixed(2) || '-'}</td>
-            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.orderId}</td>
           </tr>
         );
       case "Weekly":
@@ -1168,7 +1161,6 @@ export function BatchHistoricalReports() {
           </tr>
         );
       case "Material Consumption Report":
-      case "Total Material Consumption":
         return (
           <tr key={index} className={baseRowClasses}>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.materialName}</td>
@@ -1981,6 +1973,69 @@ export function BatchHistoricalReports() {
         });
       }
 
+      // Append a totals row so every printed report ends with total values
+      const sumBy = (rows: any[], pick: (item: any) => number) =>
+        rows.reduce((sum: number, item: any) => {
+          const v = pick(item);
+          return sum + (isNaN(v) ? 0 : v);
+        }, 0);
+
+      if (activeTab === "Product Batch Summary") {
+        const totalQuantity = sumBy(currentData, (item: any) => parseFloat(item.batchQuantity ?? item.quantity));
+        htmlContent += `
+          <tr class="total-row">
+            <td>Total (${currentData.length} batches)</td>
+            <td></td><td></td><td></td>
+            <td>${totalQuantity.toFixed(2)}</td>
+          </tr>
+        `;
+      } else if (activeTab === "Weekly" || activeTab === "Monthly" || activeTab === "Daily Report") {
+        const totalBatches = sumBy(currentData, (item: any) => parseFloat(item.noOfBatches));
+        const totalSP = sumBy(currentData, (item: any) => item.sumSP);
+        const totalAct = sumBy(currentData, (item: any) => item.sumAct);
+        const totalErrKg = Math.abs(totalAct - totalSP);
+        const totalErrPercent = totalSP !== 0 ? (totalErrKg / totalSP) * 100 : 0;
+        htmlContent += `
+          <tr class="total-row">
+            <td>Total</td>
+            <td>${totalBatches}</td>
+            <td>${totalSP.toFixed(2)}</td>
+            <td>${totalAct.toFixed(2)}</td>
+            <td>${totalErrKg.toFixed(2)}</td>
+            <td class="${totalErrPercent < 5 ? 'error-positive' : 'error-negative'}">${totalErrPercent.toFixed(2)}</td>
+          </tr>
+        `;
+      } else if (activeTab === "Detailed Report") {
+        const materialRows = detailedBatchGroups.flat().filter((item: any) => !item.isTotal);
+        const totalSP = sumBy(materialRows, (item: any) => item.setPointFloat);
+        const totalAct = sumBy(materialRows, (item: any) => item.actualValueFloat);
+        const totalErrKg = Math.abs(totalAct - totalSP);
+        const totalErrPercent = totalSP !== 0 ? (totalErrKg / totalSP) * 100 : 0;
+        htmlContent += `
+          <tr class="total-row">
+            <td>Grand Total (${detailedBatchGroups.length} batches)</td>
+            <td></td><td></td>
+            <td>${totalSP.toFixed(2)}</td>
+            <td>${totalAct.toFixed(2)}</td>
+            <td>${totalErrKg.toFixed(2)}</td>
+            <td class="${totalErrPercent < 5 ? 'error-positive' : 'error-negative'}">${totalErrPercent.toFixed(2)}</td>
+          </tr>
+        `;
+      } else if (activeTab === "Material Consumption Report") {
+        const totalPlanned = sumBy(currentData, (item: any) => item.plannedKG);
+        const totalActual = sumBy(currentData, (item: any) => item.actualKG);
+        const totalDiffPercent = totalPlanned !== 0 ? Math.abs(((totalActual - totalPlanned) / totalPlanned) * 100) : 0;
+        htmlContent += `
+          <tr class="total-row">
+            <td>Total</td>
+            <td></td>
+            <td>${totalPlanned.toFixed(2)}</td>
+            <td>${totalActual.toFixed(2)}</td>
+            <td class="${totalDiffPercent < 5 ? 'error-positive' : 'error-negative'}">${totalDiffPercent.toFixed(2)}%</td>
+          </tr>
+        `;
+      }
+
       htmlContent += `
             </tbody>
           </table>
@@ -2311,8 +2366,7 @@ export function BatchHistoricalReports() {
                             ? paginatedDailyData.map((item: any, i: number) =>
                               renderTableRow(item, activeTab, i)
                             )
-                            : activeTab === "Material Consumption Report" ||
-                              activeTab === "Total Material Consumption"
+                            : activeTab === "Material Consumption Report"
                               ? paginatedMaterialData.map((item: any, i: number) =>
                                 renderTableRow(item, activeTab, i)
                               )

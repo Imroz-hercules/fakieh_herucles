@@ -11,6 +11,7 @@ interface Client {
   id: number
   name: string
   phone: string
+  client_number?: string
   created_at?: string | null
 }
 
@@ -37,7 +38,7 @@ export default function ClientInformation(): JSX.Element {
   const [editMode, setEditMode] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
-  const [form, setForm] = useState({ name: '', phone: '' })
+  const [form, setForm] = useState({ name: '', phone: '', client_number: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -94,20 +95,24 @@ export default function ClientInformation(): JSX.Element {
   const openAddModal = () => {
     setEditMode(false)
     setSelectedClient(null)
-    setForm({ name: '', phone: '' })
+    setForm({ name: '', phone: '', client_number: '' })
     setShowModal(true)
   }
 
   const openEditModal = (client: Client) => {
     setEditMode(true)
     setSelectedClient(client)
-    setForm({ name: client.name, phone: client.phone })
+    setForm({
+      name: client.name,
+      phone: client.phone,
+      client_number: client.client_number || '',
+    })
     setShowModal(true)
   }
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.phone.trim()) {
-      setError('Client name and phone number are required')
+    if (!form.name.trim() || !form.phone.trim() || !form.client_number.trim()) {
+      setError('Client name, client number, and phone number are required')
       return
     }
 
@@ -205,6 +210,7 @@ export default function ClientInformation(): JSX.Element {
             <TableHeader>
               <TableRow className="bg-slate-800 dark:bg-slate-800 bg-gray-50 text-black dark:text-white">
                 <TableHead>Client ID</TableHead>
+                <TableHead>Client Number</TableHead>
                 <TableHead>Client Name</TableHead>
                 <TableHead>Phone Number</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -213,13 +219,13 @@ export default function ClientInformation(): JSX.Element {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-slate-400">
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-400">
                     Loading clients...
                   </TableCell>
                 </TableRow>
               ) : clients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-slate-400">
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-400">
                     No clients found
                   </TableCell>
                 </TableRow>
@@ -227,6 +233,7 @@ export default function ClientInformation(): JSX.Element {
                 clients.map((client) => (
                   <TableRow key={client.id} className="border-slate-700 light:border-gray-200">
                     <TableCell className="font-mono text-cyan-400 light:text-cyan-600">{client.id}</TableCell>
+                    <TableCell className="font-mono">{client.client_number || '—'}</TableCell>
                     <TableCell>{client.name}</TableCell>
                     <TableCell>{client.phone}</TableCell>
                     <TableCell className="text-right">
@@ -319,6 +326,12 @@ export default function ClientInformation(): JSX.Element {
             </h2>
             <div className="space-y-4">
               <Input
+                placeholder="Client Number"
+                value={form.client_number}
+                onChange={(e) => setForm({ ...form, client_number: e.target.value })}
+                className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-900"
+              />
+              <Input
                 placeholder="Client Name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -371,6 +384,8 @@ export default function ClientInformation(): JSX.Element {
             <div className="bg-slate-800/50 light:bg-gray-100 p-3 rounded-lg">
               <p className="text-sm text-slate-400 light:text-gray-500">
                 <strong>ID:</strong> {clientToDelete.id}
+                <br />
+                <strong>Client Number:</strong> {clientToDelete.client_number || '—'}
                 <br />
                 <strong>Phone:</strong> {clientToDelete.phone}
               </p>

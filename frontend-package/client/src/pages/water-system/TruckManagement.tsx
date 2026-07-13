@@ -393,8 +393,6 @@ export default function TruckManagement({
               <TableHeader>
                 <TableRow className="bg-slate-800 dark:bg-slate-800 bg-gray-50 text-black dark:text-white">
                   <TableHead>License Plate</TableHead>
-                  <TableHead>Make/Model</TableHead>
-                  <TableHead>Year</TableHead>
                   <TableHead>Capacity</TableHead>
                   <TableHead>Owner Company</TableHead>
                   <TableHead>Contact</TableHead>
@@ -405,8 +403,6 @@ export default function TruckManagement({
                 {filteredTrucks.map((truck) => (
                     <TableRow key={truck.id} className="bg-slate-900 light:bg-white hover:bg-slate-800 light:hover:bg-gray-50 text-white light:text-gray-900">
                       <TableCell className="text-cyan-400 light:text-cyan-600 font-semibold">{truck.license}</TableCell>
-                      <TableCell>{truck.model}</TableCell>
-                      <TableCell>{truck.year}</TableCell>
                       <TableCell>{truck.capacity}</TableCell>
                       <TableCell>{truck.company}</TableCell>
                       <TableCell>{truck.contact}</TableCell>
@@ -572,14 +568,6 @@ export default function TruckManagement({
                   <p className="text-lg font-semibold text-cyan-400 light:text-cyan-600">{selectedTruck.license}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-300 light:text-gray-600">Make/Model</label>
-                  <p className="text-lg">{selectedTruck.model}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-300 light:text-gray-600">Year</label>
-                  <p className="text-lg">{selectedTruck.year}</p>
-                </div>
-                <div>
                   <label className="text-sm font-medium text-slate-300 light:text-gray-600">Capacity</label>
                   <p className="text-lg">{selectedTruck.capacity}</p>
                 </div>
@@ -718,18 +706,6 @@ export default function TruckManagement({
                 placeholder="License Plate" 
                 value={newTruck.license} 
                 onChange={(e) => handleChange('license', e.target.value)}
-                className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-900"
-              />
-              <Input 
-                placeholder="Model" 
-                value={newTruck.model} 
-                onChange={(e) => handleChange('model', e.target.value)}
-                className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-900"
-              />
-              <Input 
-                placeholder="Year" 
-                value={newTruck.year} 
-                onChange={(e) => handleChange('year', e.target.value)}
                 className="bg-slate-700 light:bg-white border-slate-600 light:border-gray-300 text-white light:text-gray-900"
               />
               <Input 

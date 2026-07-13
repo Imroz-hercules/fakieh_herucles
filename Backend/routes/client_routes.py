@@ -46,11 +46,14 @@ def _parse_body():
     data = request.get_json(force=True) or {}
     name = (data.get('name') or '').strip()
     phone = (data.get('phone') or '').strip()
+    client_number = (data.get('client_number') or '').strip()
     if not name:
         return None, jsonify({'error': 'Missing required field: name'}), 400
     if not phone:
         return None, jsonify({'error': 'Missing required field: phone'}), 400
-    return {'name': name, 'phone': phone}, None, None
+    if not client_number:
+        return None, jsonify({'error': 'Missing required field: client_number'}), 400
+    return {'name': name, 'phone': phone, 'client_number': client_number}, None, None
 
 
 @client_bp.route('/', methods=['GET'])
@@ -90,7 +93,11 @@ def create_client():
         if err_resp is not None:
             return err_resp, status
 
-        client = Client(name=fields['name'], phone=fields['phone'])
+        client = Client(
+            name=fields['name'],
+            phone=fields['phone'],
+            client_number=fields['client_number'],
+        )
         db.session.add(client)
         db.session.commit()
         return jsonify(client.to_dict()), 201
@@ -112,6 +119,7 @@ def update_client(client_id):
 
         client.name = fields['name']
         client.phone = fields['phone']
+        client.client_number = fields['client_number']
         db.session.commit()
         return jsonify(client.to_dict())
     except Exception as exc:

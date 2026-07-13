@@ -53,8 +53,8 @@ def add_truck():
     data = request.json
     truck = Truck(
         license=data['license'],
-        model=data['model'],
-        year=data['year'],
+        model=data.get('model', '') or '',
+        year=data.get('year', '') or '',
         capacity=data['capacity'],
         company=data['company'],
         status=data.get('status', 'active'),
@@ -72,8 +72,8 @@ def update_truck(truck_id):
         return jsonify({'error': 'Not found'}), 404
     data = request.json
     truck.license = data['license']
-    truck.model = data['model']
-    truck.year = data['year']
+    truck.model = data.get('model', '') or ''
+    truck.year = data.get('year', '') or ''
     truck.capacity = data['capacity']
     truck.company = data['company']
     if 'status' in data:
