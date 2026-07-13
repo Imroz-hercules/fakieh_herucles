@@ -20,11 +20,13 @@ import {
   formatSaudiDateLabel,
   formatSaudiTime,
   formatSaudiTimeLabel,
+  formatUtcCalendarDayLabel,
   getDefaultProductionDayRange,
   getSpecificDateDefaults,
   parseUtcDate,
   saudiDatetimeLocalToUtcDate,
   saudiDatetimeLocalToUtcIso,
+  utcCalendarDayRange,
 } from '@/utils/timezone';
 import asmLogo from '@/assets/Asm_Logo.png';
 import fakiehBrandLogo from '@/assets/fakiehlogo.webp';
@@ -426,10 +428,12 @@ export function BatchHistoricalReports() {
     }
   }, [activeTab]);
 
-  // Fetch daily report data when Detailed Report or Material Consumption Report is active to ensure consistency
+  // Fetch daily report data when Detailed Report or Material Consumption Report is active.
+  // Use UTC calendar day of Start Date so totals match KPI Calendar (not 07:00–07:00 AST).
   useEffect(() => {
     if (activeTab === "Detailed Report" || activeTab === "Material Consumption Report") {
-      fetchReportData('daily', appliedStartDate, appliedEndDate);
+      const { startIso, endIso } = utcCalendarDayRange(appliedStartDate);
+      fetchReportData('daily', startIso, endIso);
     }
   }, [activeTab, appliedStartDate, appliedEndDate, selectedProduct, selectedBatch, selectedMaterial]);
 
@@ -483,8 +487,16 @@ export function BatchHistoricalReports() {
       const apiUrl = API_ENDPOINTS.BATCH_REPORTS_QUERY;
       const params = new URLSearchParams();
 
-      params.append('startDate', saudiDatetimeLocalToUtcIso(startDate));
-      params.append('endDate', saudiDatetimeLocalToUtcIso(endDate));
+      // Daily bounds are already UTC ISO (calendar day); weekly/monthly are Saudi datetime-local.
+      const isUtcIso = (v: string) => /Z$|[+-]\d{2}:\d{2}$/.test(v);
+      params.append(
+        'startDate',
+        reportType === 'daily' && isUtcIso(startDate) ? startDate : saudiDatetimeLocalToUtcIso(startDate),
+      );
+      params.append(
+        'endDate',
+        reportType === 'daily' && isUtcIso(endDate) ? endDate : saudiDatetimeLocalToUtcIso(endDate),
+      );
       params.append('reportType', reportType);
 
       if (selectedBatch.length > 0) {
@@ -1015,13 +1027,14 @@ export function BatchHistoricalReports() {
   };
 
   const applyDailyFilter = (isManualTrigger = false) => {
-    const endDate = addSaudiDays(dailyStartDate, 1);
+    // Match KPI Calendar: full UTC calendar day via CAST([Batch Act Start] AS DATE)
+    const { startIso, endIso } = utcCalendarDayRange(dailyStartDate);
 
     if (isManualTrigger) {
       setDailyReportTriggered(true);
     }
 
-    fetchReportData('daily', dailyStartDate, endDate);
+    fetchReportData('daily', startIso, endIso);
     setCurrentPage(1);
   };
 
@@ -1203,8 +1216,7 @@ export function BatchHistoricalReports() {
       const end = addSaudiMonths(monthlyStartDate, 1);
       return `Monthly Production Period: ${formatSaudiDateLabel(monthlyStartDate, { day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(monthlyStartDate, { hour: '2-digit', minute: '2-digit', hour12: true })} - ${formatSaudiDateLabel(end, { day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(end, { hour: '2-digit', minute: '2-digit', hour12: true })} (AST)`;
     } else if (activeTab === "Daily Report") {
-      const endDate = addSaudiDays(dailyStartDate, 1);
-      return `Daily Production Period: ${formatSaudiDateLabel(dailyStartDate, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(dailyStartDate, { hour: '2-digit', minute: '2-digit', hour12: true })} - ${formatSaudiDateLabel(endDate, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(endDate, { hour: '2-digit', minute: '2-digit', hour12: true })} (AST)`;
+      return `Daily Production Period: ${formatUtcCalendarDayLabel(dailyStartDate)} (calendar day)`;
     } else {
       return `Date Range: ${appliedStartDate} to ${appliedEndDate} (AST)`;
     }

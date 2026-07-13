@@ -224,7 +224,11 @@ def get_reports():
             if last is None:
                 return None
             return build_next_cursor_act_start_asc(
-                last.batch_act_start, last.batch_guid, last.order_id, last.material_name
+                last.batch_act_start,
+                last.batch_guid,
+                last.order_id,
+                last.material_name,
+                getattr(last, "pobjid", None),
             )
 
         if raw_cursor:

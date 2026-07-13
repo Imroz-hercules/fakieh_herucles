@@ -127,13 +127,14 @@ def build_next_cursor_asc(transfer_time, batch_guid, order_id, material_name, ba
     return _encode_cursor(payload)
 
 
-def build_next_cursor_act_start_asc(batch_act_start, batch_guid, order_id, material_name):
+def build_next_cursor_act_start_asc(batch_act_start, batch_guid, order_id, material_name, pobjid=None):
     """Cursor for batch_act_start ASC + PK tie-break (for /reports KPI)."""
     payload = {
         "bas": batch_act_start.isoformat() if batch_act_start else None,
         "bg": str(batch_guid) if batch_guid else None,
         "oid": int(order_id) if order_id is not None else None,
         "mn": material_name,
+        "pobjid": int(pobjid) if pobjid is not None else 0,
     }
     return _encode_cursor(payload)
 
@@ -211,13 +212,17 @@ def keyset_filter_transfer_time_asc(model_cls, cursor: dict):
 
 
 def keyset_filter_act_start_asc(model_cls, cursor: dict):
-    """Rows after cursor for batch_act_start ASC + PK (material, then optional tie on batch_act_start same second)."""
+    """Rows after cursor for batch_act_start ASC + PK (includes POBJID for duplicate material lines)."""
     if not cursor or "bas" not in cursor:
         return None
     bas_c = _parse_dt(cursor.get("bas"))
     bg = cursor.get("bg")
     oid = cursor.get("oid")
     mn = cursor.get("mn") or ""
+    try:
+        pobjid = int(cursor.get("pobjid") or 0)
+    except (TypeError, ValueError):
+        pobjid = 0
     if bas_c is None:
         return None
     try:
@@ -228,11 +233,19 @@ def keyset_filter_act_start_asc(model_cls, cursor: dict):
         return None
     M = model_cls
     mn_col = _mn(M)
+    pobj_col = func.coalesce(M.pobjid, 0)
     return or_(
         M.batch_act_start > bas_c,
         and_(M.batch_act_start == bas_c, M.batch_guid > guid),
         and_(M.batch_act_start == bas_c, M.batch_guid == guid, M.order_id > oid),
         and_(M.batch_act_start == bas_c, M.batch_guid == guid, M.order_id == oid, mn_col > mn),
+        and_(
+            M.batch_act_start == bas_c,
+            M.batch_guid == guid,
+            M.order_id == oid,
+            mn_col == mn,
+            pobj_col > pobjid,
+        ),
     )
 
 

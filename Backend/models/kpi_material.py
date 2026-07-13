@@ -8,8 +8,16 @@ from sqlalchemy.dialects.mssql import UNIQUEIDENTIFIER
 class KPIMaterial(db.Model):
     __bind_key__ = "sqlserver"
     __tablename__ = SQLSERVER_BATCH_MATERIALS_TABLE
+    # POBJID distinguishes multiple weighs of the same material in one batch
+    # (e.g. two Maize lines with same OrderId) — required so ORM sums match calendar.
     __table_args__ = (
-        PrimaryKeyConstraint("Batch GUID", "OrderId", "Material Name", "Batch Act Start"),
+        PrimaryKeyConstraint(
+            "Batch GUID",
+            "OrderId",
+            "Material Name",
+            "Batch Act Start",
+            "POBJID",
+        ),
         {"schema": "dbo"},
     )
 
@@ -28,6 +36,7 @@ class KPIMaterial(db.Model):
     setpoint_float = db.Column("SetPoint Float", db.Float)
     actual_value_float = db.Column("Actual Value Float", db.Float)
     formula_category_name = db.Column("FormulaCategoryName", db.String(255))
+    pobjid = db.Column("POBJID", db.Integer, default=0)
 
     def __repr__(self):
         return f"<KPIMaterial {self.batch_name}>"

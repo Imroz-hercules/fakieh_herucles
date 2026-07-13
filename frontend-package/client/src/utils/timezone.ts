@@ -48,6 +48,44 @@ export function saudiDatetimeLocalToUtcIso(datetimeLocal: string): string {
   return new Date(`${normalized}+03:00`).toISOString();
 }
 
+/**
+ * UTC calendar-day bounds matching KPI Calendar (`CAST([Batch Act Start] AS DATE)`).
+ * Accepts `YYYY-MM-DD` or datetime-local; uses the date portion only.
+ */
+export function utcCalendarDayRange(dateOrDatetimeLocal: string): {
+  startIso: string;
+  endIso: string;
+  dateKey: string;
+} {
+  const dateKey = (dateOrDatetimeLocal || '').slice(0, 10);
+  const [y, m, d] = dateKey.split('-').map(Number);
+  if (!y || !m || !d) {
+    return { startIso: '', endIso: '', dateKey };
+  }
+  const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+  // Inclusive end of UTC day so `<= end` matches CAST AS DATE (excludes next midnight).
+  const end = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999));
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+    dateKey,
+  };
+}
+
+/** Label for a UTC calendar day (e.g. "Sun, Jul 12, 2026"). */
+export function formatUtcCalendarDayLabel(dateOrDatetimeLocal: string): string {
+  const dateKey = (dateOrDatetimeLocal || '').slice(0, 10);
+  const [y, m, d] = dateKey.split('-').map(Number);
+  if (!y || !m || !d) return dateKey || 'N/A';
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export function saudiDatetimeLocalToUtcDate(datetimeLocal: string): Date {
   return new Date(saudiDatetimeLocalToUtcIso(datetimeLocal));
 }
