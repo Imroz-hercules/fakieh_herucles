@@ -34,31 +34,72 @@ KPI list API:
 - limit: clamped to env KPI_MAX_LIMIT (default 10000); default page size KPI_DEFAULT_LIMIT (default 5000).
 - includeTotal: true (default) = full count + pages; false = skip COUNT, return has_more (fetches limit+1 rows).
 - cursor: opaque token from previous response nextCursor (keyset). When set, page is ignored.
+
+IMPORTANT: Queries use with_entities() (Core rows), not full ORM entities.
+Many BatchMaterials rows have NULL POBJID; the mapped PK collapses those identities so
+entity .all() returns far fewer objects than SQL rows and has_more becomes false too early
+(Monthly truncated ~5k of ~33k). Tuple/Row results keep every material line.
 """
+
+# Columns returned for list endpoints (avoids ORM identity-map collapse on NULL POBJID).
+_KPI_LIST_COLS = (
+    KPIMaterial.source_server,
+    KPIMaterial.batch_guid,
+    KPIMaterial.rootguid,
+    KPIMaterial.order_id,
+    KPIMaterial.batch_name,
+    KPIMaterial.product_name,
+    KPIMaterial.batch_act_start,
+    KPIMaterial.batch_act_end,
+    KPIMaterial.batch_transfer_time,
+    KPIMaterial.quantity,
+    KPIMaterial.material_name,
+    KPIMaterial.material_code,
+    KPIMaterial.setpoint_float,
+    KPIMaterial.actual_value_float,
+    KPIMaterial.formula_category_name,
+    KPIMaterial.pobjid,
+)
+
+
+def _as_entities_query(query):
+    """Project to column tuples so duplicate/NULL-PK rows are not collapsed by the identity map."""
+    return query.with_entities(*_KPI_LIST_COLS)
 
 
 def _row_to_kpi_dict(mat, include_event_id=False):
+    """Accept ORM instance or with_entities Row (attribute access)."""
+    batch_guid = getattr(mat, "batch_guid", None)
+    order_id = getattr(mat, "order_id", None)
+    material_name = getattr(mat, "material_name", None)
     row = {
-        "Batch GUID": str(mat.batch_guid) if mat.batch_guid is not None else None,
-        "Batch Name": mat.batch_name,
-        "Product Name": mat.product_name,
-        "Batch Act Start": format_db_datetime_utc_iso(mat.batch_act_start),
-        "Batch Act End": format_db_datetime_utc_iso(mat.batch_act_end),
-        "Quantity": mat.quantity,
-        "Material Name": mat.material_name,
-        "Material Code": mat.material_code,
-        "SetPoint Float": mat.setpoint_float,
-        "Actual Value Float": mat.actual_value_float,
-        "Source Server": mat.source_server,
-        "ROOTGUID": str(mat.rootguid) if mat.rootguid is not None else None,
-        "OrderId": mat.order_id,
-        "Batch Transfer Time": format_db_datetime_utc_iso(mat.batch_transfer_time),
-        "FormulaCategoryName": mat.formula_category_name,
+        "Batch GUID": str(batch_guid) if batch_guid is not None else None,
+        "Batch Name": getattr(mat, "batch_name", None),
+        "Product Name": getattr(mat, "product_name", None),
+        "Batch Act Start": format_db_datetime_utc_iso(getattr(mat, "batch_act_start", None)),
+        "Batch Act End": format_db_datetime_utc_iso(getattr(mat, "batch_act_end", None)),
+        "Quantity": getattr(mat, "quantity", None),
+        "Material Name": material_name,
+        "Material Code": getattr(mat, "material_code", None),
+        "SetPoint Float": getattr(mat, "setpoint_float", None),
+        "Actual Value Float": getattr(mat, "actual_value_float", None),
+        "Source Server": getattr(mat, "source_server", None),
+        "ROOTGUID": (
+            str(getattr(mat, "rootguid", None))
+            if getattr(mat, "rootguid", None) is not None
+            else None
+        ),
+        "OrderId": order_id,
+        "Batch Transfer Time": format_db_datetime_utc_iso(
+            getattr(mat, "batch_transfer_time", None)
+        ),
+        "FormulaCategoryName": getattr(mat, "formula_category_name", None),
+        "POBJID": getattr(mat, "pobjid", None),
     }
     if include_event_id:
         row["EventID"] = (
-            f"{str(mat.batch_guid) if mat.batch_guid else ''}_{mat.order_id}_{mat.material_name or ''}"
-            if (mat.batch_guid or mat.material_name)
+            f"{str(batch_guid) if batch_guid else ''}_{order_id}_{material_name or ''}"
+            if (batch_guid or material_name)
             else None
         )
     return row
@@ -68,20 +109,24 @@ def _paginate_kpi_query(query, page, limit, include_total, order_cols_for_keyset
     """
     order_cols_for_keyset_last_row: callable(last_row) -> opaque nextCursor string or None.
     Returns (items, payload_dict) where payload has page/pages/total OR has_more.
+    Query must already use with_entities() for correct row counts.
     """
     if include_total:
-        pagination = query.paginate(page=page, per_page=limit, error_out=False)
-        items = pagination.items
-        has_more = pagination.page < pagination.pages
+        # paginate() on with_entities can be unreliable — use count + slice
+        total = query.order_by(None).count()
+        offset = max(0, (page - 1) * limit)
+        items = query.limit(limit).offset(offset).all()
+        pages = max(1, (total + limit - 1) // limit) if limit else 1
+        has_more = page < pages
         next_c = (
             order_cols_for_keyset_last_row(items[-1])
             if (items and has_more)
             else None
         )
         return items, {
-            "page": pagination.page,
-            "pages": pagination.pages,
-            "total": pagination.total,
+            "page": page,
+            "pages": pages,
+            "total": total,
             "has_more": has_more,
             "nextCursor": next_c,
         }
@@ -132,6 +177,7 @@ def get_kpis():
 
         query = query.filter(product_not_selected_clause(KPIMaterial))
         query = query.order_by(*order_by_transfer_time_asc(KPIMaterial))
+        query = _as_entities_query(query)
 
         if raw_cursor:
             ks = keyset_filter_transfer_time_asc(KPIMaterial, cur)
@@ -218,6 +264,8 @@ def get_reports():
         # Stable order must match keyset cursor (bas, guid, oid, material, pobjid)
         # or multi-page Monthly fetches truncate after the first ~10k rows.
         query = query.order_by(*order_by_act_start_asc(KPIMaterial))
+        # Bypass ORM identity map (NULL POBJID collapses entity rows / has_more).
+        query = _as_entities_query(query)
 
         if raw_cursor:
             ks = keyset_filter_act_start_asc(KPIMaterial, cur)
@@ -293,6 +341,7 @@ def get_kpi_csv_format_report():
             query = query.filter(KPIMaterial.material_name.in_(material_filters))
 
         query = query.order_by(*order_by_transfer_time_desc(KPIMaterial))
+        query = _as_entities_query(query)
 
         if raw_cursor:
             ks = keyset_filter_transfer_time_desc(KPIMaterial, cur)
