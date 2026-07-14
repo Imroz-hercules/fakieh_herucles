@@ -119,7 +119,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   return (
     <div className="relative" ref={dropdownRef}>
       <div
-        className={`w-full min-h-[1.75rem] px-2 py-1 rounded-md bg-slate-800 dark:bg-slate-800 bg-white border border-slate-600 dark:border-slate-600 border-slate-300 text-white dark:text-white text-slate-900 cursor-pointer hover:border-cyan-400 focus-within:border-cyan-500 transition-all duration-200 text-xs h-7 ${
+        className={`w-full min-h-[1.75rem] px-2 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white cursor-pointer hover:border-cyan-400 focus-within:border-cyan-500 transition-all duration-200 text-xs h-7 ${
           options.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
         }`}
         onClick={() => options.length > 0 && setIsOpen(!isOpen)}
@@ -131,10 +131,10 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-slate-800 dark:bg-slate-800 bg-white border border-slate-600 dark:border-slate-600 border-slate-300 rounded-md shadow-xl max-h-48 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-xl max-h-48 overflow-y-auto">
           {/* Select All Option */}
           <div
-            className="px-2 py-1 hover:bg-slate-700 dark:hover:bg-slate-700 hover:bg-slate-100 cursor-pointer border-b border-slate-600 dark:border-slate-600 border-slate-300 text-cyan-400 dark:text-cyan-400 text-cyan-600 font-medium text-xs"
+            className="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-300 dark:border-slate-600 text-cyan-600 dark:text-cyan-400 font-medium text-xs"
             onClick={handleSelectAll}
           >
             <div className="flex items-center justify-between">
@@ -153,19 +153,19 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
           {options.map((option) => (
             <div
               key={option}
-              className={`px-2 py-1 hover:bg-slate-700 dark:hover:bg-slate-700 hover:bg-slate-100 cursor-pointer text-xs flex items-center justify-between ${selectedValues.includes(option) ? 'bg-slate-700 dark:bg-slate-700 bg-slate-100 text-cyan-300 dark:text-cyan-300 text-cyan-600' : 'text-white dark:text-white text-slate-900'
+              className={`px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-xs flex items-center justify-between ${selectedValues.includes(option) ? 'bg-slate-100 dark:bg-slate-700 text-cyan-600 dark:text-cyan-300' : 'text-slate-900 dark:text-white'
                 }`}
               onClick={() => handleOptionClick(option)}
             >
               <span className="truncate flex-1 text-xs">{labelFor(option)}</span>
               {selectedValues.includes(option) && (
-                <Check className="h-3 w-3 text-cyan-400 dark:text-cyan-400 text-cyan-600 ml-1 flex-shrink-0" />
+                <Check className="h-3 w-3 text-cyan-600 dark:text-cyan-400 ml-1 flex-shrink-0" />
               )}
             </div>
           ))}
 
           {options.length === 0 && (
-            <div className="px-2 py-1 text-slate-400 dark:text-slate-400 text-slate-600 text-xs">
+            <div className="px-2 py-1 text-slate-600 dark:text-slate-400 text-xs">
               No options available - try adjusting other filters
             </div>
           )}
@@ -1362,6 +1362,10 @@ export function BatchHistoricalReports() {
     }
   };
 
+  // Avoid "Report Report" when the tab name already ends with Report
+  const getReportTitle = () =>
+    /\breport$/i.test(activeTab) ? activeTab : `${activeTab} Report`;
+
   // CSV Export functionality
   const exportToCSV = () => {
     try {
@@ -1383,7 +1387,7 @@ export function BatchHistoricalReports() {
       csvContent += '\ufeff';
 
       // Add report title and metadata
-      csvContent += `${activeTab} Report\n`;
+      csvContent += `${getReportTitle()}\n`;
       csvContent += `${getDateRangeString()}\n`;
       csvContent += `ASM Logo: ASM Company Logo\n`;
       // csvContent += `Aghtia Logo: Aghtia Company Logo\n`; // Agthia logo commented out
@@ -1531,7 +1535,7 @@ export function BatchHistoricalReports() {
       csvContent += '\ufeff';
 
       // Add report title and metadata
-      csvContent += `${activeTab} Report\n`;
+      csvContent += `${getReportTitle()}\n`;
       csvContent += `${getDateRangeString()}\n`;
       csvContent += `ASM Logo: ASM Company Logo\n`;
       // csvContent += `Aghtia Logo: Aghtia Company Logo\n`; // Agthia logo commented out
@@ -1710,7 +1714,7 @@ export function BatchHistoricalReports() {
         <!DOCTYPE html>
         <html>
         <head>
-          <title>${activeTab} Report</title>
+          <title>${getReportTitle()}</title>
           <style>
             @page {
               margin: 100px 20px 60px 20px;
@@ -1956,7 +1960,7 @@ export function BatchHistoricalReports() {
             </div>
           </div>
           <div class="header">
-            <h1>${activeTab} Report</h1>
+            <h1>${getReportTitle()}</h1>
             <p>Generated on: ${new Date().toLocaleString()}</p>
           </div>
           
@@ -2268,7 +2272,7 @@ export function BatchHistoricalReports() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-slate-300 dark:text-slate-300 text-slate-600 font-medium text-xs">Select Product:</Label>
+                <Label className="text-slate-600 dark:text-slate-300 font-medium text-xs">Select Product:</Label>
                 <MultiSelect
                   options={productOptions}
                   selectedValues={pendingProduct}
@@ -2279,7 +2283,7 @@ export function BatchHistoricalReports() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-slate-300 dark:text-slate-300 text-slate-600 font-medium text-xs">Select Batch:</Label>
+                <Label className="text-slate-600 dark:text-slate-300 font-medium text-xs">Select Batch:</Label>
                 <MultiSelect
                   options={batchOptions}
                   optionLabels={batchOptionLabels}
@@ -2291,7 +2295,7 @@ export function BatchHistoricalReports() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-slate-300 dark:text-slate-300 text-slate-600 font-medium text-xs">Select Material:</Label>
+                <Label className="text-slate-600 dark:text-slate-300 font-medium text-xs">Select Material:</Label>
                 <MultiSelect
                   options={materialOptions}
                   selectedValues={pendingMaterial}
