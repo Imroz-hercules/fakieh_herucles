@@ -1088,6 +1088,146 @@ export function BatchHistoricalReports() {
     return numValue < 5 ? 'text-green-400' : 'text-red-400';
   };
 
+  const sumBy = (rows: any[], pick: (item: any) => number) =>
+    rows.reduce((sum: number, item: any) => {
+      const v = pick(item);
+      return sum + (Number.isFinite(v) && !Number.isNaN(v) ? v : 0);
+    }, 0);
+
+  /** Full-dataset totals for screen footer + print (not paginated page only). */
+  const getTabTotals = (tabName: string) => {
+    if (tabName === "Product Batch Summary") {
+      const rows = filteredData;
+      if (!rows.length) return null;
+      return {
+        kind: "batchSummary" as const,
+        label: `Total (${rows.length} batches)`,
+        totalQuantity: sumBy(rows, (item) => parseFloat(item.batchQuantity ?? item.quantity)),
+      };
+    }
+    if (tabName === "Weekly" || tabName === "Monthly" || tabName === "Daily Report") {
+      const rows =
+        tabName === "Weekly" ? weeklyData : tabName === "Monthly" ? monthlyData : dailyData;
+      if (!rows.length) return null;
+      const totalBatches = sumBy(rows, (item) => Number(item.noOfBatches));
+      const totalSP = sumBy(rows, (item) => Number(item.sumSP));
+      const totalAct = sumBy(rows, (item) => Number(item.sumAct));
+      const totalErrKg = Math.abs(totalAct - totalSP);
+      const totalErrPercent = totalSP !== 0 ? (totalErrKg / totalSP) * 100 : 0;
+      return {
+        kind: "productSummary" as const,
+        label: "Total",
+        totalBatches,
+        totalSP,
+        totalAct,
+        totalErrKg,
+        totalErrPercent,
+      };
+    }
+    if (tabName === "Detailed Report") {
+      const materialRows = detailedBatchGroups.flat().filter((item: any) => !item.isTotal);
+      if (!materialRows.length) return null;
+      const totalSP = sumBy(materialRows, (item) => Number(item.setPointFloat));
+      const totalAct = sumBy(materialRows, (item) => Number(item.actualValueFloat));
+      const totalErrKg = Math.abs(totalAct - totalSP);
+      const totalErrPercent = totalSP !== 0 ? (totalErrKg / totalSP) * 100 : 0;
+      return {
+        kind: "detailed" as const,
+        label: `Grand Total (${detailedBatchGroups.length} batches)`,
+        totalSP,
+        totalAct,
+        totalErrKg,
+        totalErrPercent,
+      };
+    }
+    if (tabName === "Material Consumption Report") {
+      const rows = materialData;
+      if (!rows.length) return null;
+      const totalPlanned = sumBy(rows, (item) => Number(item.plannedKG));
+      const totalActual = sumBy(rows, (item) => Number(item.actualKG));
+      const totalDiffPercent =
+        totalPlanned !== 0 ? Math.abs(((totalActual - totalPlanned) / totalPlanned) * 100) : 0;
+      return {
+        kind: "material" as const,
+        label: "Total",
+        totalPlanned,
+        totalActual,
+        totalDiffPercent,
+      };
+    }
+    return null;
+  };
+
+  const renderTableFooter = (tabName: string) => {
+    const totals = getTabTotals(tabName);
+    if (!totals) return null;
+    const cell = "border border-slate-300 dark:border-slate-600 px-4 py-3 text-sm text-slate-900 dark:text-white";
+    const rowClass =
+      "bg-slate-200 dark:bg-slate-700 font-semibold border-t-2 border-cyan-600 dark:border-cyan-500";
+
+    if (totals.kind === "batchSummary") {
+      return (
+        <tfoot>
+          <tr className={rowClass}>
+            <td className={cell}>{totals.label}</td>
+            <td className={cell}></td>
+            <td className={cell}></td>
+            <td className={cell}></td>
+            <td className={cell}>{totals.totalQuantity.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      );
+    }
+    if (totals.kind === "productSummary") {
+      return (
+        <tfoot>
+          <tr className={rowClass}>
+            <td className={cell}>{totals.label}</td>
+            <td className={cell}>{totals.totalBatches}</td>
+            <td className={cell}>{totals.totalSP.toFixed(2)}</td>
+            <td className={cell}>{totals.totalAct.toFixed(2)}</td>
+            <td className={`${cell} font-bold`}>{totals.totalErrKg.toFixed(2)}</td>
+            <td className={`${cell} font-black ${getPercentClass(totals.totalErrPercent)}`}>
+              {totals.totalErrPercent.toFixed(2)}
+            </td>
+          </tr>
+        </tfoot>
+      );
+    }
+    if (totals.kind === "detailed") {
+      return (
+        <tfoot>
+          <tr className={rowClass}>
+            <td className={cell} colSpan={2}>{totals.label}</td>
+            <td className={cell}></td>
+            <td className={cell}>{totals.totalSP.toFixed(2)}</td>
+            <td className={cell}>{totals.totalAct.toFixed(2)}</td>
+            <td className={`${cell} font-bold`}>{totals.totalErrKg.toFixed(2)}</td>
+            <td className={`${cell} font-black ${getPercentClass(totals.totalErrPercent)}`}>
+              {totals.totalErrPercent.toFixed(2)}
+            </td>
+          </tr>
+        </tfoot>
+      );
+    }
+    if (totals.kind === "material") {
+      return (
+        <tfoot>
+          <tr className={rowClass}>
+            <td className={cell}>{totals.label}</td>
+            <td className={cell}></td>
+            <td className={cell}>{totals.totalPlanned.toFixed(2)}</td>
+            <td className={cell}>{totals.totalActual.toFixed(2)}</td>
+            <td className={`${cell} font-bold ${getPercentClass(totals.totalDiffPercent)}`}>
+              {totals.totalDiffPercent.toFixed(2)}%
+            </td>
+          </tr>
+        </tfoot>
+      );
+    }
+    return null;
+  };
+
   const renderTableRow = (item: any, tabName: string, index: string | number, batchGroup: any = null, isFirstMaterial = false, rowSpan = 1) => {
     const isTotalRow = item.isTotal;
     const isEvenRow = typeof index === 'number' ? index % 2 === 0 : false;
@@ -1986,64 +2126,45 @@ export function BatchHistoricalReports() {
       }
 
       // Append a totals row so every printed report ends with total values
-      const sumBy = (rows: any[], pick: (item: any) => number) =>
-        rows.reduce((sum: number, item: any) => {
-          const v = pick(item);
-          return sum + (isNaN(v) ? 0 : v);
-        }, 0);
-
-      if (activeTab === "Product Batch Summary") {
-        const totalQuantity = sumBy(currentData, (item: any) => parseFloat(item.batchQuantity ?? item.quantity));
+      const totals = getTabTotals(activeTab);
+      if (totals?.kind === "batchSummary") {
         htmlContent += `
           <tr class="total-row">
-            <td>Total (${currentData.length} batches)</td>
+            <td>${totals.label}</td>
             <td></td><td></td><td></td>
-            <td>${totalQuantity.toFixed(2)}</td>
+            <td>${totals.totalQuantity.toFixed(2)}</td>
           </tr>
         `;
-      } else if (activeTab === "Weekly" || activeTab === "Monthly" || activeTab === "Daily Report") {
-        const totalBatches = sumBy(currentData, (item: any) => parseFloat(item.noOfBatches));
-        const totalSP = sumBy(currentData, (item: any) => item.sumSP);
-        const totalAct = sumBy(currentData, (item: any) => item.sumAct);
-        const totalErrKg = Math.abs(totalAct - totalSP);
-        const totalErrPercent = totalSP !== 0 ? (totalErrKg / totalSP) * 100 : 0;
+      } else if (totals?.kind === "productSummary") {
         htmlContent += `
           <tr class="total-row">
-            <td>Total</td>
-            <td>${totalBatches}</td>
-            <td>${totalSP.toFixed(2)}</td>
-            <td>${totalAct.toFixed(2)}</td>
-            <td>${totalErrKg.toFixed(2)}</td>
-            <td class="${totalErrPercent < 5 ? 'error-positive' : 'error-negative'}">${totalErrPercent.toFixed(2)}</td>
+            <td>${totals.label}</td>
+            <td>${totals.totalBatches}</td>
+            <td>${totals.totalSP.toFixed(2)}</td>
+            <td>${totals.totalAct.toFixed(2)}</td>
+            <td>${totals.totalErrKg.toFixed(2)}</td>
+            <td class="${totals.totalErrPercent < 5 ? 'error-positive' : 'error-negative'}">${totals.totalErrPercent.toFixed(2)}</td>
           </tr>
         `;
-      } else if (activeTab === "Detailed Report") {
-        const materialRows = detailedBatchGroups.flat().filter((item: any) => !item.isTotal);
-        const totalSP = sumBy(materialRows, (item: any) => item.setPointFloat);
-        const totalAct = sumBy(materialRows, (item: any) => item.actualValueFloat);
-        const totalErrKg = Math.abs(totalAct - totalSP);
-        const totalErrPercent = totalSP !== 0 ? (totalErrKg / totalSP) * 100 : 0;
+      } else if (totals?.kind === "detailed") {
         htmlContent += `
           <tr class="total-row">
-            <td>Grand Total (${detailedBatchGroups.length} batches)</td>
+            <td>${totals.label}</td>
             <td></td><td></td>
-            <td>${totalSP.toFixed(2)}</td>
-            <td>${totalAct.toFixed(2)}</td>
-            <td>${totalErrKg.toFixed(2)}</td>
-            <td class="${totalErrPercent < 5 ? 'error-positive' : 'error-negative'}">${totalErrPercent.toFixed(2)}</td>
+            <td>${totals.totalSP.toFixed(2)}</td>
+            <td>${totals.totalAct.toFixed(2)}</td>
+            <td>${totals.totalErrKg.toFixed(2)}</td>
+            <td class="${totals.totalErrPercent < 5 ? 'error-positive' : 'error-negative'}">${totals.totalErrPercent.toFixed(2)}</td>
           </tr>
         `;
-      } else if (activeTab === "Material Consumption Report") {
-        const totalPlanned = sumBy(currentData, (item: any) => item.plannedKG);
-        const totalActual = sumBy(currentData, (item: any) => item.actualKG);
-        const totalDiffPercent = totalPlanned !== 0 ? Math.abs(((totalActual - totalPlanned) / totalPlanned) * 100) : 0;
+      } else if (totals?.kind === "material") {
         htmlContent += `
           <tr class="total-row">
-            <td>Total</td>
+            <td>${totals.label}</td>
             <td></td>
-            <td>${totalPlanned.toFixed(2)}</td>
-            <td>${totalActual.toFixed(2)}</td>
-            <td class="${totalDiffPercent < 5 ? 'error-positive' : 'error-negative'}">${totalDiffPercent.toFixed(2)}%</td>
+            <td>${totals.totalPlanned.toFixed(2)}</td>
+            <td>${totals.totalActual.toFixed(2)}</td>
+            <td class="${totals.totalDiffPercent < 5 ? 'error-positive' : 'error-negative'}">${totals.totalDiffPercent.toFixed(2)}%</td>
           </tr>
         `;
       }
@@ -2386,6 +2507,7 @@ export function BatchHistoricalReports() {
                                 renderTableRow(item, activeTab, i)
                               )}
                   </tbody>
+                  {renderTableFooter(activeTab)}
 
                 </table>
                 <div className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">

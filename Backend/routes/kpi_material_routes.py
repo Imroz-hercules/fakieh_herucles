@@ -21,6 +21,9 @@ from utils.kpi_pagination import (
     build_next_cursor_asc,
     build_next_cursor_act_start_asc,
     build_next_cursor_transfer_desc,
+    order_by_act_start_asc,
+    order_by_transfer_time_asc,
+    order_by_transfer_time_desc,
 )
 
 kpi_material_bp = Blueprint("kpi_material", __name__)
@@ -128,7 +131,7 @@ def get_kpis():
             query = query.filter(KPIMaterial.material_name.in_(material_filters))
 
         query = query.filter(product_not_selected_clause(KPIMaterial))
-        query = query.order_by(KPIMaterial.batch_transfer_time.asc())
+        query = query.order_by(*order_by_transfer_time_asc(KPIMaterial))
 
         if raw_cursor:
             ks = keyset_filter_transfer_time_asc(KPIMaterial, cur)
@@ -212,7 +215,9 @@ def get_reports():
             query = query.filter(KPIMaterial.material_name.in_(material_filters))
 
         query = query.filter(product_not_selected_clause(KPIMaterial))
-        query = query.order_by(KPIMaterial.batch_act_start.asc())
+        # Stable order must match keyset cursor (bas, guid, oid, material, pobjid)
+        # or multi-page Monthly fetches truncate after the first ~10k rows.
+        query = query.order_by(*order_by_act_start_asc(KPIMaterial))
 
         if raw_cursor:
             ks = keyset_filter_act_start_asc(KPIMaterial, cur)
@@ -287,7 +292,7 @@ def get_kpi_csv_format_report():
         if material_filters:
             query = query.filter(KPIMaterial.material_name.in_(material_filters))
 
-        query = query.order_by(KPIMaterial.batch_transfer_time.desc())
+        query = query.order_by(*order_by_transfer_time_desc(KPIMaterial))
 
         if raw_cursor:
             ks = keyset_filter_transfer_time_desc(KPIMaterial, cur)

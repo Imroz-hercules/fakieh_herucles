@@ -156,14 +156,60 @@ def _parse_dt(s):
     if not s:
         return None
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
-        return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+        dt = datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+    # DB columns are naive UTC — strip tz so keyset equality matches ORDER BY rows.
+    if dt.tzinfo is not None:
+        from datetime import timezone
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 def _mn(model_cls):
     """Comparable material name with NULL as empty string for ordering."""
     return func.coalesce(model_cls.material_name, "")
+
+
+def _pobjid(model_cls):
+    """Comparable POBJID with NULL as 0 (matches PK / duplicate material lines)."""
+    return func.coalesce(model_cls.pobjid, 0)
+
+
+def order_by_act_start_asc(model_cls):
+    """
+    Stable ASC order for /api/reports keyset pagination.
+    Must match keyset_filter_act_start_asc / build_next_cursor_act_start_asc columns.
+    """
+    return (
+        model_cls.batch_act_start.asc(),
+        model_cls.batch_guid.asc(),
+        model_cls.order_id.asc(),
+        _mn(model_cls).asc(),
+        _pobjid(model_cls).asc(),
+    )
+
+
+def order_by_transfer_time_asc(model_cls):
+    """Stable ASC order for /api/kpi keyset pagination."""
+    return (
+        model_cls.batch_transfer_time.asc(),
+        model_cls.batch_guid.asc(),
+        model_cls.order_id.asc(),
+        _mn(model_cls).asc(),
+        model_cls.batch_act_start.asc(),
+    )
+
+
+def order_by_transfer_time_desc(model_cls):
+    """Stable DESC order for /api/kpi/csv-format-report keyset pagination."""
+    return (
+        model_cls.batch_transfer_time.desc(),
+        model_cls.batch_guid.desc(),
+        model_cls.order_id.desc(),
+        _mn(model_cls).desc(),
+        model_cls.batch_act_start.desc(),
+    )
 
 
 def keyset_filter_transfer_time_asc(model_cls, cursor: dict):
@@ -233,7 +279,7 @@ def keyset_filter_act_start_asc(model_cls, cursor: dict):
         return None
     M = model_cls
     mn_col = _mn(M)
-    pobj_col = func.coalesce(M.pobjid, 0)
+    pobj_col = _pobjid(M)
     return or_(
         M.batch_act_start > bas_c,
         and_(M.batch_act_start == bas_c, M.batch_guid > guid),
