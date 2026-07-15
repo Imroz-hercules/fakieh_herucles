@@ -1,0 +1,928 @@
+{
+  "trained_at": "2026-07-15T07:13:20.120640+00:00",
+  "model_type": "RandomForestClassifier",
+  "target": "dose out-of-tolerance (|actual-setpoint| > tolerance)",
+  "tolerance_pct": 2.0,
+  "n_total": 1000,
+  "n_train": 750,
+  "n_test": 250,
+  "positive_rate": 0.333,
+  "metrics": {
+    "accuracy": 0.828,
+    "roc_auc": 0.89,
+    "confusion_matrix": [
+      [
+        142,
+        25
+      ],
+      [
+        18,
+        65
+      ]
+    ],
+    "precision": 0.722,
+    "recall": 0.783,
+    "f1_score": 0.751,
+    "per_class": {
+      "on_target": {
+        "precision": 0.887,
+        "recall": 0.85,
+        "f1_score": 0.869,
+        "support": 167
+      },
+      "flagged": {
+        "precision": 0.722,
+        "recall": 0.783,
+        "f1_score": 0.751,
+        "support": 83
+      }
+    },
+    "cross_validation": {
+      "accuracy": {
+        "mean": 0.817,
+        "std": 0.027,
+        "folds": [
+          0.83,
+          0.8,
+          0.78,
+          0.86,
+          0.815
+        ]
+      },
+      "roc_auc": {
+        "mean": 0.886,
+        "std": 0.016,
+        "folds": [
+          0.868,
+          0.893,
+          0.872,
+          0.912,
+          0.885
+        ]
+      },
+      "precision": {
+        "mean": 0.702,
+        "std": 0.047,
+        "folds": [
+          0.709,
+          0.69,
+          0.646,
+          0.788,
+          0.679
+        ]
+      },
+      "recall": {
+        "mean": 0.79,
+        "std": 0.041,
+        "folds": [
+          0.836,
+          0.731,
+          0.761,
+          0.788,
+          0.833
+        ]
+      },
+      "f1": {
+        "mean": 0.742,
+        "std": 0.034,
+        "folds": [
+          0.767,
+          0.71,
+          0.699,
+          0.788,
+          0.748
+        ]
+      }
+    }
+  },
+  "feature_importances": [
+    {
+      "feature": "setpoint",
+      "importance": 0.2709
+    },
+    {
+      "feature": "log_setpoint",
+      "importance": 0.2666
+    },
+    {
+      "feature": "material_code",
+      "importance": 0.24
+    },
+    {
+      "feature": "product_name",
+      "importance": 0.101
+    },
+    {
+      "feature": "quantity",
+      "importance": 0.0505
+    },
+    {
+      "feature": "is_micro",
+      "importance": 0.0463
+    },
+    {
+      "feature": "category",
+      "importance": 0.0247
+    }
+  ],
+  "options": {
+    "materials": [
+      {
+        "material_code": "100517",
+        "material_name": "AMA-Poultry"
+      },
+      {
+        "material_code": "100607",
+        "material_name": "Availa Cr1000 Zinpro USA"
+      },
+      {
+        "material_code": "100334",
+        "material_name": "BARLEY"
+      },
+      {
+        "material_code": "200223",
+        "material_name": "BRAN"
+      },
+      {
+        "material_code": "100559",
+        "material_name": "Bacillus Blend"
+      },
+      {
+        "material_code": "100511",
+        "material_name": "Beta Mannanese"
+      },
+      {
+        "material_code": "100107",
+        "material_name": "Betafin S6"
+      },
+      {
+        "material_code": "200321",
+        "material_name": "Bran Pellets"
+      },
+      {
+        "material_code": "100038",
+        "material_name": "CORN"
+      },
+      {
+        "material_code": "100078",
+        "material_name": "Carrophyl Red 10%"
+      },
+      {
+        "material_code": "100079",
+        "material_name": "Carrophyl Yellow"
+      },
+      {
+        "material_code": "100108",
+        "material_name": "Choline Chloride"
+      },
+      {
+        "material_code": "100069",
+        "material_name": "Cobalt Proteinate 15%"
+      },
+      {
+        "material_code": "100075",
+        "material_name": "Copper Oxychloride"
+      },
+      {
+        "material_code": "100068",
+        "material_name": "Copper proteinate 15%"
+      },
+      {
+        "material_code": "100102",
+        "material_name": "D Biotin 2%"
+      },
+      {
+        "material_code": "100105",
+        "material_name": "D Pantothenic Acid [B5]"
+      },
+      {
+        "material_code": "100427",
+        "material_name": "DDGS"
+      },
+      {
+        "material_code": "100001",
+        "material_name": "DL-Methionine Premix"
+      },
+      {
+        "material_code": "100361",
+        "material_name": "EDDI"
+      },
+      {
+        "material_code": "100012",
+        "material_name": "Ethoxyquine 66.6%"
+      },
+      {
+        "material_code": "985-ML",
+        "material_name": "FM Layer Gro Mash LM"
+      },
+      {
+        "material_code": "100365-ML",
+        "material_name": "FM Layer Peak Mash"
+      },
+      {
+        "material_code": "100372-ML",
+        "material_name": "FM Layer Post Peak Mash"
+      },
+      {
+        "material_code": "100487-CR",
+        "material_name": "FM Layer Post Peak PL"
+      },
+      {
+        "material_code": "100362-CR",
+        "material_name": "FM Layer Starter L M CR"
+      },
+      {
+        "material_code": "100021",
+        "material_name": "Feed Enzyme"
+      },
+      {
+        "material_code": "100103",
+        "material_name": "Folic Acid B9 80%"
+      },
+      {
+        "material_code": "100048",
+        "material_name": "Limestone"
+      },
+      {
+        "material_code": "100000",
+        "material_name": "Lysine"
+      },
+      {
+        "material_code": "100341",
+        "material_name": "MARBLE Chips"
+      },
+      {
+        "material_code": "2001445",
+        "material_name": "MCP"
+      },
+      {
+        "material_code": "1004",
+        "material_name": "METH"
+      },
+      {
+        "material_code": "100236",
+        "material_name": "Magnesium Oxide 52%"
+      },
+      {
+        "material_code": "100062",
+        "material_name": "Magnesium Sulphate"
+      },
+      {
+        "material_code": "100055",
+        "material_name": "Manganese Oxide 60%"
+      },
+      {
+        "material_code": "100067",
+        "material_name": "Manganese Proteinate 15%[CMC]"
+      },
+      {
+        "material_code": "100077",
+        "material_name": "MasterCube/Pellet Binder"
+      },
+      {
+        "material_code": "100085",
+        "material_name": "Molasses"
+      },
+      {
+        "material_code": "100104",
+        "material_name": "Nicotinic Acid Vitamin [B3]"
+      },
+      {
+        "material_code": "100314",
+        "material_name": "PMX 100314 Broiler Starter"
+      },
+      {
+        "material_code": "100331",
+        "material_name": "PMX 100331 Ruminant"
+      },
+      {
+        "material_code": "100364",
+        "material_name": "PMX 100364 Chick Starter Mash"
+      },
+      {
+        "material_code": "100366",
+        "material_name": "PMX 100366 Layer Mash"
+      },
+      {
+        "material_code": "100392",
+        "material_name": "PMX 100392  Broiler Fin HP"
+      },
+      {
+        "material_code": "100410",
+        "material_name": "PMX 100410 Baladi MM1"
+      },
+      {
+        "material_code": "100414",
+        "material_name": "PMX 100414 Baladi Egg Maker"
+      },
+      {
+        "material_code": "100552",
+        "material_name": "PMX 100552 Layer Breeder Production"
+      },
+      {
+        "material_code": "100284",
+        "material_name": "Palm Oil"
+      },
+      {
+        "material_code": "100353",
+        "material_name": "Phytase"
+      },
+      {
+        "material_code": "100412",
+        "material_name": "Pmx 100412  Baladi MM2"
+      },
+      {
+        "material_code": "100518",
+        "material_name": "Potassium Carbonate Buffer"
+      },
+      {
+        "material_code": "100466",
+        "material_name": "Prebotic(Celmanax dry)"
+      },
+      {
+        "material_code": "10046500",
+        "material_name": "Prophorce 130 fatty acid"
+      },
+      {
+        "material_code": "100389",
+        "material_name": "Protease Enzyme"
+      },
+      {
+        "material_code": "100081",
+        "material_name": "RAPSEED"
+      },
+      {
+        "material_code": "100317",
+        "material_name": "RICE HUSK"
+      },
+      {
+        "material_code": "100560",
+        "material_name": "RM Emulsifier"
+      },
+      {
+        "material_code": "200000",
+        "material_name": "Recycle Broiler feed"
+      },
+      {
+        "material_code": "100051",
+        "material_name": "SALT."
+      },
+      {
+        "material_code": "GM100465",
+        "material_name": "SMCFA-Fatty acids"
+      },
+      {
+        "material_code": "100359",
+        "material_name": "SOYA BEAN 100359"
+      },
+      {
+        "material_code": "100623",
+        "material_name": "Selenium Yeast 4000"
+      },
+      {
+        "material_code": "100598",
+        "material_name": "Selplex 3000 (Alltech USA)"
+      },
+      {
+        "material_code": "101510",
+        "material_name": "Slob-preblend"
+      },
+      {
+        "material_code": "100052",
+        "material_name": "Sodium Bicarbonate"
+      },
+      {
+        "material_code": "100590",
+        "material_name": "Sodium Formate"
+      },
+      {
+        "material_code": "100061",
+        "material_name": "Sodium Selinite 1% SELEN"
+      },
+      {
+        "material_code": "100461",
+        "material_name": "Sodium Sulphate"
+      },
+      {
+        "material_code": "GM100446",
+        "material_name": "Soya Been Low Pro"
+      },
+      {
+        "material_code": "100024",
+        "material_name": "Soya Oil"
+      },
+      {
+        "material_code": "100094",
+        "material_name": "Vitamin A1000"
+      },
+      {
+        "material_code": "100098",
+        "material_name": "Vitamin B1 Thiamine"
+      },
+      {
+        "material_code": "100101",
+        "material_name": "Vitamin B12 1%"
+      },
+      {
+        "material_code": "100099",
+        "material_name": "Vitamin B2 (Riboflaven)"
+      },
+      {
+        "material_code": "100100",
+        "material_name": "Vitamin B6 (Pyridoxine HCI)"
+      },
+      {
+        "material_code": "100095",
+        "material_name": "Vitamin D3 500"
+      },
+      {
+        "material_code": "100096",
+        "material_name": "Vitamin E50"
+      },
+      {
+        "material_code": "100097",
+        "material_name": "Vitamin K3 (Menadion)"
+      },
+      {
+        "material_code": "150066",
+        "material_name": "WHEAT"
+      },
+      {
+        "material_code": "1001",
+        "material_name": "Water"
+      },
+      {
+        "material_code": "200223",
+        "material_name": "Wheat Bran"
+      },
+      {
+        "material_code": "100306",
+        "material_name": "Wheat Flour"
+      },
+      {
+        "material_code": "100330",
+        "material_name": "Wheat by Product"
+      },
+      {
+        "material_code": "GM0000",
+        "material_name": "Xcelsio AAPF"
+      },
+      {
+        "material_code": "100057",
+        "material_name": "Zinc Oxide 70%"
+      },
+      {
+        "material_code": "100583",
+        "material_name": "corn screening"
+      },
+      {
+        "material_code": "100056",
+        "material_name": "ferrous carbonate"
+      },
+      {
+        "material_code": "200001",
+        "material_name": "layer  Recycle"
+      }
+    ],
+    "products": [
+      "FM Al Wasmi MM-3 PL",
+      "FM B Breeder Productio",
+      "FM Baladi Egg Maker",
+      "FM Baladi Maker 2",
+      "FM Baladi Meat Maker -1",
+      "FM Baladi Pigeon Feed Pellet",
+      "FM Crushed Corn",
+      "FM Layer Gro Mash LM",
+      "FM Layer Peak Mash",
+      "FM Layer Post Peak Mash",
+      "FM Layer Starter L M",
+      "FM Maker 1 DDGS",
+      "FM Meat Maker3 CR  New",
+      "FM Meat Maker3 New",
+      "FM Ruminant 13%",
+      "Not Selected",
+      "PMX 100331 Ruminant",
+      "PMX 100366 Layer Mash",
+      "mumtaz mix-grain"
+    ],
+    "categories": [
+      "FeedMill_Hammer",
+      "FeedMill_Roller",
+      "OutLoading",
+      "Premix"
+    ]
+  },
+  "material_defaults": {
+    "100000": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 2.62
+    },
+    "100001": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 4.3
+    },
+    "100012": {
+      "category": "Premix",
+      "typical_setpoint": 3.35
+    },
+    "100021": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.21
+    },
+    "100024": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 50.0
+    },
+    "100038": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 1671.6
+    },
+    "100048": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 91.69
+    },
+    "100051": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 6.0
+    },
+    "100052": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 6.3
+    },
+    "100055": {
+      "category": "Premix",
+      "typical_setpoint": 11.88
+    },
+    "100056": {
+      "category": "Premix",
+      "typical_setpoint": 5.92
+    },
+    "100057": {
+      "category": "Premix",
+      "typical_setpoint": 9.49
+    },
+    "100061": {
+      "category": "Premix",
+      "typical_setpoint": 2.23
+    },
+    "100062": {
+      "category": "Premix",
+      "typical_setpoint": 134.61
+    },
+    "100067": {
+      "category": "Premix",
+      "typical_setpoint": 5.0
+    },
+    "100068": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.3
+    },
+    "100069": {
+      "category": "Premix",
+      "typical_setpoint": 2.61
+    },
+    "100075": {
+      "category": "Premix",
+      "typical_setpoint": 1.69
+    },
+    "100077": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 6.0
+    },
+    "100078": {
+      "category": "Premix",
+      "typical_setpoint": 2.85
+    },
+    "100079": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.06
+    },
+    "100081": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 209.4
+    },
+    "100085": {
+      "category": "FeedMill_Roller",
+      "typical_setpoint": 75.0
+    },
+    "100094": {
+      "category": "Premix",
+      "typical_setpoint": 0.86
+    },
+    "100095": {
+      "category": "Premix",
+      "typical_setpoint": 0.2
+    },
+    "100096": {
+      "category": "Premix",
+      "typical_setpoint": 6.65
+    },
+    "100097": {
+      "category": "Premix",
+      "typical_setpoint": 0.23
+    },
+    "100098": {
+      "category": "Premix",
+      "typical_setpoint": 0.09
+    },
+    "100099": {
+      "category": "Premix",
+      "typical_setpoint": 0.27
+    },
+    "1001": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 37.5
+    },
+    "100100": {
+      "category": "Premix",
+      "typical_setpoint": 0.17
+    },
+    "100101": {
+      "category": "Premix",
+      "typical_setpoint": 0.1
+    },
+    "100102": {
+      "category": "Premix",
+      "typical_setpoint": 0.33
+    },
+    "100103": {
+      "category": "Premix",
+      "typical_setpoint": 0.04
+    },
+    "100104": {
+      "category": "Premix",
+      "typical_setpoint": 1.35
+    },
+    "100105": {
+      "category": "Premix",
+      "typical_setpoint": 0.36
+    },
+    "100107": {
+      "category": "Premix",
+      "typical_setpoint": 5.0
+    },
+    "100108": {
+      "category": "Premix",
+      "typical_setpoint": 47.5
+    },
+    "100236": {
+      "category": "Premix",
+      "typical_setpoint": 82.84
+    },
+    "100284": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 24.0
+    },
+    "100306": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 400.0
+    },
+    "100314": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 60.0
+    },
+    "100317": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 600.0
+    },
+    "100330": {
+      "category": "FeedMill_Roller",
+      "typical_setpoint": 75.0
+    },
+    "100331": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 9.0
+    },
+    "100334": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 225.0
+    },
+    "100341": {
+      "category": "FeedMill_Roller",
+      "typical_setpoint": 170.28
+    },
+    "100353": {
+      "category": "Premix",
+      "typical_setpoint": 2.0
+    },
+    "100359": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 900.0
+    },
+    "100361": {
+      "category": "Premix",
+      "typical_setpoint": 0.23
+    },
+    "100362-CR": {
+      "category": "OutLoading",
+      "typical_setpoint": 4000.0
+    },
+    "100364": {
+      "category": "FeedMill_Roller",
+      "typical_setpoint": 60.0
+    },
+    "100365-ML": {
+      "category": "OutLoading",
+      "typical_setpoint": 5000.0
+    },
+    "100366": {
+      "category": "FeedMill_Roller",
+      "typical_setpoint": 45.0
+    },
+    "100372-ML": {
+      "category": "OutLoading",
+      "typical_setpoint": 6000.0
+    },
+    "100389": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.6
+    },
+    "100392": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 60.0
+    },
+    "1004": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 11.1
+    },
+    "100410": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 60.0
+    },
+    "100412": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 60.0
+    },
+    "100414": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 45.0
+    },
+    "100427": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 147.0
+    },
+    "100461": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 4.34
+    },
+    "10046500": {
+      "category": "Premix",
+      "typical_setpoint": 16.5
+    },
+    "100466": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 3.0
+    },
+    "100487-CR": {
+      "category": "OutLoading",
+      "typical_setpoint": 4000.0
+    },
+    "100511": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.99
+    },
+    "100517": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 1.2
+    },
+    "100518": {
+      "category": "Premix",
+      "typical_setpoint": 12.5
+    },
+    "100552": {
+      "category": "FeedMill_Roller",
+      "typical_setpoint": 42.86
+    },
+    "100559": {
+      "category": "Premix",
+      "typical_setpoint": 1.5
+    },
+    "100560": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.75
+    },
+    "100583": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 210.0
+    },
+    "100590": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 9.0
+    },
+    "100598": {
+      "category": "Premix",
+      "typical_setpoint": 7.0
+    },
+    "100607": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.9
+    },
+    "100623": {
+      "category": "Premix",
+      "typical_setpoint": 1.12
+    },
+    "101510": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.12
+    },
+    "150066": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 1205.48
+    },
+    "200000": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 60.0
+    },
+    "200001": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 60.0
+    },
+    "2001445": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 12.4
+    },
+    "200223": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 176.11
+    },
+    "200321": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 700.0
+    },
+    "985-ML": {
+      "category": "OutLoading",
+      "typical_setpoint": 4000.0
+    },
+    "GM0000": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 1.5
+    },
+    "GM100446": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 412.82
+    },
+    "GM100465": {
+      "category": "FeedMill_Hammer",
+      "typical_setpoint": 0.75
+    }
+  },
+  "product_defaults": {
+    "FM Al Wasmi MM-3 PL": {
+      "typical_quantity": 6000.0
+    },
+    "FM B Breeder Productio": {
+      "typical_quantity": 5714.3
+    },
+    "FM Baladi Egg Maker": {
+      "typical_quantity": 6000.0
+    },
+    "FM Baladi Maker 2": {
+      "typical_quantity": 6000.0
+    },
+    "FM Baladi Meat Maker -1": {
+      "typical_quantity": 6000.0
+    },
+    "FM Baladi Pigeon Feed Pellet": {
+      "typical_quantity": 6000.0
+    },
+    "FM Crushed Corn": {
+      "typical_quantity": 4000.0
+    },
+    "FM Layer Gro Mash LM": {
+      "typical_quantity": 6000.0
+    },
+    "FM Layer Peak Mash": {
+      "typical_quantity": 6000.0
+    },
+    "FM Layer Post Peak Mash": {
+      "typical_quantity": 12000.0
+    },
+    "FM Layer Starter L M": {
+      "typical_quantity": 4500.0
+    },
+    "FM Maker 1 DDGS": {
+      "typical_quantity": 6000.0
+    },
+    "FM Meat Maker3 CR  New": {
+      "typical_quantity": 6000.0
+    },
+    "FM Meat Maker3 New": {
+      "typical_quantity": 3000.0
+    },
+    "FM Ruminant 13%": {
+      "typical_quantity": 6000.0
+    },
+    "Not Selected": {
+      "typical_quantity": 144000.0
+    },
+    "PMX 100331 Ruminant": {
+      "typical_quantity": 1000.0
+    },
+    "PMX 100366 Layer Mash": {
+      "typical_quantity": 1000.0
+    },
+    "mumtaz mix-grain": {
+      "typical_quantity": 6000.0
+    }
+  }
+}

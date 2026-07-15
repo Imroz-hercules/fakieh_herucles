@@ -1,0 +1,532 @@
+{
+  "trained_at": "2026-07-15T07:46:12.550658+00:00",
+  "model_type": "RandomForestClassifier (multi-class)",
+  "target": "dosing severity band: on_target / watch / severe",
+  "classes": [
+    "on_target",
+    "watch",
+    "severe"
+  ],
+  "severity_boundaries_pct": {
+    "on_target": "<= 2.0",
+    "watch": "2.0 - 13.0",
+    "severe": "> 13.0"
+  },
+  "n_total": 1000,
+  "n_train": 750,
+  "n_test": 250,
+  "class_balance": {
+    "on_target": 667,
+    "watch": 221,
+    "severe": 112
+  },
+  "model_selection_note": "Two choices were tested via 5-fold CV rather than assumed: (1) plain multi-class RandomForestClassifier beat an ordinal regression-on-rank approach (macro-F1 0.549 vs 0.512); (2) merging the original minor+moderate classes into one 'watch' class beat the 4-class split (macro-F1 0.640 vs 0.549, accuracy 0.733 vs 0.688) because minor/moderate were not reliably separable and get the same operational response anyway.",
+  "metrics": {
+    "accuracy": 0.752,
+    "macro_precision": 0.649,
+    "macro_recall": 0.701,
+    "macro_f1": 0.668,
+    "weighted_precision": 0.768,
+    "weighted_recall": 0.752,
+    "weighted_f1": 0.757,
+    "per_class": {
+      "on_target": {
+        "precision": 0.885,
+        "recall": 0.826,
+        "f1_score": 0.854,
+        "support": 167
+      },
+      "watch": {
+        "precision": 0.537,
+        "recall": 0.527,
+        "f1_score": 0.532,
+        "support": 55
+      },
+      "severe": {
+        "precision": 0.525,
+        "recall": 0.75,
+        "f1_score": 0.618,
+        "support": 28
+      }
+    },
+    "confusion_matrix": [
+      [
+        138,
+        22,
+        7
+      ],
+      [
+        14,
+        29,
+        12
+      ],
+      [
+        4,
+        3,
+        21
+      ]
+    ],
+    "confusion_matrix_labels": [
+      "on_target",
+      "watch",
+      "severe"
+    ],
+    "cross_validation": {
+      "accuracy": {
+        "mean": 0.733,
+        "std": 0.027,
+        "folds": [
+          0.705,
+          0.715,
+          0.78,
+          0.745,
+          0.72
+        ]
+      },
+      "f1_macro": {
+        "mean": 0.64,
+        "std": 0.042,
+        "folds": [
+          0.627,
+          0.596,
+          0.704,
+          0.67,
+          0.6
+        ]
+      },
+      "precision_macro": {
+        "mean": 0.628,
+        "std": 0.035,
+        "folds": [
+          0.612,
+          0.6,
+          0.688,
+          0.648,
+          0.594
+        ]
+      },
+      "recall_macro": {
+        "mean": 0.667,
+        "std": 0.057,
+        "folds": [
+          0.668,
+          0.602,
+          0.748,
+          0.709,
+          0.608
+        ]
+      }
+    }
+  },
+  "feature_importances": [
+    {
+      "feature": "setpoint",
+      "importance": 0.2707
+    },
+    {
+      "feature": "log_setpoint",
+      "importance": 0.2613
+    },
+    {
+      "feature": "material_code",
+      "importance": 0.2007
+    },
+    {
+      "feature": "product_name",
+      "importance": 0.1281
+    },
+    {
+      "feature": "quantity",
+      "importance": 0.0687
+    },
+    {
+      "feature": "is_micro",
+      "importance": 0.04
+    },
+    {
+      "feature": "category",
+      "importance": 0.0306
+    }
+  ],
+  "options": {
+    "materials": [
+      {
+        "material_code": "100517",
+        "material_name": "AMA-Poultry"
+      },
+      {
+        "material_code": "100607",
+        "material_name": "Availa Cr1000 Zinpro USA"
+      },
+      {
+        "material_code": "100334",
+        "material_name": "BARLEY"
+      },
+      {
+        "material_code": "200223",
+        "material_name": "BRAN"
+      },
+      {
+        "material_code": "100559",
+        "material_name": "Bacillus Blend"
+      },
+      {
+        "material_code": "100511",
+        "material_name": "Beta Mannanese"
+      },
+      {
+        "material_code": "100107",
+        "material_name": "Betafin S6"
+      },
+      {
+        "material_code": "200321",
+        "material_name": "Bran Pellets"
+      },
+      {
+        "material_code": "100038",
+        "material_name": "CORN"
+      },
+      {
+        "material_code": "100078",
+        "material_name": "Carrophyl Red 10%"
+      },
+      {
+        "material_code": "100079",
+        "material_name": "Carrophyl Yellow"
+      },
+      {
+        "material_code": "100108",
+        "material_name": "Choline Chloride"
+      },
+      {
+        "material_code": "100069",
+        "material_name": "Cobalt Proteinate 15%"
+      },
+      {
+        "material_code": "100075",
+        "material_name": "Copper Oxychloride"
+      },
+      {
+        "material_code": "100068",
+        "material_name": "Copper proteinate 15%"
+      },
+      {
+        "material_code": "100102",
+        "material_name": "D Biotin 2%"
+      },
+      {
+        "material_code": "100105",
+        "material_name": "D Pantothenic Acid [B5]"
+      },
+      {
+        "material_code": "100427",
+        "material_name": "DDGS"
+      },
+      {
+        "material_code": "100001",
+        "material_name": "DL-Methionine Premix"
+      },
+      {
+        "material_code": "100361",
+        "material_name": "EDDI"
+      },
+      {
+        "material_code": "100012",
+        "material_name": "Ethoxyquine 66.6%"
+      },
+      {
+        "material_code": "985-ML",
+        "material_name": "FM Layer Gro Mash LM"
+      },
+      {
+        "material_code": "100365-ML",
+        "material_name": "FM Layer Peak Mash"
+      },
+      {
+        "material_code": "100372-ML",
+        "material_name": "FM Layer Post Peak Mash"
+      },
+      {
+        "material_code": "100487-CR",
+        "material_name": "FM Layer Post Peak PL"
+      },
+      {
+        "material_code": "100362-CR",
+        "material_name": "FM Layer Starter L M CR"
+      },
+      {
+        "material_code": "100021",
+        "material_name": "Feed Enzyme"
+      },
+      {
+        "material_code": "100103",
+        "material_name": "Folic Acid B9 80%"
+      },
+      {
+        "material_code": "100048",
+        "material_name": "Limestone"
+      },
+      {
+        "material_code": "100000",
+        "material_name": "Lysine"
+      },
+      {
+        "material_code": "100341",
+        "material_name": "MARBLE Chips"
+      },
+      {
+        "material_code": "2001445",
+        "material_name": "MCP"
+      },
+      {
+        "material_code": "1004",
+        "material_name": "METH"
+      },
+      {
+        "material_code": "100236",
+        "material_name": "Magnesium Oxide 52%"
+      },
+      {
+        "material_code": "100062",
+        "material_name": "Magnesium Sulphate"
+      },
+      {
+        "material_code": "100055",
+        "material_name": "Manganese Oxide 60%"
+      },
+      {
+        "material_code": "100067",
+        "material_name": "Manganese Proteinate 15%[CMC]"
+      },
+      {
+        "material_code": "100077",
+        "material_name": "MasterCube/Pellet Binder"
+      },
+      {
+        "material_code": "100085",
+        "material_name": "Molasses"
+      },
+      {
+        "material_code": "100104",
+        "material_name": "Nicotinic Acid Vitamin [B3]"
+      },
+      {
+        "material_code": "100314",
+        "material_name": "PMX 100314 Broiler Starter"
+      },
+      {
+        "material_code": "100331",
+        "material_name": "PMX 100331 Ruminant"
+      },
+      {
+        "material_code": "100364",
+        "material_name": "PMX 100364 Chick Starter Mash"
+      },
+      {
+        "material_code": "100366",
+        "material_name": "PMX 100366 Layer Mash"
+      },
+      {
+        "material_code": "100392",
+        "material_name": "PMX 100392  Broiler Fin HP"
+      },
+      {
+        "material_code": "100410",
+        "material_name": "PMX 100410 Baladi MM1"
+      },
+      {
+        "material_code": "100414",
+        "material_name": "PMX 100414 Baladi Egg Maker"
+      },
+      {
+        "material_code": "100552",
+        "material_name": "PMX 100552 Layer Breeder Production"
+      },
+      {
+        "material_code": "100284",
+        "material_name": "Palm Oil"
+      },
+      {
+        "material_code": "100353",
+        "material_name": "Phytase"
+      },
+      {
+        "material_code": "100412",
+        "material_name": "Pmx 100412  Baladi MM2"
+      },
+      {
+        "material_code": "100518",
+        "material_name": "Potassium Carbonate Buffer"
+      },
+      {
+        "material_code": "100466",
+        "material_name": "Prebotic(Celmanax dry)"
+      },
+      {
+        "material_code": "10046500",
+        "material_name": "Prophorce 130 fatty acid"
+      },
+      {
+        "material_code": "100389",
+        "material_name": "Protease Enzyme"
+      },
+      {
+        "material_code": "100081",
+        "material_name": "RAPSEED"
+      },
+      {
+        "material_code": "100317",
+        "material_name": "RICE HUSK"
+      },
+      {
+        "material_code": "100560",
+        "material_name": "RM Emulsifier"
+      },
+      {
+        "material_code": "200000",
+        "material_name": "Recycle Broiler feed"
+      },
+      {
+        "material_code": "100051",
+        "material_name": "SALT."
+      },
+      {
+        "material_code": "GM100465",
+        "material_name": "SMCFA-Fatty acids"
+      },
+      {
+        "material_code": "100359",
+        "material_name": "SOYA BEAN 100359"
+      },
+      {
+        "material_code": "100623",
+        "material_name": "Selenium Yeast 4000"
+      },
+      {
+        "material_code": "100598",
+        "material_name": "Selplex 3000 (Alltech USA)"
+      },
+      {
+        "material_code": "101510",
+        "material_name": "Slob-preblend"
+      },
+      {
+        "material_code": "100052",
+        "material_name": "Sodium Bicarbonate"
+      },
+      {
+        "material_code": "100590",
+        "material_name": "Sodium Formate"
+      },
+      {
+        "material_code": "100061",
+        "material_name": "Sodium Selinite 1% SELEN"
+      },
+      {
+        "material_code": "100461",
+        "material_name": "Sodium Sulphate"
+      },
+      {
+        "material_code": "GM100446",
+        "material_name": "Soya Been Low Pro"
+      },
+      {
+        "material_code": "100024",
+        "material_name": "Soya Oil"
+      },
+      {
+        "material_code": "100094",
+        "material_name": "Vitamin A1000"
+      },
+      {
+        "material_code": "100098",
+        "material_name": "Vitamin B1 Thiamine"
+      },
+      {
+        "material_code": "100101",
+        "material_name": "Vitamin B12 1%"
+      },
+      {
+        "material_code": "100099",
+        "material_name": "Vitamin B2 (Riboflaven)"
+      },
+      {
+        "material_code": "100100",
+        "material_name": "Vitamin B6 (Pyridoxine HCI)"
+      },
+      {
+        "material_code": "100095",
+        "material_name": "Vitamin D3 500"
+      },
+      {
+        "material_code": "100096",
+        "material_name": "Vitamin E50"
+      },
+      {
+        "material_code": "100097",
+        "material_name": "Vitamin K3 (Menadion)"
+      },
+      {
+        "material_code": "150066",
+        "material_name": "WHEAT"
+      },
+      {
+        "material_code": "1001",
+        "material_name": "Water"
+      },
+      {
+        "material_code": "200223",
+        "material_name": "Wheat Bran"
+      },
+      {
+        "material_code": "100306",
+        "material_name": "Wheat Flour"
+      },
+      {
+        "material_code": "100330",
+        "material_name": "Wheat by Product"
+      },
+      {
+        "material_code": "GM0000",
+        "material_name": "Xcelsio AAPF"
+      },
+      {
+        "material_code": "100057",
+        "material_name": "Zinc Oxide 70%"
+      },
+      {
+        "material_code": "100583",
+        "material_name": "corn screening"
+      },
+      {
+        "material_code": "100056",
+        "material_name": "ferrous carbonate"
+      },
+      {
+        "material_code": "200001",
+        "material_name": "layer  Recycle"
+      }
+    ],
+    "products": [
+      "FM Al Wasmi MM-3 PL",
+      "FM B Breeder Productio",
+      "FM Baladi Egg Maker",
+      "FM Baladi Maker 2",
+      "FM Baladi Meat Maker -1",
+      "FM Baladi Pigeon Feed Pellet",
+      "FM Crushed Corn",
+      "FM Layer Gro Mash LM",
+      "FM Layer Peak Mash",
+      "FM Layer Post Peak Mash",
+      "FM Layer Starter L M",
+      "FM Maker 1 DDGS",
+      "FM Meat Maker3 CR  New",
+      "FM Meat Maker3 New",
+      "FM Ruminant 13%",
+      "Not Selected",
+      "PMX 100331 Ruminant",
+      "PMX 100366 Layer Mash",
+      "mumtaz mix-grain"
+    ]
+  }
+}

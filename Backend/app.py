@@ -30,6 +30,8 @@ from routes.distribution_routes import distribution_bp
 from routes.settings_routes import settings_bp
 from routes.client_routes import client_bp
 from routes.truck_entry_routes import truck_entry_bp
+from routes.ai_routes import ai_bp
+from routes.live_routes import live_bp
 # Import models so db.create_all() picks up the new tables (PostgreSQL).
 from models.distribution import DistributionRule, SystemSetting
 from models.client import Client
@@ -134,6 +136,15 @@ app.register_blueprint(distribution_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(client_bp)
 app.register_blueprint(truck_entry_bp)
+app.register_blueprint(ai_bp)
+app.register_blueprint(live_bp)
+
+# Boot the Hercules AI live monitor (CSV replay by default; SQL via AI_LIVE_SOURCE).
+try:
+    from ai_assistant.live.engine import get_engine
+    get_engine()
+except Exception as _ai_err:
+    print(f"Hercules AI live monitor skipped: {_ai_err}")
 
 if __name__ == '__main__':
     with app.app_context():

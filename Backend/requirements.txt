@@ -12,3 +12,11 @@ xhtml2pdf
 reportlab
 Pillow
 resend
+
+# Hercules AI Assistant
+pandas
+numpy
+scikit-learn
+joblib
+requests
+google-genai

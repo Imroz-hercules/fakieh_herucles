@@ -13,6 +13,7 @@ import {
   BarChart3,
   Send,
   Users,
+  Sparkles,
 } from 'lucide-react'
 
 export interface SidebarNavItem {
@@ -162,6 +163,12 @@ export const sidebarNavEntries: SidebarNavEntry[] = [
     label: 'Distribution',
     description: 'Scheduled report email & disk delivery',
   },
+  {
+    path: '/fakieh/ai-assistant',
+    icon: Sparkles,
+    label: 'Hercules AI',
+    description: 'Ask Hercules, predictive dosing, live monitoring',
+  },
 ]
 
 export type TopNavLinkItem = {
@@ -239,5 +246,12 @@ export const topNavItems: TopNavItem[] = [
     path: '/fakieh/distribution',
     label: 'Distribution',
     icon: Send,
+  },
+  {
+    kind: 'link',
+    path: '/fakieh/ai-assistant',
+    label: 'Hercules AI',
+    shortLabel: 'AI',
+    icon: Sparkles,
   },
 ]

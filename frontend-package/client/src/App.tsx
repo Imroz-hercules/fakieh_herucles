@@ -34,6 +34,7 @@ import { BatchHistoricalReports } from "./pages/water-system/BatchHistoricalRepo
 import { BatchRawDataPage } from "./pages/water-system/BatchRawDataPage";
 import { Distribution } from "./pages/water-system/Distribution";
 import Management from "./pages/water-system/Management";
+import AiAssistant from "./pages/water-system/AiAssistant";
 
 function Router() {
   const { isInitialized } = useTheme();
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/fakieh/alarms" component={Alarms} />
       <Route path="/fakieh/admin" component={Admin} />
       <Route path="/fakieh/distribution" component={Distribution} />
+      <Route path="/fakieh/ai-assistant" component={AiAssistant} />
       <Route path="/fakieh/engineering" component={PLCConfiguration} />
       <Route path="/fakieh/plc-reports" component={PLCReports} />
       <Route path="/fakieh/batch-calendar" component={BatchCalendarPage} />

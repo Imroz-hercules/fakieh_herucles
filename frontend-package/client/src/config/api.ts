@@ -76,6 +76,18 @@ export const API_ENDPOINTS = {
   
   // Production
   PRODUCTION: '/api/production',
+
+  // Hercules AI
+  AI: {
+    HEALTH: '/api/ai/health',
+    INSIGHTS: '/api/ai/insights',
+    ASK: '/api/ai/ask',
+    ML_INFO: '/api/ai/ml/info',
+    ML_PREDICT: '/api/ai/ml/predict',
+    ML_TOP_RISKS: '/api/ai/ml/top-risks',
+    LIVE_STATE: '/api/ai/live/state',
+    LIVE_CONTROL: '/api/ai/live/control',
+  },
 };
 
 export default API_ENDPOINTS;
