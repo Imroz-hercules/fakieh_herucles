@@ -46,16 +46,13 @@ def parse_include_total(request_args):
 
 def product_not_selected_clause(model_cls):
     """
-    Exclude placeholder product rows. Uses case-insensitive match without wrapping
-    the column in LOWER() when possible: SQL Server CI collation often matches
-    literal inequality for common casings; keep LOWER fallback via OR for edge cases.
+    Exclude placeholder product rows — same rule as Batch Calendar SQL:
+    lower(Product Name) != 'not selected'
+    (Do not also drop NULL/blank here; calendar does not, and counts must match.)
     """
     pn = model_cls.product_name
-    return and_(
-        pn.isnot(None),
-        func.trim(pn) != "",
-        ~func.lower(func.trim(pn)).in_(("not selected",)),
-    )
+    return ~func.lower(pn).in_(("not selected",))
+
 
 
 def _try_parse_uuid(value):

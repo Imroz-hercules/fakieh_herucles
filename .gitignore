@@ -13,6 +13,7 @@ yarn-error.log*
 # Build files
 dist/
 build/
+Hercules_AI_export/
 
 # Environment files
 .env

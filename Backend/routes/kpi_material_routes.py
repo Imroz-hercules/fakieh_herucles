@@ -249,9 +249,10 @@ def get_reports():
 
         start_date, end_date = parse_request_datetime_optional(start_date_str, end_date_str)
 
+        # Half-open [start, end) — matches Batch Calendar / production-day windows
         query = KPIMaterial.query.filter(
             KPIMaterial.batch_act_start >= start_date,
-            KPIMaterial.batch_act_start <= end_date
+            KPIMaterial.batch_act_start < end_date,
         )
         if batch_filters:
             query = apply_batch_filters(query, KPIMaterial, batch_filters)
@@ -305,6 +306,142 @@ def get_reports():
         return jsonify({"data": kpi_list, "reportType": report_type, **meta}), 200
 
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# 🟢 Product summary (SQL aggregates — same window/math as Batch Calendar)
+@kpi_material_bp.route("/reports/product-summary", methods=["GET"])
+def get_reports_product_summary():
+    """Per-product batch counts and SP/ACT sums via SQL (no pagination truncation).
+
+    Uses half-open [start, end) on Batch Act Start — same as /kpi_calendar.
+    """
+    try:
+        start_date_str = request.args.get("startDate")
+        end_date_str = request.args.get("endDate")
+        batch_filters = request.args.getlist("batch")
+        product_filters = request.args.getlist("product")
+        material_filters = request.args.getlist("material")
+
+        if not start_date_str or not end_date_str:
+            return jsonify({"error": "Start date and end date are required"}), 400
+
+        start_date, end_date = parse_request_datetime_optional(start_date_str, end_date_str)
+        if start_date is None or end_date is None:
+            return jsonify({"error": "Invalid startDate or endDate"}), 400
+
+        tbl = SQLSERVER_BATCH_MATERIALS_TABLE
+        where = [
+            f"dbo.[{tbl}].[Batch Act Start] >= :start_date",
+            f"dbo.[{tbl}].[Batch Act Start] < :end_date",
+            f"LOWER(LTRIM(RTRIM(dbo.[{tbl}].[Product Name]))) <> 'not selected'",
+            f"dbo.[{tbl}].[Product Name] IS NOT NULL",
+            f"LTRIM(RTRIM(dbo.[{tbl}].[Product Name])) <> ''",
+        ]
+        bind = {"start_date": start_date, "end_date": end_date}
+
+        if product_filters:
+            placeholders = []
+            for i, name in enumerate(product_filters):
+                key = f"prod_{i}"
+                placeholders.append(f":{key}")
+                bind[key] = name
+            where.append(f"dbo.[{tbl}].[Product Name] IN ({', '.join(placeholders)})")
+
+        if material_filters:
+            placeholders = []
+            for i, name in enumerate(material_filters):
+                key = f"mat_{i}"
+                placeholders.append(f":{key}")
+                bind[key] = name
+            where.append(f"dbo.[{tbl}].[Material Name] IN ({', '.join(placeholders)})")
+
+        if batch_filters:
+            guid_keys = []
+            name_keys = []
+            for i, raw in enumerate(batch_filters):
+                if not raw:
+                    continue
+                s = str(raw).strip().replace("{", "").replace("}", "")
+                try:
+                    from uuid import UUID
+                    UUID(s)
+                    key = f"bg_{i}"
+                    guid_keys.append(f":{key}")
+                    bind[key] = s
+                except ValueError:
+                    key = f"bn_{i}"
+                    name_keys.append(f":{key}")
+                    bind[key] = raw
+            parts = []
+            if guid_keys:
+                parts.append(f"CAST(dbo.[{tbl}].[Batch GUID] AS NVARCHAR(64)) IN ({', '.join(guid_keys)})")
+            if name_keys:
+                parts.append(f"dbo.[{tbl}].[Batch Name] IN ({', '.join(name_keys)})")
+            if parts:
+                where.append("(" + " OR ".join(parts) + ")")
+
+        where_sql = " AND ".join(where)
+        sql_products = text(
+            f"""
+            SELECT dbo.[{tbl}].[Product Name] AS product_name,
+                   COUNT(DISTINCT dbo.[{tbl}].[Batch GUID]) AS batch_count,
+                   SUM(dbo.[{tbl}].[SetPoint Float]) AS sum_sp,
+                   SUM(dbo.[{tbl}].[Actual Value Float]) AS sum_act
+            FROM dbo.[{tbl}]
+            WHERE {where_sql}
+            GROUP BY dbo.[{tbl}].[Product Name]
+            ORDER BY dbo.[{tbl}].[Product Name]
+            """
+        )
+        sql_totals = text(
+            f"""
+            SELECT COUNT(DISTINCT dbo.[{tbl}].[Batch GUID]) AS batch_count,
+                   SUM(dbo.[{tbl}].[SetPoint Float]) AS sum_sp,
+                   SUM(dbo.[{tbl}].[Actual Value Float]) AS sum_act
+            FROM dbo.[{tbl}]
+            WHERE {where_sql}
+            """
+        )
+
+        engine = db.get_engine(bind="sqlserver")
+        with engine.connect() as conn:
+            product_rows = conn.execute(sql_products, bind).fetchall()
+            total_row = conn.execute(sql_totals, bind).fetchone()
+
+        products = []
+        for row in product_rows:
+            sum_sp = float(row.sum_sp or 0)
+            sum_act = float(row.sum_act or 0)
+            err_kg = abs(sum_act - sum_sp)
+            err_pct = (err_kg / sum_sp * 100) if sum_sp else 0.0
+            products.append(
+                {
+                    "productName": row.product_name,
+                    "noOfBatches": int(row.batch_count or 0),
+                    "sumSP": round(sum_sp, 2),
+                    "sumAct": round(sum_act, 2),
+                    "errKg": f"{err_kg:.2f}",
+                    "errPercent": f"{err_pct:.2f}",
+                }
+            )
+
+        tot_sp = float(total_row.sum_sp or 0) if total_row else 0.0
+        tot_act = float(total_row.sum_act or 0) if total_row else 0.0
+        tot_err = abs(tot_act - tot_sp)
+        tot_pct = (tot_err / tot_sp * 100) if tot_sp else 0.0
+        totals = {
+            "noOfBatches": int(total_row.batch_count or 0) if total_row else 0,
+            "sumSP": round(tot_sp, 2),
+            "sumAct": round(tot_act, 2),
+            "errKg": f"{tot_err:.2f}",
+            "errPercent": f"{tot_pct:.2f}",
+        }
+
+        return jsonify({"products": products, "totals": totals}), 200
+
+    except Exception as e:
+        logger.exception("GET /api/reports/product-summary failed: %s", e)
         return jsonify({"error": str(e)}), 500
 
 

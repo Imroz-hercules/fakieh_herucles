@@ -1,9 +1,13 @@
 """Business timezone helpers — DB stores UTC; UI uses Asia/Riyadh (UTC+3)."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 BUSINESS_TZ = ZoneInfo("Asia/Riyadh")
 UTC = timezone.utc
+
+# AST = UTC+3; production day starts 07:00 AST = 04:00 UTC.
+# CAST(DATEADD(hour, -4, utc_col) AS DATE) yields the Saudi production-day label.
+PRODUCTION_DAY_UTC_OFFSET_HOURS = -4
 
 
 def parse_request_datetime(value: str) -> datetime:
@@ -27,6 +31,44 @@ def parse_request_datetime(value: str) -> datetime:
     if dt.tzinfo is not None:
         return dt.astimezone(UTC).replace(tzinfo=None)
     return dt
+
+
+def saudi_local_to_utc_naive(year: int, month: int, day: int, hour: int = 7, minute: int = 0) -> datetime:
+    """Convert a Saudi local wall time to naive UTC (for SQL Server UTC columns)."""
+    local = datetime(year, month, day, hour, minute, tzinfo=BUSINESS_TZ)
+    return local.astimezone(UTC).replace(tzinfo=None)
+
+
+def production_day_bounds_utc(date_str: str) -> tuple[datetime, datetime]:
+    """Half-open UTC window for production day D: D 07:00 AST → D+1 07:00 AST."""
+    d = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
+    start = saudi_local_to_utc_naive(d.year, d.month, d.day, 7, 0)
+    end = start + timedelta(days=1)
+    return start, end
+
+
+def parse_calendar_range(start_str: str, end_str: str) -> tuple[datetime, datetime]:
+    """Parse calendar filter to UTC half-open [start, end).
+
+    - Date-only YYYY-MM-DD: start = that day 07:00 AST; end = (day+1) 07:00 AST
+      so a selected end date includes that full production day.
+    - datetime-local (no TZ): treated as Saudi wall time.
+    - ISO with Z / offset: converted to UTC.
+    """
+    def _parse_bound(value: str, *, is_end: bool) -> datetime:
+        s = value.strip()
+        if len(s) == 10 and s[4] == "-" and s[7] == "-":
+            d = datetime.strptime(s, "%Y-%m-%d").date()
+            start = saudi_local_to_utc_naive(d.year, d.month, d.day, 7, 0)
+            return start + timedelta(days=1) if is_end else start
+        # datetime-local without TZ: treat as Saudi wall time
+        if "T" in s and not (s.endswith("Z") or "+" in s[10:] or s.count("-") > 2):
+            naive = datetime.fromisoformat(s)
+            local = naive.replace(tzinfo=BUSINESS_TZ)
+            return local.astimezone(UTC).replace(tzinfo=None)
+        return parse_request_datetime(s)
+
+    return _parse_bound(start_str, is_end=False), _parse_bound(end_str, is_end=True)
 
 
 def parse_request_datetime_optional(start_str: str | None, end_str: str | None) -> tuple[datetime | None, datetime | None]:

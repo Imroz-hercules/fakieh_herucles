@@ -20,13 +20,11 @@ import {
   formatSaudiDateLabel,
   formatSaudiTime,
   formatSaudiTimeLabel,
-  formatUtcCalendarDayLabel,
   getDefaultProductionDayRange,
   getSpecificDateDefaults,
   parseUtcDate,
   saudiDatetimeLocalToUtcDate,
   saudiDatetimeLocalToUtcIso,
-  utcCalendarDayRange,
 } from '@/utils/timezone';
 import asmLogo from '@/assets/Asm_Logo.png';
 import fakiehBrandLogo from '@/assets/fakiehlogo.webp';
@@ -274,6 +272,13 @@ export function BatchHistoricalReports() {
   const [dailyReportData, setDailyReportData] = useState<any[]>([]);
   const [weeklyReportData, setWeeklyReportData] = useState<any[]>([]);
   const [monthlyReportData, setMonthlyReportData] = useState<any[]>([]);
+  // SQL product aggregates (same math as Batch Calendar — no pagination truncation)
+  const [dailyProductSummary, setDailyProductSummary] = useState<any[]>([]);
+  const [weeklyProductSummary, setWeeklyProductSummary] = useState<any[]>([]);
+  const [monthlyProductSummary, setMonthlyProductSummary] = useState<any[]>([]);
+  const [dailySummaryTotals, setDailySummaryTotals] = useState<any | null>(null);
+  const [weeklySummaryTotals, setWeeklySummaryTotals] = useState<any | null>(null);
+  const [monthlySummaryTotals, setMonthlySummaryTotals] = useState<any | null>(null);
   const [monthlyStartDate, setMonthlyStartDate] = useState(specificDefaults.monthlyStart);
   const [dailyStartDate, setDailyStartDate] = useState(specificDefaults.dailyStart);
 
@@ -429,11 +434,10 @@ export function BatchHistoricalReports() {
   }, [activeTab]);
 
   // Fetch daily report data when Detailed Report or Material Consumption Report is active.
-  // Use UTC calendar day of Start Date so totals match KPI Calendar (not 07:00–07:00 AST).
+  // Use Saudi 07:00→07:00 range from filters so totals match Batch Calendar production days.
   useEffect(() => {
     if (activeTab === "Detailed Report" || activeTab === "Material Consumption Report") {
-      const { startIso, endIso } = utcCalendarDayRange(appliedStartDate);
-      fetchReportData('daily', startIso, endIso);
+      fetchReportData('daily', appliedStartDate, appliedEndDate);
     }
   }, [activeTab, appliedStartDate, appliedEndDate, selectedProduct, selectedBatch, selectedMaterial]);
 
@@ -482,21 +486,142 @@ export function BatchHistoricalReports() {
     setError(null);
     setLoadingProgress(`Fetching ${reportType} report data...`);
 
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    const setSummary = (products: any[], totals: any | null) => {
+      if (reportType === 'daily') {
+        setDailyProductSummary(products);
+        setDailySummaryTotals(totals);
+      } else if (reportType === 'weekly') {
+        setWeeklyProductSummary(products);
+        setWeeklySummaryTotals(totals);
+      } else if (reportType === 'monthly') {
+        setMonthlyProductSummary(products);
+        setMonthlySummaryTotals(totals);
+      }
+    };
+
+    const buildTotals = (noOfBatches: number, sumSP: number, sumAct: number) => {
+      const errKg = Math.abs(sumAct - sumSP);
+      return {
+        noOfBatches,
+        sumSP: round2(sumSP),
+        sumAct: round2(sumAct),
+        errKg: errKg.toFixed(2),
+        errPercent: sumSP !== 0 ? ((errKg / sumSP) * 100).toFixed(2) : '0.00',
+      };
+    };
+
+    /**
+     * Daily summary from Batch Calendar APIs (same numbers as the calendar card / popup).
+     *
+     * Live server still groups by UTC calendar day (CAST AS DATE). Querying a 07:00→07:00
+     * ISO window only returns a partial day (e.g. 118). The calendar card uses the full
+     * UTC day, so Daily must call calendar with date-only bounds:
+     *   startDate=YYYY-MM-DD, endDate=next day  → matches card (149 / ~670.97 t).
+     */
+    const fetchDailyFromCalendar = async (_startIso: string, _endIso: string, rows: any[]) => {
+      const dateKey = (startDate || '').slice(0, 10);
+      const [y, m, d] = dateKey.split('-').map(Number);
+      const next = new Date(Date.UTC(y, m - 1, d + 1));
+      const nextKey = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`;
+
+      const fetchCal = (start: string, end: string) =>
+        axios.get(API_ENDPOINTS.BATCH_KPI_CALENDAR, {
+          params: { startDate: start, endDate: end },
+          timeout: LARGE_REPORT_TIMEOUT_MS,
+        });
+
+      // 1) Old CAST-AS-DATE servers: date → next date (full UTC day)
+      // 2) New 07:00 servers: same date twice (expands to D 07:00 → D+1 07:00)
+      let days: any[] = [];
+      for (const [a, b] of [
+        [dateKey, nextKey],
+        [dateKey, dateKey],
+      ] as const) {
+        const calRes = await fetchCal(a, b);
+        const list = Array.isArray(calRes.data) ? calRes.data : [];
+        const match = list.find((x: any) => String(x.date).slice(0, 10) === dateKey);
+        if (match && Number(match.batch_count) > 0) {
+          days = list;
+          break;
+        }
+        if (list.length && !days.length) days = list;
+      }
+
+      const detRes = await axios.get(API_ENDPOINTS.BATCH_KPI_CALENDAR_DETAILS, {
+        params: { date: dateKey },
+        timeout: LARGE_REPORT_TIMEOUT_MS,
+      });
+
+      const day =
+        days.find((x: any) => String(x.date).slice(0, 10) === dateKey) ||
+        (days.length === 1 ? days[0] : null);
+
+      const calBatches = day ? Number(day.batch_count) || 0 : 0;
+      const calAct = day ? Number(day.total_actual_kg) || 0 : 0;
+
+      const details = Array.isArray(detRes.data) ? detRes.data : [];
+      const rowAgg = aggregateByProduct(rows, 'day');
+      const rowByName: Record<string, any> = {};
+      rowAgg.forEach((p) => {
+        rowByName[p.productName] = p;
+      });
+
+      const detailActSum = details.reduce((s: number, x: any) => s + (Number(x.quantity_kg) || 0), 0);
+      const detailsMatchCalendar =
+        calAct > 0 && detailActSum > 0 && Math.abs(detailActSum - calAct) / calAct < 0.02;
+
+      let products: any[];
+      if (details.length > 0 && (detailsMatchCalendar || calAct <= 0)) {
+        // Prefer calendar details for SUM ACT (matches popup); SP / batch counts from rows when missing
+        products = details.map((x: any) => {
+          const name = x.product_name;
+          const row = rowByName[name];
+          const sumAct = Number(x.quantity_kg) || 0;
+          const sumSP = Number(x.sum_sp) > 0 ? Number(x.sum_sp) : Number(row?.sumSP) || 0;
+          const noOfBatches =
+            Number(x.batch_count) > 0 ? Number(x.batch_count) : Number(row?.noOfBatches) || 0;
+          const errKg = Math.abs(sumAct - sumSP);
+          return {
+            productName: name,
+            noOfBatches,
+            sumSP: round2(sumSP),
+            sumAct: round2(sumAct),
+            errKg: errKg.toFixed(2),
+            errPercent: sumSP !== 0 ? ((errKg / sumSP) * 100).toFixed(2) : '0.00',
+          };
+        });
+      } else {
+        products = rowAgg.map((p) => ({
+          ...p,
+          sumSP: round2(Number(p.sumSP) || 0),
+          sumAct: round2(Number(p.sumAct) || 0),
+        }));
+      }
+
+      const sumSP = products.reduce((s, p) => s + Number(p.sumSP), 0);
+      const sumActFromProducts = products.reduce((s, p) => s + Number(p.sumAct), 0);
+      const totals = buildTotals(
+        calBatches > 0 ? calBatches : products.reduce((s, p) => s + Number(p.noOfBatches), 0),
+        sumSP,
+        calAct > 0 ? calAct : sumActFromProducts,
+      );
+
+      return { products, totals };
+    };
+
     try {
-      // Use /api/reports endpoint like old system
       const apiUrl = API_ENDPOINTS.BATCH_REPORTS_QUERY;
       const params = new URLSearchParams();
 
-      // Daily bounds are already UTC ISO (calendar day); weekly/monthly are Saudi datetime-local.
       const isUtcIso = (v: string) => /Z$|[+-]\d{2}:\d{2}$/.test(v);
-      params.append(
-        'startDate',
-        reportType === 'daily' && isUtcIso(startDate) ? startDate : saudiDatetimeLocalToUtcIso(startDate),
-      );
-      params.append(
-        'endDate',
-        reportType === 'daily' && isUtcIso(endDate) ? endDate : saudiDatetimeLocalToUtcIso(endDate),
-      );
+      const startIso =
+        reportType === 'daily' && isUtcIso(startDate) ? startDate : saudiDatetimeLocalToUtcIso(startDate);
+      const endIso =
+        reportType === 'daily' && isUtcIso(endDate) ? endDate : saudiDatetimeLocalToUtcIso(endDate);
+      params.append('startDate', startIso);
+      params.append('endDate', endIso);
       params.append('reportType', reportType);
 
       if (selectedBatch.length > 0) {
@@ -513,42 +638,80 @@ export function BatchHistoricalReports() {
         timeout: LARGE_REPORT_TIMEOUT_MS,
       })) as Record<string, unknown>[];
 
-      // Format the data for display - use same structure as old TableView.jsx
-      if (rows && rows.length > 0) {
-        const formattedData = rows.map((item: any) => ({
-          batchGuid: item["Batch GUID"] || "Unknown",
-          batchName: item["Batch Name"] || "Unknown",
-          batchStart: item["Batch Act Start"] || "N/A",
-          batchEnd: item["Batch Act End"] || "N/A",
-          productName: item["Product Name"] || "Unknown",
-          materialName: item["Material Name"] || "Unknown",
-          materialCode: item["Material Code"] || "Unknown",
-          quantity: item["Quantity"] || 0,
-          batchQuantity: item["Quantity"] ?? item["Batch Quantity"] ?? 0,
-          setPointFloat: item["SetPoint Float"] || 0,
-          actualValueFloat: item["Actual Value Float"] || 0,
-          sourceServer: item["Source Server"] || "Unknown",
-          rootGuid: item["ROOTGUID"] || "Unknown",
-          orderId: item["OrderId"] || "Unknown",
-        }));
+      const formattedData =
+        rows && rows.length > 0
+          ? rows.map((item: any) => ({
+              batchGuid: item["Batch GUID"] || "Unknown",
+              batchName: item["Batch Name"] || "Unknown",
+              batchStart: item["Batch Act Start"] || "N/A",
+              batchEnd: item["Batch Act End"] || "N/A",
+              productName: item["Product Name"] || "Unknown",
+              materialName: item["Material Name"] || "Unknown",
+              materialCode: item["Material Code"] || "Unknown",
+              quantity: item["Quantity"] || 0,
+              batchQuantity: item["Quantity"] ?? item["Batch Quantity"] ?? 0,
+              setPointFloat: item["SetPoint Float"] || 0,
+              actualValueFloat: item["Actual Value Float"] || 0,
+              sourceServer: item["Source Server"] || "Unknown",
+              rootGuid: item["ROOTGUID"] || "Unknown",
+              orderId: item["OrderId"] || "Unknown",
+            }))
+          : [];
 
-        // Store the formatted data in the appropriate state variable
-        if (reportType === 'daily') {
-          setDailyReportData(formattedData);
-        } else if (reportType === 'weekly') {
-          setWeeklyReportData(formattedData);
-        } else if (reportType === 'monthly') {
-          setMonthlyReportData(formattedData);
+      if (reportType === 'daily') {
+        setDailyReportData(formattedData);
+        // Always align Daily table with Batch Calendar (same APIs as the calendar card)
+        try {
+          const { products, totals } = await fetchDailyFromCalendar(startIso, endIso, formattedData);
+          setSummary(products, totals);
+        } catch (calErr) {
+          console.error('Calendar-aligned daily summary failed:', calErr);
+          const aggregated = aggregateByProduct(formattedData, 'day');
+          const sumSP = aggregated.reduce((s, p) => s + Number(p.sumSP), 0);
+          const sumAct = aggregated.reduce((s, p) => s + Number(p.sumAct), 0);
+          const noOfBatches = aggregated.reduce((s, p) => s + Number(p.noOfBatches), 0);
+          setSummary(aggregated, buildTotals(noOfBatches, sumSP, sumAct));
         }
+      } else if (reportType === 'weekly' || reportType === 'monthly') {
+        if (reportType === 'weekly') setWeeklyReportData(formattedData);
+        else setMonthlyReportData(formattedData);
 
-
-      } else {
-        if (reportType === 'daily') {
-          setDailyReportData([]);
-        } else if (reportType === 'weekly') {
-          setWeeklyReportData([]);
-        } else if (reportType === 'monthly') {
-          setMonthlyReportData([]);
+        // Try product-summary when deployed; else calendar day-sum + row aggregates
+        let usedSummary = false;
+        try {
+          const summaryRes = await axios.get(
+            `${API_ENDPOINTS.BATCH_REPORTS_PRODUCT_SUMMARY}?${params.toString()}`,
+            { timeout: LARGE_REPORT_TIMEOUT_MS },
+          );
+          const products = summaryRes.data?.products;
+          if (!summaryRes.data?.error && Array.isArray(products) && products.length > 0) {
+            setSummary(products, summaryRes.data.totals ?? null);
+            usedSummary = true;
+          }
+        } catch {
+          /* fall through */
+        }
+        if (!usedSummary) {
+          const calRes = await axios.get(API_ENDPOINTS.BATCH_KPI_CALENDAR, {
+            params: { startDate: startIso, endDate: endIso },
+            timeout: LARGE_REPORT_TIMEOUT_MS,
+          });
+          const days = Array.isArray(calRes.data) ? calRes.data : [];
+          const calBatches = days.reduce((s: number, d: any) => s + (Number(d.batch_count) || 0), 0);
+          const calAct = days.reduce((s: number, d: any) => s + (Number(d.total_actual_kg) || 0), 0);
+          const aggregated = aggregateByProduct(
+            formattedData,
+            reportType === 'weekly' ? 'week' : 'month',
+          );
+          const sumSP = aggregated.reduce((s, p) => s + Number(p.sumSP), 0);
+          setSummary(
+            aggregated,
+            buildTotals(
+              calBatches > 0 ? calBatches : aggregated.reduce((s, p) => s + Number(p.noOfBatches), 0),
+              sumSP,
+              calAct > 0 ? calAct : aggregated.reduce((s, p) => s + Number(p.sumAct), 0),
+            ),
+          );
         }
       }
     } catch (error) {
@@ -556,10 +719,16 @@ export function BatchHistoricalReports() {
       setError(msg);
       if (reportType === 'daily') {
         setDailyReportData([]);
+        setDailyProductSummary([]);
+        setDailySummaryTotals(null);
       } else if (reportType === 'weekly') {
         setWeeklyReportData([]);
+        setWeeklyProductSummary([]);
+        setWeeklySummaryTotals(null);
       } else if (reportType === 'monthly') {
         setMonthlyReportData([]);
+        setMonthlyProductSummary([]);
+        setMonthlySummaryTotals(null);
       }
     } finally {
       setLoading(false);
@@ -747,33 +916,24 @@ export function BatchHistoricalReports() {
 
 
 
-  // Generate aggregated data for summary reports - matching old system exactly
+  // Prefer SQL product-summary (matches Batch Calendar); fall back to client aggregate
   const dailyData = useMemo(() => {
     if (activeTab !== "Daily Report") return [];
-    // For daily reports, use dailyReportData from the /api/reports endpoint
-    const aggregated = aggregateByProduct(dailyReportData, 'day');
-    
-    // Debug: Log batch count and material sums for each product
-    aggregated.forEach(product => {
-      console.log(`Daily Report - Product: ${product.productName}, Batches: ${product.noOfBatches}, Sum SP: ${product.sumSP}, Sum Act: ${product.sumAct}`);
-    });
-    
-    return aggregated;
-  }, [dailyReportData, activeTab]);
+    if (dailyProductSummary.length > 0) return dailyProductSummary;
+    return aggregateByProduct(dailyReportData, 'day');
+  }, [dailyProductSummary, dailyReportData, activeTab]);
 
   const weeklyData = useMemo(() => {
     if (activeTab !== "Weekly") return [];
-    // For weekly reports, use weeklyReportData from the /api/reports endpoint
-    const aggregated = aggregateByProduct(weeklyReportData, 'week');
-    return aggregated;
-  }, [weeklyReportData, activeTab]);
+    if (weeklyProductSummary.length > 0) return weeklyProductSummary;
+    return aggregateByProduct(weeklyReportData, 'week');
+  }, [weeklyProductSummary, weeklyReportData, activeTab]);
 
   const monthlyData = useMemo(() => {
     if (activeTab !== "Monthly") return [];
-    // For monthly reports, use monthlyReportData from the /api/reports endpoint
-    const aggregated = aggregateByProduct(monthlyReportData, 'month');
-    return aggregated;
-  }, [monthlyReportData, activeTab]);
+    if (monthlyProductSummary.length > 0) return monthlyProductSummary;
+    return aggregateByProduct(monthlyReportData, 'month');
+  }, [monthlyProductSummary, monthlyReportData, activeTab]);
 
   const materialData = useMemo(() => {
     // For Material Consumption Report, use dailyReportData to ensure consistency with other reports
@@ -1027,14 +1187,14 @@ export function BatchHistoricalReports() {
   };
 
   const applyDailyFilter = (isManualTrigger = false) => {
-    // Match KPI Calendar: full UTC calendar day via CAST([Batch Act Start] AS DATE)
-    const { startIso, endIso } = utcCalendarDayRange(dailyStartDate);
+    // Use selected Saudi datetime + 24h (same pattern as Weekly), not UTC calendar midnight
+    const endDate = addSaudiDays(dailyStartDate, 1);
 
     if (isManualTrigger) {
       setDailyReportTriggered(true);
     }
 
-    fetchReportData('daily', startIso, endIso);
+    fetchReportData('daily', dailyStartDate, endDate);
     setCurrentPage(1);
   };
 
@@ -1109,6 +1269,24 @@ export function BatchHistoricalReports() {
       const rows =
         tabName === "Weekly" ? weeklyData : tabName === "Monthly" ? monthlyData : dailyData;
       if (!rows.length) return null;
+      // Prefer SQL totals (overall DISTINCT batch count — matches Batch Calendar card)
+      const apiTotals =
+        tabName === "Weekly"
+          ? weeklySummaryTotals
+          : tabName === "Monthly"
+            ? monthlySummaryTotals
+            : dailySummaryTotals;
+      if (apiTotals) {
+        return {
+          kind: "productSummary" as const,
+          label: "Total",
+          totalBatches: Number(apiTotals.noOfBatches) || 0,
+          totalSP: Number(apiTotals.sumSP) || 0,
+          totalAct: Number(apiTotals.sumAct) || 0,
+          totalErrKg: parseFloat(apiTotals.errKg) || Math.abs(Number(apiTotals.sumAct) - Number(apiTotals.sumSP)),
+          totalErrPercent: parseFloat(apiTotals.errPercent) || 0,
+        };
+      }
       const totalBatches = sumBy(rows, (item) => Number(item.noOfBatches));
       const totalSP = sumBy(rows, (item) => Number(item.sumSP));
       const totalAct = sumBy(rows, (item) => Number(item.sumAct));
@@ -1356,7 +1534,8 @@ export function BatchHistoricalReports() {
       const end = addSaudiMonths(monthlyStartDate, 1);
       return `Monthly Production Period: ${formatSaudiDateLabel(monthlyStartDate, { day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(monthlyStartDate, { hour: '2-digit', minute: '2-digit', hour12: true })} - ${formatSaudiDateLabel(end, { day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(end, { hour: '2-digit', minute: '2-digit', hour12: true })} (AST)`;
     } else if (activeTab === "Daily Report") {
-      return `Daily Production Period: ${formatUtcCalendarDayLabel(dailyStartDate)} (calendar day)`;
+      const end = addSaudiDays(dailyStartDate, 1);
+      return `Daily Production Period: ${formatSaudiDateLabel(dailyStartDate, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(dailyStartDate, { hour: '2-digit', minute: '2-digit', hour12: true })} - ${formatSaudiDateLabel(end, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })} ${formatSaudiTimeLabel(end, { hour: '2-digit', minute: '2-digit', hour12: true })} (AST)`;
     } else {
       return `Date Range: ${appliedStartDate} to ${appliedEndDate} (AST)`;
     }

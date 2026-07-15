@@ -49,8 +49,8 @@ export function saudiDatetimeLocalToUtcIso(datetimeLocal: string): string {
 }
 
 /**
- * UTC calendar-day bounds matching KPI Calendar (`CAST([Batch Act Start] AS DATE)`).
- * Accepts `YYYY-MM-DD` or datetime-local; uses the date portion only.
+ * UTC midnight–end calendar-day bounds (legacy).
+ * Prefer Saudi 07:00→07:00 production days for Batch Calendar / reports.
  */
 export function utcCalendarDayRange(dateOrDatetimeLocal: string): {
   startIso: string;
@@ -148,6 +148,20 @@ export function getDefaultProductionDayRange(): { startDate: string; endDate: st
   const startUtc = new Date(endUtc.getTime() - 24 * 60 * 60 * 1000);
   const startParts = getSaudiPartsForInstant(startUtc);
   const startDate = toDatetimeLocal(startParts.year, startParts.month, startParts.day, 7, 0);
+  return { startDate, endDate };
+}
+
+/** Batch calendar default: 1st of current Saudi month 07:00 → 1st of next month 07:00. */
+export function getDefaultCalendarMonthRange(): { startDate: string; endDate: string } {
+  const nowParts = getSaudiPartsForInstant(new Date());
+  const startDate = toDatetimeLocal(nowParts.year, nowParts.month, 1, 7, 0);
+  let y = nowParts.year;
+  let m = nowParts.month + 1;
+  if (m > 12) {
+    m = 1;
+    y += 1;
+  }
+  const endDate = toDatetimeLocal(y, m, 1, 7, 0);
   return { startDate, endDate };
 }
 

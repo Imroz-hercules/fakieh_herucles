@@ -4,11 +4,10 @@ const PAGE_LIMIT = 10000;
 const MAX_PAGES = 1000;
 
 /**
- * Fetch all rows from a KPI list endpoint (/api/kpi, /api/kpi/csv-format-report, /api/reports)
- * using includeTotal=false and OFFSET page until has_more is false.
+ * Fetch all rows from a KPI list endpoint (/api/kpi, /api/kpi/csv-format-report, /api/reports).
  *
- * Uses page/offset (not keyset cursor) so multi-page Monthly/Weekly totals stay complete
- * as long as the server ORDER BY is stable across pages.
+ * Prefers keyset `cursor` / `nextCursor` (stable, no OFFSET skip/dup risk).
+ * Falls back to page/offset when the server does not return nextCursor.
  */
 export async function fetchAllKpiPages(
   urlWithPath: string,
@@ -17,18 +16,26 @@ export async function fetchAllKpiPages(
 ): Promise<unknown[]> {
   const all: unknown[] = [];
   let page = 1;
+  let cursor: string | null = null;
 
   for (let guard = 0; guard < MAX_PAGES; guard += 1) {
     const p = new URLSearchParams(baseParams.toString());
     p.set('limit', String(PAGE_LIMIT));
     p.set('includeTotal', 'false');
-    p.set('page', String(page));
-    p.delete('cursor');
+
+    if (cursor) {
+      p.set('cursor', cursor);
+      p.delete('page');
+    } else {
+      p.set('page', String(page));
+      p.delete('cursor');
+    }
 
     const r = await axios.get(`${urlWithPath}?${p.toString()}`, config);
     const body = r.data as {
       data?: unknown[];
       has_more?: boolean;
+      nextCursor?: string | null;
       error?: string;
     };
     if (body?.error) {
@@ -41,7 +48,15 @@ export async function fetchAllKpiPages(
     if (!hasMore || rows.length === 0) {
       break;
     }
-    page += 1;
+
+    const next = body.nextCursor || null;
+    if (next) {
+      cursor = next;
+    } else {
+      // Offset fallback when server omits nextCursor
+      cursor = null;
+      page += 1;
+    }
   }
 
   return all;

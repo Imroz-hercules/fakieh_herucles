@@ -6,6 +6,11 @@ import { Label } from '@/components/ui/label';
 import axios from "axios";
 import DetailsPopup from "@/components/batch-material/DetailsPopup";
 import { API_ENDPOINTS } from '@/config/api';
+import {
+  getDefaultCalendarMonthRange,
+  getSaudiPartsForInstant,
+  saudiDatetimeLocalToUtcIso,
+} from '@/utils/timezone';
 
 interface CalendarData {
   date: string;
@@ -20,9 +25,13 @@ interface DetailsData {
     quantity_kg: number;
 }
 
+/** Date portion of datetime-local / ISO (YYYY-MM-DD). */
+const dateKey = (value: string) => (value || '').slice(0, 10);
+
 export function BatchCalendarPage() {
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const defaults = getDefaultCalendarMonthRange();
+  const [startDate, setStartDate] = useState(defaults.startDate);
+  const [endDate, setEndDate] = useState(defaults.endDate);
   const [calendarData, setCalendarData] = useState<CalendarData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,28 +42,6 @@ export function BatchCalendarPage() {
   const [detailsData, setDetailsData] = useState<DetailsData[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
-
-  // Set default date range (current month)
-  useEffect(() => {
-    const now = new Date();
-    
-    // Set start date to first day of current month
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    // Set end date to last day of current month
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    // Format dates as YYYY-MM-DD without timezone conversion
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    
-    setStartDate(formatDate(start));
-    setEndDate(formatDate(end));
-  }, []);
 
   // Fetch calendar data when dates change
   useEffect(() => {
@@ -70,8 +57,9 @@ export function BatchCalendarPage() {
       
       const response = await axios.get(API_ENDPOINTS.BATCH_KPI_CALENDAR, {
         params: {
-          startDate,
-          endDate,
+          // Saudi datetime-local → UTC ISO; backend buckets by 07:00→07:00 production days
+          startDate: saudiDatetimeLocalToUtcIso(startDate),
+          endDate: saudiDatetimeLocalToUtcIso(endDate),
         },
       });
 
@@ -93,8 +81,9 @@ export function BatchCalendarPage() {
     try {
         setDetailsLoading(true);
         setDetailsError(null);
+        // Production-day label (YYYY-MM-DD); backend expands to D 07:00 → D+1 07:00 AST
         const response = await axios.get(API_ENDPOINTS.BATCH_KPI_CALENDAR_DETAILS, {
-            params: { date },
+            params: { date: dateKey(date) },
         });
         setDetailsData(response.data);
     } catch (err) {
@@ -117,18 +106,19 @@ export function BatchCalendarPage() {
     }
   };
 
-  // Generate date range array like the old working code
+  // Production-day cards for half-open range [start, end) — e.g. Jul 1 07:00 → Aug 1 07:00 → Jul 1..31
   const getDateRangeArray = (start: string, end: string) => {
     if (!start || !end) return [];
-    const arr = [];
-    // Parse dates as local time (YYYY-MM-DD format)
-    const [startYear, startMonth, startDay] = start.split('-').map(Number);
-    const [endYear, endMonth, endDay] = end.split('-').map(Number);
+    const startKey = dateKey(start);
+    const endKey = dateKey(end);
+    const [startYear, startMonth, startDay] = startKey.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endKey.split('-').map(Number);
     
     let dt = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
-    const endDate = new Date(endYear, endMonth - 1, endDay, 0, 0, 0, 0);
+    const endExclusive = new Date(endYear, endMonth - 1, endDay, 0, 0, 0, 0);
     
-    while (dt <= endDate) {
+    const arr: Date[] = [];
+    while (dt < endExclusive) {
       arr.push(new Date(dt));
       dt.setDate(dt.getDate() + 1);
     }
@@ -142,9 +132,8 @@ export function BatchCalendarPage() {
     // Build calendarData: key = full date string, value = data (fix for multi-month ranges)
     const calendarDataByDate: { [key: string]: CalendarData } = {};
     calendarData.forEach((item) => {
-      // Use the full date string as key instead of just day number
-      const dateStr = item.date;
-      calendarDataByDate[dateStr] = item;
+      const dateStr = dateKey(String(item.date));
+      calendarDataByDate[dateStr] = { ...item, date: dateStr };
     });
 
 
@@ -157,7 +146,6 @@ export function BatchCalendarPage() {
     }> = [];
 
     dateRange.forEach((dateObj) => {
-      const day = dateObj.getDate();
       const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
       const dayOfMonth = dateObj.getDate();
       const month = dateObj.toLocaleDateString('en-US', { month: 'short' });
@@ -177,10 +165,6 @@ export function BatchCalendarPage() {
         total_actual_kg: 0 
       };
 
-      // Debug: Log data for each day
-      if (data.total_actual_ton > 0 || data.product_count > 0 || data.batch_count > 0) {
-      }
-
       grid.push({
         fullDate: dateStr,
         day: dayOfWeek,
@@ -194,19 +178,17 @@ export function BatchCalendarPage() {
 
   const filteredData = generateCalendarGrid();
 
-  // Today as YYYY-MM-DD (local), matching the grid's fullDate format.
-  // Future days (strictly after today) are blanked with "—" so they aren't
-  // mistaken for zero-production days.
+  // Current Saudi calendar date — future production days blanked with "—"
   const todayStr = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const p = getSaudiPartsForInstant(new Date());
+    return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
   })();
 
   return (
     <>
       <WaterSystemLayout
         title="Batch calendar"
-        subtitle="Daily production totals, batches, and products from batch materials"
+        subtitle="Daily production totals (07:00–07:00 AST), batches, and products from batch materials"
       >
         <div className="space-y-6">
           {/* Header with Filters */}
@@ -219,30 +201,30 @@ export function BatchCalendarPage() {
               </h1>
             </div>
 
-            {/* Date Filters */}
+            {/* Date Filters — Saudi production-day window (default 07:00) */}
             <div className="flex flex-wrap gap-3">
               <div className="flex flex-col">
                 <Label className="mb-1 text-sm font-medium text-slate-800 dark:text-cyan-300">
-                  Start Date
+                  Start (AST)
                 </Label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-slate-800 dark:bg-slate-800 light:bg-white border-slate-600 dark:border-slate-600 light:border-slate-300 text-white dark:text-white light:text-slate-900 cursor-pointer hover:border-cyan-400 transition-colors"
+                  className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white cursor-pointer hover:border-cyan-400 transition-colors"
                   onClick={(e) => e.currentTarget.showPicker?.()}
                 />
               </div>
 
               <div className="flex flex-col">
                 <Label className="mb-1 text-sm font-medium text-slate-800 dark:text-cyan-300">
-                  End Date
+                  End (AST)
                 </Label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-slate-800 dark:bg-slate-800 light:bg-white border-slate-600 dark:border-slate-600 light:border-slate-300 text-white dark:text-white light:text-slate-900 cursor-pointer hover:border-cyan-400 transition-colors"
+                  className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white cursor-pointer hover:border-cyan-400 transition-colors"
                   onClick={(e) => e.currentTarget.showPicker?.()}
                 />
               </div>

@@ -68,6 +68,8 @@ export const API_ENDPOINTS = {
   /** SQL Server BatchMaterials (NFM-style batch reporting) */
   BATCH_KPI: `${API_BASE_URL}/kpi`,
   BATCH_REPORTS_QUERY: `${API_BASE_URL}/reports`,
+  /** Calendar-aligned SQL product aggregates (same filter/window as Batch Calendar). */
+  BATCH_REPORTS_PRODUCT_SUMMARY: `${API_BASE_URL}/kpi_calendar/product-summary`,
   BATCH_FILTER_OPTIONS: `${API_BASE_URL}/filter-options`,
   BATCH_KPI_CALENDAR: `${API_BASE_URL}/kpi_calendar`,
   BATCH_KPI_CALENDAR_DETAILS: `${API_BASE_URL}/kpi_calendar/details`,
