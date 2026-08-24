@@ -127,31 +127,41 @@ def _fetch_batch_rows(from_dt, to_dt, limit=5000):
 
 
 def _aggregate_by_product(from_dt, to_dt):
-    """Group BatchMaterials by product (mirrors frontend ``aggregateByProduct``).
+    """Group BatchMaterials by product code + name (mirrors frontend ``aggregateByProduct``).
 
-    Columns: Product Name | No Of Batches (unique batches) | Sum SP | Sum Act |
-    Err Kg | Err %.  ``Err %`` is left numeric-as-string so the PDF can colour it.
+    Columns: Product Code | Product Name | No Of Batches (unique batches) |
+    Sum SP | Sum Act | Err Kg | Err %.  ``Err %`` is left numeric-as-string
+    so the PDF can colour it.
     """
     mats = _fetch_batch_rows(from_dt, to_dt)
     groups = {}
     order = []
     for m in mats:
+        code = (m.product_code or '').strip() if getattr(m, 'product_code', None) else ''
         name = m.product_name or 'Unknown'
-        if name not in groups:
-            groups[name] = {'sumSP': 0.0, 'sumAct': 0.0, 'batches': set()}
-            order.append(name)
-        groups[name]['batches'].add(str(m.batch_guid))
-        groups[name]['sumSP'] += float(m.setpoint_float or 0)
-        groups[name]['sumAct'] += float(m.actual_value_float or 0)
+        key = (code, name)
+        if key not in groups:
+            groups[key] = {
+                'productCode': code,
+                'productName': name,
+                'sumSP': 0.0,
+                'sumAct': 0.0,
+                'batches': set(),
+            }
+            order.append(key)
+        groups[key]['batches'].add(str(m.batch_guid))
+        groups[key]['sumSP'] += float(m.setpoint_float or 0)
+        groups[key]['sumAct'] += float(m.actual_value_float or 0)
 
-    columns = ['Product Name', 'No Of Batches', 'Sum SP', 'Sum Act', 'Err Kg', 'Err %']
+    columns = ['Product Code', 'Product Name', 'No Of Batches', 'Sum SP', 'Sum Act', 'Err Kg', 'Err %']
     rows = []
-    for name in order:
-        g = groups[name]
+    for key in order:
+        g = groups[key]
         err_kg = abs(g['sumAct'] - g['sumSP'])
         err_pct = (err_kg / g['sumSP'] * 100) if g['sumSP'] else 0.0
         rows.append({
-            'Product Name': name,
+            'Product Code': g['productCode'],
+            'Product Name': g['productName'],
             'No Of Batches': len(g['batches']),
             'Sum SP': f"{g['sumSP']:.2f}",
             'Sum Act': f"{g['sumAct']:.2f}",

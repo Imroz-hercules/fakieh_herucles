@@ -20,6 +20,20 @@ export interface TruckWeighOrder {
   created_at?: string | null;
 }
 
+export interface ScaleLiveReading {
+  ok: boolean;
+  scale: number;
+  name?: string;
+  role?: "entry" | "exit" | string;
+  ip?: string;
+  mac?: string;
+  weight_kg: number | null;
+  stable: boolean;
+  unit?: string;
+  mode?: string;
+  error?: string | null;
+}
+
 const BASE = `${API_BASE_URL}/truck-entry`;
 
 async function parseJson<T>(res: Response): Promise<T> {
@@ -46,7 +60,32 @@ export async function createTruckWeighOrder(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ truck_id: truckId, material_code: materialCode }),
   });
-  return parseJson(res);
+  const text = await res.text();
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(text || res.statusText);
+  }
+  if (res.status === 409) {
+    const err = data as { error?: string; order_id?: number; ticket?: string; status?: string };
+    const conflict = new Error(err?.error || "Truck already has an open weigh order") as Error & {
+      orderId?: number;
+      ticket?: string;
+      status?: string;
+      code?: "OPEN_ORDER";
+    };
+    conflict.code = "OPEN_ORDER";
+    conflict.orderId = err?.order_id;
+    conflict.ticket = err?.ticket;
+    conflict.status = err?.status;
+    throw conflict;
+  }
+  if (!res.ok) {
+    const err = data as { error?: string };
+    throw new Error(err?.error || text || res.statusText);
+  }
+  return data as TruckWeighOrder;
 }
 
 export async function saveFirstWeight(orderId: number, weight: number): Promise<TruckWeighOrder> {
@@ -88,4 +127,28 @@ export async function fetchCompletedToday(date?: string): Promise<CompletedToday
 export async function fetchTruckWeighOrder(orderId: number): Promise<TruckWeighOrder> {
   const res = await fetch(`${BASE}/orders/${orderId}`);
   return parseJson(res);
+}
+
+/** Cancel an open trip (awaiting entry or exit) so the truck can be reused. */
+export async function deleteTruckWeighOrder(orderId: number): Promise<TruckWeighOrder> {
+  const res = await fetch(`${BASE}/orders/${orderId}`, { method: "DELETE" });
+  return parseJson(res);
+}
+
+/** Scale 1 = entry, Scale 2 = exit */
+export async function fetchScaleLive(scaleId: 1 | 2): Promise<ScaleLiveReading> {
+  const res = await fetch(`${BASE}/scales/${scaleId}/live`);
+  const text = await res.text();
+  let data: ScaleLiveReading;
+  try {
+    data = text
+      ? (JSON.parse(text) as ScaleLiveReading)
+      : ({ ok: false, scale: scaleId, weight_kg: null, stable: false } as ScaleLiveReading);
+  } catch {
+    throw new Error(text || res.statusText);
+  }
+  if (!res.ok && !data?.error && data?.weight_kg == null) {
+    throw new Error(text || res.statusText);
+  }
+  return data;
 }

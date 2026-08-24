@@ -49,7 +49,13 @@ def ask():
         return jsonify({"error": "Missing 'question'."}), 400
     try:
         result = brain.ask(question)
-        logstore.log(question, result.get("answer", ""), result.get("provider"), result.get("cached", False))
+        logstore.log(
+            question,
+            result.get("answer", ""),
+            result.get("provider"),
+            result.get("cached", False),
+            result.get("usage"),
+        )
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500

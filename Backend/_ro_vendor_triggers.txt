@@ -1,0 +1,182 @@
+
+
+################## FAKIEH_SERVER1 — SIMATIC_BATCH capture-trigger definitions ##################
+
+
+################## FAKIEH_SERVER2 — SIMATIC_BATCH capture-trigger definitions ##################
+
+----- TRIGGER: CopyBatch  (1690 chars) -----
+/* 1) Batch header -> BatchCopy  (verbatim NFM CopyBatch; no offset; safe pattern already present) */
+CREATE   TRIGGER [SIMATIC_BATCH].[CopyBatch]
+ON [SimaticBatch].[SIMATIC_BATCH].[Batch]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT OFF;                 -- never propagate to the batch engine
+    BEGIN TRY
+        INSERT INTO [ASMBatchReports].[dbo].[BatchCopy]
+            ([ROOTGUID],[ROOTOBJID],[ROOTOTID],[OGUID],[OBJID],[OTID],[Created],[ExAttribute],
+             [Quantity],[ProductName],[ProductCode],[ProductGUID],[ProductUoMId],[FormulaCategoryName],
+             [FormulaName],[FormulaVersion],[FormulaGUID],[FormulaId],[MRecipeName],[MRecipeVersion],
+             [MRecipeGUID],[MRecipeId],[OrderId],[PlanEnd],[PCellGUID],[PCellId],[PartId],
+             [BatchReleaseGroupId],[CreationDateTime],[BatchHasNoTags],[BatchVersion],[LastOSCDateTime],
+             [MarkByOSC],[BatchTransferTime])
+        SELECT
+             i.[ROOTGUID],i.[ROOTOBJID],i.[ROOTOTID],i.[OGUID],i.[OBJID],i.[OTID],i.[Created],i.[ExAttribute],
+             i.[Quantity],i.[ProductName],i.[ProductCode],i.[ProductGUID],i.[ProductUoMId],i.[FormulaCategoryName],
+             i.[FormulaName],i.[FormulaVersion],i.[FormulaGUID],i.[FormulaId],i.[MRecipeName],i.[MRecipeVersion],
+             i.[MRecipeGUID],i.[MRecipeId],i.[OrderId],i.[PlanEnd],i.[PCellGUID],i.[PCellId],i.[PartId],
+             i.[BatchReleaseGroupId],i.[CreationDateTime],i.[BatchHasNoTags],i.[BatchVersion],i.[LastOSCDateTime],
+             i.[MarkByOSC],i.[BatchTransferTime]
+        FROM inserted i;
+    END TRY
+    BEGIN CATCH
+        -- swallow: capture must never break the batch engine
+    END CATCH;
+END;
+
+----- TRIGGER: CopyBatchChanges  (3495 chars) -----
+/* 2) BatchChanges -> BatchCopy state fields  (SAFE + SET-BASED rewrite of NFM CopyBatchChanges;
+      offsets stripped; keyed on OBJID; never rolls back) */
+CREATE   TRIGGER [SIMATIC_BATCH].[CopyBatchChanges]
+ON [SimaticBatch].[SIMATIC_BATCH].[BatchChanges]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT OFF;                 -- never roll back the batch engine
+    BEGIN TRY
+        -- 2a) ensure a header row exists for each completed batch (ActEnd present) that CopyBatch
+        --     hasn't already created; pull the full NOT-NULL header from Batch.
+        INSERT INTO [ASMBatchReports].[dbo].[BatchCopy]
+            ([ROOTGUID],[ROOTOBJID],[ROOTOTID],[OGUID],[OBJID],[OTID],[Created],[ExAttribute],[Quantity],
+             [ProductName],[ProductCode],[ProductGUID],[ProductUoMId],[FormulaCategoryName],[FormulaName],
+             [FormulaVersion],[FormulaGUID],[FormulaId],[MRecipeName],[MRecipeVersion],[MRecipeGUID],
+             [MRecipeId],[OrderId],[PlanEnd],[PCellGUID],[PCellId],[PartId],[BatchReleaseGroupId],
+             [CreationDateTime],[BatchHasNoTags],[BatchVersion],[LastOSCDateTime],[MarkByOSC],[BatchTransferTime])
+        SELECT
+             b.[ROOTGUID],b.[ROOTOBJID],b.[ROOTOTID],b.[OGUID],b.[OBJID],b.[OTID],b.[Created],b.[ExAttribute],b.[Quantity],
+             b.[ProductName],b.[ProductCode],b.[ProductGUID],b.[ProductUoMId],b.[FormulaCategoryName],b.[FormulaName],
+             b.[FormulaVersion],b.[FormulaGUID],b.[FormulaId],b.[MRecipeName],b.[MRecipeVersion],b.[MRecipeGUID],
+             b.[MRecipeId],b.[OrderId],b.[PlanEnd],b.[PCellGUID],b.[PCellId],b.[PartId],b.[BatchReleaseGroupId],
+             b.[CreationDateTime],b.[BatchHasNoTags],b.[BatchVersion],b.[LastOSCDateTime],b.[MarkByOSC],b.[BatchTransferTime]
+        FROM (SELECT DISTINCT [OBJID] FROM inserted WHERE [ActEnd] IS NOT NULL) i
+        JOIN [SimaticBatch].[SIMATIC_BATCH].[Batch] b ON b.[OBJID] = i.[OBJID]
+        WHERE NOT EXISTS (SELECT 1 FROM [ASMBatchReports].[dbo].[BatchCopy] bc WHERE bc.[OGUID] = b.[OGUID]);
+
+        -- 2b) update the BatchChanges-sourced fields on the header row(s), KEYED ON OGUID (the unique
+        --     batch id) — OBJID is used only for the inherent BatchChanges->Batch link, because OBJID
+        --     is not collision-safe in this system (the reason NFM carries the +15000/+28000 offsets).
+        UPDATE bc
+        SET bc.[Name]                       = i.[Name],
+            bc.[Description]                = i.[Description],
+            bc.[PredecessorBatchId]        = i.[PredecessorBatchId],
+            bc.[ChainMode]                 = i.[ChainMode],
+            bc.[ChainIgnorePredecessorState] = i.[ChainIgnorePredecessorState],
+            bc.[ActQuantity]               = i.[ActQuantity],
+            bc.[ReleaseTime]               = i.[ReleaseTime],
+            bc.[PlanStart]                 = i.[PlanStart],
+            bc.[ActStart]                  = i.[ActStart],
+            bc.[ActEnd]                    = i.[ActEnd],
+            bc.[Mode]                      = i.[StartMode],
+            bc.[State]                     = i.[State],
+            bc.[ExState]                   = i.[ExState]
+        FROM [ASMBatchReports].[dbo].[BatchCopy] bc
+        JOIN [SimaticBatch].[SIMATIC_BATCH].[Batch] b ON b.[OGUID] = bc.[OGUID]
+        JOIN inserted i ON i.[OBJID] = b.[OBJID]
+        WHERE i.[ActEnd] IS NOT NULL;
+    END TRY
+    BEGIN CATCH
+        -- swallow: never roll back the batch engine
+    END CATCH;
+END;
+
+----- TRIGGER: CopyParValueOnline  (1901 chars) -----
+/* 3) ParValueOnline -> ParValueOnline_copy  (verbatim NFM CopyParValueOnline; +28000 offset stripped) */
+CREATE   TRIGGER [SIMATIC_BATCH].[CopyParValueOnline]
+ON [SimaticBatch].[SIMATIC_BATCH].[ParValueOnline]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT OFF;
+    BEGIN TRY
+        INSERT INTO [ASMBatchReports].[dbo].[ParValueOnline_copy]
+            ([ROOTGUID],[POBJID],[POTID],[P2OBJID],[P2OTID],[OBJID],[ActivationCounter],[EventID],[TimeStamp],
+             [Name],[EventNotifyType],[UsageId],[DataTypeId],[DataTypeName],[UoMId],[UoMName],[HighValue],[LowValue],
+             [RecHighValue],[RecLowValue],[sp_float],[asp_float],[av_float],[sp_int],[asp_int],[av_int],[sp_string],
+             [asp_string],[av_string],[loc_unitallocname],[loc_unitname],[sp_locname],[asp_locname],[av_locname],
+             [sp_matname],[sp_matcode],[asp_matname],[asp_matcode],[av_matname],[av_matcode],[sp_EnumValue],
+             [asp_EnumValue],[av_EnumValue],[sp_Unit],[asp_Unit],[av_Unit],[sp_prot],[asp_prot],[av_prot])
+        SELECT
+             i.[ROOTGUID],i.[POBJID],i.[POTID],i.[P2OBJID],i.[P2OTID],i.[OBJID],i.[ActivationCounter],i.[EventID],i.[TimeStamp],
+             i.[Name],i.[EventNotifyType],i.[UsageId],i.[DataTypeId],i.[DataTypeName],i.[UoMId],i.[UoMName],i.[HighValue],i.[LowValue],
+             i.[RecHighValue],i.[RecLowValue],i.[sp_float],i.[asp_float],i.[av_float],i.[sp_int],i.[asp_int],i.[av_int],i.[sp_string],
+             i.[asp_string],i.[av_string],i.[loc_unitallocname],i.[loc_unitname],i.[sp_locname],i.[asp_locname],i.[av_locname],
+             i.[sp_matname],i.[sp_matcode],i.[asp_matname],i.[asp_matcode],i.[av_matname],i.[av_matcode],i.[sp_EnumValue],
+             i.[asp_EnumValue],i.[av_EnumValue],i.[sp_Unit],i.[asp_Unit],i.[av_Unit],i.[sp_prot],i.[asp_prot],i.[av_prot]
+        FROM inserted i;
+    END TRY
+    BEGIN CATCH
+    END CATCH;
+END;
+
+----- TRIGGER: tr_BatchChangesMerger  (1829 chars) -----
+ 	create trigger [SIMATIC_BATCH].[tr_BatchChangesMerger] on [SIMATIC_BATCH].[BatchChanges] INSTEAD of INSERT 	as 	begin 		set NOCOUNT on; 		merge into [SIMATIC_BATCH].[BatchChanges] as [Target] 		using ( select * from inserted ) as [Source]  		on [Target].OGUID = [Source].OGUID and [Target].EventID = [Source].EventID  		when matched then update set 			[Name]								= [Source].[Name]					, 			[Description]						= [Source].[Description]		, 			[Deleted]							= [Source].[Deleted]				, 			[PredecessorBatchId]				= [Source].[PredecessorBatchId]			, 			[ChainMode]							= [Source].[ChainMode]			, 			[ChainIgnorePredecessorState]	= [Source].[ChainIgnorePredecessorState]		, 			[ActQuantity]						= [Source].[ActQuantity]		, 			[ReleaseTime]						= [Source].[ReleaseTime]		, 			[PlanStart]							= [Source].[PlanStart]			, 			[ActStart]							= [Source].[ActStart]			, 			[ActEnd]								= [Source].[ActEnd]				, 			[StartMode]							= [Source].[StartMode]			, 			[State]								= [Source].[State]				, 			[ExState]							= [Source].[ExState]				, 			[ModificationDateTime]			= [Source].[ModificationDateTime]	, 			[GapTime]							= [Source].[GapTime] 		when not matched then insert values 		( 			[Source].[OGUID]						, 			[Source].[OBJID]						, 			[Source].[EventID]					, 			[Source].[Name]						, 			[Source].[Description]				, 			[Source].[Deleted]					, 			[Source].[PredecessorBatchId]		, 			[Source].[ChainMode]					, 			[Source].[ChainIgnorePredecessorState]				, 			[Source].[ActQuantity]				, 			[Source].[ReleaseTime]				, 			[Source].[PlanStart]					, 			[Source].[ActStart]					, 			[Source].[ActEnd]						, 			[Source].[StartMode]					, 			[Source].[State]						, 			[Source].[ExState]					, 			[Source].[ModificationDateTime]	, 			[Source].[GapTime]				  		); 	end
+
+----- TRIGGER: tr_BatchMerger  (2888 chars) -----
+ create trigger [SIMATIC_BATCH].[tr_BatchMerger] on [SIMATIC_BATCH].[Batch] INSTEAD of INSERT as begin 	set NOCOUNT on; 	merge into [SIMATIC_BATCH].[Batch] as [Target] 	using ( select * from inserted ) as [Source] 	on [Target].OGUID = [Source].OGUID 	when MATCHED then update set 		[Created]					 = [Source].[Created]						, 		[ExAttribute]				 = [Source].[ExAttribute]					, 		[Quantity]					 = [Source].[Quantity]						, 		[ProductName]				= [Source].[ProductName]			, 		[ProductCode]				= [Source].[ProductCode]			, 		[ProductGUID]				= [Source].[ProductGUID]			, 		[ProductUoMId]				= [Source].[ProductUoMId]			, 		[FormulaCategoryName]		 = [Source].[FormulaCategoryName]			, 		[FormulaName]				 = [Source].[FormulaName]					, 		[FormulaVersion]			 = [Source].[FormulaVersion]				, 		[FormulaGUID]				 = [Source].[FormulaGUID]					, 		[FormulaId]					 = [Source].[FormulaId]						, 		[MRecipeName]				 = [Source].[MRecipeName]					, 		[MRecipeVersion]			 = [Source].[MRecipeVersion]				, 		[MRecipeGUID]				 = [Source].[MRecipeGUID]					,  		[MRecipeId]					 = [Source].[MRecipeId]						, 		[OrderId]					 = [Source].[OrderId]						, 		[PlanEnd]					 = [Source].[PlanEnd]						, 		[PCellGUID]					 = [Source].[PCellGUID]						, 		[PCellId]					 = [Source].[PCellId]						, 		[PartId]					 = [Source].[PartId]						, 		[BatchReleaseGroupId]	 	 = [Source].[BatchReleaseGroupId]			,	 		[CreationDateTime]		 	 = [Source].[CreationDateTime]				,	 		[BatchHasNoTags]			 = [Source].[BatchHasNoTags]				, 	 		[LastOSCDateTime]				= [Source].[LastOSCDateTime]				, 		[MarkByOSC]						= [Source].[MarkByOSC]						, 		[BatchTransferTime]			= [Source].[BatchTransferTime]		, 		[InternalSettings]			= [Source].[InternalSettings] 		 	when NOT MATCHED then insert values 	( 		[Source].[ROOTGUID]					, 		[Source].[ROOTOBJID]					, 		[Source].[ROOTOTID]					, 		[Source].[OGUID]						, 		[Source].[OBJID]						, 		[Source].[OTID]						, 		[Source].[Created]					, 		[Source].[ExAttribute]				, 		[Source].[Quantity]					, 		[Source].[ProductName]				, 		[Source].[ProductCode]				, 		[Source].[ProductGUID]				, 		[Source].[ProductUoMId]				, 		[Source].[FormulaCategoryName]	, 		[Source].[FormulaName]				, 		[Source].[FormulaVersion]			, 		[Source].[FormulaGUID]				, 		[Source].[FormulaId]					, 		[Source].[MRecipeName]				, 		[Source].[MRecipeVersion]			, 		[Source].[MRecipeGUID]				, 		[Source].[MRecipeId]					, 		[Source].[OrderId]					, 		[Source].[PlanEnd]					, 		[Source].[PCellGUID]					, 		[Source].[PCellId]					, 		[Source].[PartId]						, 		[Source].[BatchReleaseGroupId]	, 		[Source].[CreationDateTime]		, 		[Source].[BatchHasNoTags]			, 		[Source].[BatchVersion]				, 		[Source].[LastOSCDateTime]			, 		[Source].[MarkByOSC]					, 		[Source].[BatchTransferTime]		, 		[Source].[InternalSettings] 	) ; end 
+
+----- TRIGGER: tr_Order  (1001 chars) -----
+create trigger [SIMATIC_BATCH].[tr_Order] on [SIMATIC_BATCH].[Order] INSTEAD of INSERT as begin 	set NOCOUNT on; 	merge into [SIMATIC_BATCH].[Order] as [Target] 	using ( select * from inserted ) as [Source]  	on 	[Target].[OGUID] = [Source].[OGUID] 	and [Target].[ROOTGUID] = [Source].[ROOTGUID] 	when matched then update set 		[Name]					= [Source].[Name]				, 		[CreationDateTime]		= [Source].[CreationDateTime], 		[EarliestDateTime]		= [Source].[EarliestDateTime], 		[LatestDateTime]			= [Source].[LatestDateTime], 		[Quantity]					= [Source].[Quantity], 		[Description]				= [Source].[Description] 	when not matched then insert values 	( 		[Source].[ROOTGUID]				, 		[Source].[ROOTOBJID]			, 		[Source].[ROOTOTID]				, 		[Source].[OGUID]				, 		[Source].[OBJID]				, 		[Source].[OTID]					, 		[Source].[Name]					, 		[Source].[CreationDateTime]	, 		[Source].[EarliestDateTime], 		[Source].[LatestDateTime], 		[Source].[Quantity], 		[Source].[Description] 	); end    
+
+----- TRIGGER: tr_OrderCategory  (663 chars) -----
+create trigger [SIMATIC_BATCH].[tr_OrderCategory] on [SIMATIC_BATCH].[OrderCategory] INSTEAD of INSERT as begin 	set NOCOUNT on; 	merge into [SIMATIC_BATCH].[OrderCategory] as [Target] 	using ( select * from inserted ) as [Source]  	on 	[Target].[OGUID] = [Source].[OGUID] 	when matched then update set 		[Name]					= [Source].[Name]				, 		[CreationDateTime]		= [Source].[CreationDateTime]	, 		[Description]				= [Source].[Description] 	when not matched then insert values 	( 		[Source].[OGUID]				, 		[Source].[OBJID]				, 		[Source].[OTID]					, 		[Source].[Name]					, 		[Source].[CreationDateTime]	, 		[Source].[Description] 		); end    
+
+----- TRIGGER: trgInsertOrderDetailsOnOrder  (1102 chars) -----
+/* 4) Order -> OrderDetails  (verbatim NFM; safe wrapper added) */
+CREATE   TRIGGER [SIMATIC_BATCH].[trgInsertOrderDetailsOnOrder]
+ON [SIMATIC_BATCH].[Order]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT OFF;
+    BEGIN TRY
+        MERGE [ASMBatchReports].[dbo].[OrderDetails] AS target
+        USING (SELECT i.ROOTGUID, i.OBJID AS OrderId, i.Name AS OrderName, i.CreationDateTime, i.Quantity, i.Description
+               FROM inserted i) AS source
+        ON target.ROOTGUID = source.ROOTGUID AND target.OrderId = source.OrderId
+        WHEN MATCHED THEN UPDATE SET target.OrderName = source.OrderName, target.CreationDateTime = source.CreationDateTime,
+                                     target.Quantity = source.Quantity, target.Description = source.Description
+        WHEN NOT MATCHED BY TARGET THEN
+            INSERT (ROOTGUID, OrderId, OrderName, CreationDateTime, Quantity, Description)
+            VALUES (source.ROOTGUID, source.OrderId, source.OrderName, source.CreationDateTime, source.Quantity, source.Description);
+    END TRY
+    BEGIN CATCH
+    END CATCH;
+END;
+
+----- TRIGGER: trgInsertOrderDetailsOnOrderCategory  (904 chars) -----
+/* 5) OrderCategory -> OrderDetails  (verbatim NFM; safe wrapper added) */
+CREATE   TRIGGER [SIMATIC_BATCH].[trgInsertOrderDetailsOnOrderCategory]
+ON [SIMATIC_BATCH].[OrderCategory]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT OFF;
+    BEGIN TRY
+        MERGE [ASMBatchReports].[dbo].[OrderDetails] AS target
+        USING (SELECT i.OGUID AS ROOTGUID, i.OBJID AS OrderId, i.Name AS OrderCategory, i.CreationDateTime
+               FROM inserted i) AS source
+        ON target.ROOTGUID = source.ROOTGUID AND target.OrderId = source.OrderId
+        WHEN MATCHED THEN UPDATE SET target.OrderCategory = source.OrderCategory
+        WHEN NOT MATCHED BY TARGET THEN
+            INSERT (ROOTGUID, OrderId, OrderCategory, CreationDateTime)
+            VALUES (source.ROOTGUID, source.OrderId, source.OrderCategory, source.CreationDateTime);
+    END TRY
+    BEGIN CATCH
+    END CATCH;
+END;

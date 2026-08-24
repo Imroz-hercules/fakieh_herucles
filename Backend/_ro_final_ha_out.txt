@@ -1,0 +1,87 @@
+FINAL HA/GOLDEN @ local 2026-07-23T22:25:51.896897 (READ-ONLY)
+
+===== 7.FAKIEH_SERVER1.vendor_Batch_max =====
+rows_ | max_btt | max_creation | max_created
+1 | 2026-07-21 00:24:34.286 +00:00 | 2026-07-20 23:58:26.831 +00:00 | 2026-07-21 00:24:34.286 +00:00
+
+===== 7.FAKIEH_SERVER1.vendor_ParValueOnline_max =====
+rows_ | max_ts
+3692 | 2026-07-21 00:23:30.650 +00:00
+
+===== 7.FAKIEH_SERVER1.vendor_BatchChanges_max =====
+rows_ | max_actend | max_mod
+30 | 2026-07-21 00:23:30.650 +00:00 | 2026-07-21 00:24:30.128 +00:00
+
+===== 7.FAKIEH_SERVER1.staging_BatchCopy_max =====
+rows_ | max_btt | max_actstart | max_actend
+2642 | 2026-07-21 00:24:34.286 +00:00 | 2026-07-21 00:04:12.573 +00:00 | 2026-07-21 00:23:30.650 +00:00
+
+===== 7.FAKIEH_SERVER2.vendor_Batch_max =====
+rows_ | max_btt | max_creation | max_created
+1 | 2026-07-23 19:24:34.550 +00:00 | 2026-07-23 19:01:21.115 +00:00 | 2026-07-23 19:24:34.550 +00:00
+
+===== 7.FAKIEH_SERVER2.vendor_ParValueOnline_max =====
+rows_ | max_ts
+3692 | 2026-07-23 19:23:30.548 +00:00
+
+===== 7.FAKIEH_SERVER2.vendor_BatchChanges_max =====
+rows_ | max_actend | max_mod
+30 | 2026-07-23 19:23:30.548 +00:00 | 2026-07-23 19:24:30.238 +00:00
+
+===== 7.FAKIEH_SERVER2.staging_BatchCopy_max =====
+rows_ | max_btt | max_actstart | max_actend
+415 | 2026-07-23 19:24:34.550 +00:00 | 2026-07-23 19:07:28.947 +00:00 | 2026-07-23 19:23:30.548 +00:00
+
+===== 6.overlap_ALL_TIME =====
+server1_only | server2_only | in_both
+2640 | 414 | 1
+
+===== 6.overlap_SINCE_2026-06-22 =====
+server1_only | server2_only | in_both
+2640 | 414 | 1
+
+===== 6.sample_5_in_both =====
+OGUID | server1_btt | server2_btt
+A175BC58-88C3-4B14-8478-E851CC2E7D36 | 2026-06-28 12:16:55.473 +00:00 | 2026-06-28 12:16:25.010 +00:00
+
+===== 9.golden_full -> _ro_golden_full.csv : 2994 rows x 18 cols =====
+
+===== 9.total_distinct_batches_RAW (no product filter) =====
+total_batches | total_rows
+148 | 2994
+
+===== 9.totals_FILTERED (dashboard math) =====
+batch_count | sum_sp | sum_act | sum_sp_2dp | sum_act_2dp
+148 | 671412.9599999987 | 672688.0798542695 | 671412.96 | 672688.08
+
+===== 9.per_product (dashboard math) =====
+product | batches | sum_sp | sum_act
+BROILER FINISHER BAG | 18 | 80986.95 | 81014.85855897
+BROILER GROWER | 88 | 395928.72000000015 | 397035.09686169995
+BROILER STARTER | 42 | 194497.29 | 194638.12443360002
+
+===== 9.per_material (dashboard filter) =====
+material | batches | sum_sp | sum_act
+BETAIN HCL | 148 | 333.0 | 397.3032587699999
+BIOSTRONG 510 | 148 | 99.89999999999974 | 112.41030760000002
+Broiler Mineral Mix | 148 | 618.3 | 863.324633
+Broiler Starter PX | 106 | 429.30000000000075 | 587.7893819999999
+Choline Chloride 60% | 106 | 286.1999999999994 | 286.4814992700001
+KENZYME PRO | 148 | 399.59999999999894 | 453.55902000000015
+Limestone | 148 | 8473.409999999985 | 9423.031259999996
+LYSOFORTE DRY | 148 | 133.20000000000036 | 143.4013359
+Maize | 148 | 400528.89000000025 | 401129.20100000006
+Methionine | 147 | 1681.4699999999978 | 1667.6795000000022
+Monocalcium Phos | 148 | 5735.339999999992 | 5772.135289999998
+NOVELA ECL | 148 | 66.60000000000018 | 94.35475470000002
+Provi Oxi Stop | 137 | 61.65000000000015 | 140.49190552999997
+Rovabio P10 | 148 | 333.0 | 410.9201464999999
+Sacox (500g) | 130 | 292.5 | 453.88891199999995
+Salt | 148 | 1894.3200000000027 | 2074.3635210000016
+SOLIS | 148 | 999.0 | 1078.2841229999995
+SOUDIOM Bicarbon | 148 | 1346.6699999999987 | 1358.9410050000001
+SOYA- | 148 | 242170.6499999997 | 241606.7689999999
+Soya Oil | 148 | 4571.459999999996 | 4633.75
+TermiN-8 | 148 | 958.5 | 0.0
+
+DONE FINAL HA/GOLDEN

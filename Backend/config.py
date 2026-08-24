@@ -57,5 +57,5 @@ SQLALCHEMY_ENGINE_OPTIONS = {
     "max_overflow": _max_overflow,
 }
 
-# Set True at runtime when /api/websocket/start-broadcast runs (not a static deploy default).
+# Set True at runtime when the always-on PLC broadcast worker starts (app boot).
 PLC_BROADCAST_ACTIVE = False

@@ -158,21 +158,37 @@ def broadcast_worker(app_instance):
 
 # ---------- CONTROL ROUTES ----------
 
+def ensure_broadcast_running(app=None):
+    """Start the PLC broadcast worker if it is not already running.
+
+    Called on backend startup so live PLC polling stays always-on for operators.
+    Safe to call repeatedly (idempotent).
+    """
+    global _broadcast_running, _broadcast_thread
+
+    if _broadcast_running and _broadcast_thread is not None and _broadcast_thread.is_alive():
+        return False
+
+    target_app = app
+    if target_app is None:
+        target_app = current_app._get_current_object()
+
+    _broadcast_running = True
+    target_app.config["PLC_BROADCAST_ACTIVE"] = True
+    _broadcast_thread = threading.Thread(
+        target=broadcast_worker, args=(target_app,), daemon=True, name="plc-broadcast"
+    )
+    _broadcast_thread.start()
+    print("[websocket] PLC broadcast worker ensured running (always-on)")
+    return True
+
+
 @websocket_bp.route("/start-broadcast", methods=["POST"])
 def start_broadcast():
-    """Start broadcasting PLC data"""
-    global _broadcast_running, _broadcast_thread
-    
-    if _broadcast_running:
+    """Start broadcasting PLC data (kept for recovery; UI no longer exposes this)."""
+    if not ensure_broadcast_running():
         return {'status': 'already_running', 'message': 'Broadcast is already running'}
-    
-    _broadcast_running = True
-    app = current_app._get_current_object()
-    app.config["PLC_BROADCAST_ACTIVE"] = True
-    # Pass the Flask app instance to the worker
-    _broadcast_thread = threading.Thread(target=broadcast_worker, args=(app,), daemon=True)
-    _broadcast_thread.start()
-    
+
     return {
         'status': 'started',
         'message': 'PLC data broadcast started',
@@ -181,15 +197,13 @@ def start_broadcast():
 
 @websocket_bp.route("/stop-broadcast", methods=["POST"])
 def stop_broadcast():
-    """Stop broadcasting PLC data"""
-    global _broadcast_running
-    
-    if not _broadcast_running:
-        return {'status': 'not_running', 'message': 'Broadcast is not running'}
-    
-    _broadcast_running = False
-    current_app._get_current_object().config["PLC_BROADCAST_ACTIVE"] = False
-    return {'status': 'stopped', 'message': 'PLC data broadcast stopped'}
+    """Broadcast is always-on — refuse stop so operators cannot kill the live feed."""
+    ensure_broadcast_running()
+    return {
+        'status': 'always_on',
+        'message': 'PLC broadcast is always-on and cannot be stopped',
+        'broadcast_running': True,
+    }
 
 @websocket_bp.route("/status", methods=["GET"])
 def websocket_status():

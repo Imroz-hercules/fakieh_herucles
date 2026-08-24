@@ -84,7 +84,8 @@ def get_kpi_calendar_details():
 
         tbl = SQLSERVER_BATCH_MATERIALS_TABLE
         sql_query = f"""
-        SELECT dbo.[{tbl}].[Product Name] as product_name,
+        SELECT dbo.[{tbl}].[ProductCode] as product_code,
+               dbo.[{tbl}].[Product Name] as product_name,
                COUNT(DISTINCT dbo.[{tbl}].[Batch GUID]) as batch_count,
                SUM(dbo.[{tbl}].[SetPoint Float]) as sum_sp,
                SUM(dbo.[{tbl}].[Actual Value Float]) as quantity_kg
@@ -92,7 +93,7 @@ def get_kpi_calendar_details():
         WHERE dbo.[{tbl}].[Batch Act Start] >= :start_date
           AND dbo.[{tbl}].[Batch Act Start] < :end_date
           AND lower(dbo.[{tbl}].[Product Name]) != 'not selected'
-        GROUP BY dbo.[{tbl}].[Product Name]
+        GROUP BY dbo.[{tbl}].[ProductCode], dbo.[{tbl}].[Product Name]
         ORDER BY quantity_kg DESC
         """
 
@@ -100,6 +101,7 @@ def get_kpi_calendar_details():
 
         details = [
             {
+                "product_code": (row.product_code or "").strip() if row.product_code else "",
                 "product_name": row.product_name,
                 "batch_count": int(row.batch_count or 0),
                 "sum_sp": float(row.sum_sp or 0),
@@ -154,14 +156,15 @@ def get_kpi_calendar_product_summary():
             where_sql += f" AND dbo.[{tbl}].[Material Name] IN ({', '.join(keys)})"
 
         sql_products = f"""
-        SELECT dbo.[{tbl}].[Product Name] AS product_name,
+        SELECT dbo.[{tbl}].[ProductCode] AS product_code,
+               dbo.[{tbl}].[Product Name] AS product_name,
                COUNT(DISTINCT dbo.[{tbl}].[Batch GUID]) AS batch_count,
                SUM(dbo.[{tbl}].[SetPoint Float]) AS sum_sp,
                SUM(dbo.[{tbl}].[Actual Value Float]) AS sum_act
         FROM dbo.[{tbl}]
         WHERE {where_sql}
-        GROUP BY dbo.[{tbl}].[Product Name]
-        ORDER BY dbo.[{tbl}].[Product Name]
+        GROUP BY dbo.[{tbl}].[ProductCode], dbo.[{tbl}].[Product Name]
+        ORDER BY dbo.[{tbl}].[Product Name], dbo.[{tbl}].[ProductCode]
         """
         sql_totals = f"""
         SELECT COUNT(DISTINCT dbo.[{tbl}].[Batch GUID]) AS batch_count,
@@ -183,6 +186,7 @@ def get_kpi_calendar_product_summary():
             err_pct = (err_kg / sum_sp * 100) if sum_sp else 0.0
             products.append(
                 {
+                    "productCode": (row.product_code or "").strip() if row.product_code else "",
                     "productName": row.product_name,
                     "noOfBatches": int(row.batch_count or 0),
                     "sumSP": round(sum_sp, 2),

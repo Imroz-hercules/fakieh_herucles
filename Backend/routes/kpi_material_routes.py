@@ -49,6 +49,7 @@ _KPI_LIST_COLS = (
     KPIMaterial.order_id,
     KPIMaterial.batch_name,
     KPIMaterial.product_name,
+    KPIMaterial.product_code,
     KPIMaterial.batch_act_start,
     KPIMaterial.batch_act_end,
     KPIMaterial.batch_transfer_time,
@@ -76,6 +77,7 @@ def _row_to_kpi_dict(mat, include_event_id=False):
         "Batch GUID": str(batch_guid) if batch_guid is not None else None,
         "Batch Name": getattr(mat, "batch_name", None),
         "Product Name": getattr(mat, "product_name", None),
+        "ProductCode": getattr(mat, "product_code", None),
         "Batch Act Start": format_db_datetime_utc_iso(getattr(mat, "batch_act_start", None)),
         "Batch Act End": format_db_datetime_utc_iso(getattr(mat, "batch_act_end", None)),
         "Quantity": getattr(mat, "quantity", None),
@@ -384,14 +386,15 @@ def get_reports_product_summary():
         where_sql = " AND ".join(where)
         sql_products = text(
             f"""
-            SELECT dbo.[{tbl}].[Product Name] AS product_name,
+            SELECT dbo.[{tbl}].[ProductCode] AS product_code,
+                   dbo.[{tbl}].[Product Name] AS product_name,
                    COUNT(DISTINCT dbo.[{tbl}].[Batch GUID]) AS batch_count,
                    SUM(dbo.[{tbl}].[SetPoint Float]) AS sum_sp,
                    SUM(dbo.[{tbl}].[Actual Value Float]) AS sum_act
             FROM dbo.[{tbl}]
             WHERE {where_sql}
-            GROUP BY dbo.[{tbl}].[Product Name]
-            ORDER BY dbo.[{tbl}].[Product Name]
+            GROUP BY dbo.[{tbl}].[ProductCode], dbo.[{tbl}].[Product Name]
+            ORDER BY dbo.[{tbl}].[Product Name], dbo.[{tbl}].[ProductCode]
             """
         )
         sql_totals = text(
@@ -417,6 +420,7 @@ def get_reports_product_summary():
             err_pct = (err_kg / sum_sp * 100) if sum_sp else 0.0
             products.append(
                 {
+                    "productCode": (row.product_code or "").strip() if row.product_code else "",
                     "productName": row.product_name,
                     "noOfBatches": int(row.batch_count or 0),
                     "sumSP": round(sum_sp, 2),

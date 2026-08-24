@@ -45,62 +45,90 @@ _CHART_INSTRUCTIONS = (
 _CHART_RE = re.compile(r"```chart\s*(\{.*?\})\s*```", re.DOTALL)
 
 
-def _context_json() -> str:
-    """Compact, grounded snapshot of the dataset for the model.
-
-    Slimmed to essential fields so a small model isn't overwhelmed or tempted
-    to echo the raw structure.
-    """
+def _overall_compact() -> dict:
     ov = insights.overall()
-    mats = sorted(insights.material_accuracy(min_count=1), key=lambda m: m["count"], reverse=True)
-    ctx = {
-        "overall": {
-            "total_doses": ov["count"],
-            "accuracy_pct": ov["accuracy_score"],
-            "on_target": ov["on_target"],
-            "over_dosed": ov["over"],
-            "under_dosed": ov["under"],
-            "flagged": ov["flagged"],
-        },
-        "products": [
-            {"name": p["product_name"], "accuracy_pct": p["accuracy_score"], "doses": p["count"]}
-            for p in insights.product_summary()
-        ],
-        "ingredients": [
-            {
-                "name": m["material_name"],
-                "doses": m["count"],
-                "avg_deviation_pct": m["mean_dev_pct"],
-                "avg_abs_deviation_pct": m["mean_abs_dev_pct"],
-                "over": m["over"],
-                "under": m["under"],
-            }
-            for m in mats
-        ],
-        "worst_batches": [
-            {"product": b["product_name"], "accuracy_pct": b["accuracy_score"], "doses": b["count"]}
-            for b in insights.worst_batches(8)
-        ],
+    return {
+        "doses": ov["count"],
+        "accuracy_pct": round(ov["accuracy_score"], 1),
+        "on_target": ov["on_target"],
+        "over": ov["over"],
+        "under": ov["under"],
+        "flagged": ov["flagged"],
     }
-    return json.dumps(ctx, ensure_ascii=False)
+
+
+def _mat_row(m: dict, *, abs_dev: bool = False) -> dict:
+    row = {"name": m["material_name"], "dev_pct": round(m["mean_dev_pct"], 1)}
+    if abs_dev:
+        row["abs_dev_pct"] = round(m["mean_abs_dev_pct"], 1)
+    return row
+
+
+def _context_for_question(question: str) -> str:
+    """Question-aware DATA blob for Ask Hercules captions.
+
+    Charts are built locally — the LLM only needs a tiny grounded slice so
+    input tokens stay ~500–1500 instead of dumping every ingredient/product.
+    """
+    q = (question or "").lower()
+    ctx: dict = {"overall": _overall_compact()}
+
+    if "under" in q:
+        ctx["top_under"] = [_mat_row(m) for m in insights.top_underdosed(8)]
+    elif "over" in q:
+        ctx["top_over"] = [_mat_row(m) for m in insights.top_overdosed(8)]
+    elif "product" in q or "compare" in q:
+        ctx["weak_products"] = [
+            {"name": p["product_name"], "accuracy_pct": round(p["accuracy_score"], 1)}
+            for p in insights.product_summary()[:8]
+        ]
+    elif "batch" in q:
+        ctx["weak_batches"] = [
+            {
+                "batch": b.get("batch_name") or b.get("product_name"),
+                "accuracy_pct": round(b["accuracy_score"], 1),
+            }
+            for b in insights.worst_batches(8)
+        ]
+    elif "yield" in q or "on target" in q or "on-target" in q or "error" in q or "flag" in q:
+        # overall alone is enough for doughnut-style captions
+        pass
+    elif "worst" in q or "accuracy" in q or "material" in q or "ingredient" in q or "micro" in q:
+        ctx["weak_ingredients"] = [
+            _mat_row(m, abs_dev=True) for m in insights.worst_materials(8)
+        ]
+    else:
+        # Generic ask: small headline slice only
+        ctx["weak_ingredients"] = [
+            _mat_row(m, abs_dev=True) for m in insights.worst_materials(5)
+        ]
+        ctx["weak_batches"] = [
+            {
+                "batch": b.get("batch_name") or b.get("product_name"),
+                "accuracy_pct": round(b["accuracy_score"], 1),
+            }
+            for b in insights.worst_batches(3)
+        ]
+
+    return json.dumps(ctx, ensure_ascii=False, separators=(",", ":"))
 
 
 def _auto_chart(question: str):
-    """Attach a relevant precomputed chart based on the question's intent.
+    """Always attach a grounded chart for the answer.
 
-    Used when the model doesn't emit its own chart block, so common demo
-    questions still get a visual — reliably and grounded in real numbers.
+    Matches question intent when possible; falls back to overall dose-outcome
+    mix so every Ask Hercules reply has a visual.
     """
     q = (question or "").lower()
 
-    def spec(title, rows, key, unit="%"):
+    def spec(title, rows, key, unit="%", chart_type="bar"):
         rows = [r for r in rows if r.get(key) is not None][:6]
         if not rows:
             return None
         return {
-            "type": "bar",
+            "type": chart_type,
             "title": title,
-            "labels": [r.get("material_name") or r.get("product_name") for r in rows],
+            "labels": [r.get("material_name") or r.get("product_name") or r.get("batch_name") for r in rows],
             "values": [round(float(r[key]), 1) for r in rows],
             "unit": unit,
         }
@@ -109,20 +137,54 @@ def _auto_chart(question: str):
         return spec("Most under-dosed ingredients (avg deviation %)", insights.top_underdosed(6), "mean_dev_pct")
     if "over" in q:
         return spec("Most over-dosed ingredients (avg deviation %)", insights.top_overdosed(6), "mean_dev_pct")
-    if "product" in q:
+    if "product" in q or "compare" in q:
         return spec("Lowest-accuracy products (accuracy %)", insights.product_summary()[:6], "accuracy_score")
     if "batch" in q:
         rows = insights.worst_batches(6)
-        return {
-            "type": "bar",
-            "title": "Lowest-accuracy batches (accuracy %)",
-            "labels": [r["product_name"] for r in rows],
-            "values": [round(r["accuracy_score"], 1) for r in rows],
-            "unit": "%",
-        }
-    if "worst" in q or "accuracy" in q or "material" in q or "ingredient" in q:
+        if rows:
+            return {
+                "type": "bar",
+                "title": "Lowest-accuracy batches (accuracy %)",
+                "labels": [r["batch_name"] or r["product_name"] for r in rows],
+                "values": [round(r["accuracy_score"], 1) for r in rows],
+                "unit": "%",
+            }
+    if "worst" in q or "accuracy" in q or "material" in q or "ingredient" in q or "micro" in q:
         return spec("Least accurate ingredients (avg |deviation| %)", insights.worst_materials(6), "mean_abs_dev_pct")
-    return None
+    if "yield" in q or "on target" in q or "on-target" in q:
+        ov = insights.overall()
+        return {
+            "type": "doughnut",
+            "title": "Yield · dose outcomes",
+            "labels": ["On target", "Over-dosed", "Under-dosed"],
+            "values": [ov["on_target"], ov["over"], ov["under"]],
+            "unit": "doses",
+            "center_label": f"{ov['on_target_pct']}%",
+            "center_sub": "yield",
+        }
+    if "error" in q or "flag" in q or "fail" in q:
+        ov = insights.overall()
+        return {
+            "type": "doughnut",
+            "title": "Error rate · flagged vs on target",
+            "labels": ["On target", "Flagged"],
+            "values": [ov["on_target"], ov["flagged"]],
+            "unit": "doses",
+            "center_label": f"{round(100.0 * ov['flagged'] / max(ov['count'], 1), 1)}%",
+            "center_sub": "error",
+        }
+
+    # Default visual — always show something
+    ov = insights.overall()
+    return {
+        "type": "doughnut",
+        "title": "Dose outcomes",
+        "labels": ["On target", "Over-dosed", "Under-dosed"],
+        "values": [ov["on_target"], ov["over"], ov["under"]],
+        "unit": "doses",
+        "center_label": f"{ov['accuracy_score']}%",
+        "center_sub": "accuracy",
+    }
 
 
 def _extract_chart(text: str):
@@ -183,6 +245,7 @@ def executive_summary() -> dict:
         "provider": provider,
         "cached": cached,
         "errors": result.get("errors", []),
+        "usage": result.get("usage"),
     }
 
 
@@ -314,17 +377,36 @@ def _try_predictive_answer(question: str) -> dict | None:
 
     weight_note = f" (using its typical target of {setpoint:.2f} kg, since none was given)" if used_default else f" at {setpoint:.2f} kg"
     answer = (
-        f"For {material_name}{weight_note}, the trained model predicts a {risk['risk_pct']}% chance "
-        f"of coming out of tolerance ({risk['band']} risk), with the most likely outcome being "
-        f'"{sev["severity_label"]}" ({sev["confidence_pct"]}% confidence). This is a live prediction '
-        f"from the trained model for this specific dose, not a historical average."
+        f"{material_name}{weight_note}: {risk['risk_pct']}% out-of-tolerance risk "
+        f"({risk['band']}) · likely {sev['severity_label']}."
     )
+    # Visual: severity probability bars
+    probs = sev.get("probabilities") or {}
+    labels = list(probs.keys()) if probs else ["On target", "Watch", "Severe"]
+    values = [round(float(probs.get(k, 0)), 1) for k in labels] if probs else [
+        round(100 - risk["risk_pct"], 1),
+        round(risk["risk_pct"] * 0.4, 1),
+        round(risk["risk_pct"] * 0.6, 1),
+    ]
+    # Prefer friendly labels
+    label_map = {"on_target": "On target", "watch": "Watch", "severe": "Severe"}
+    labels = [label_map.get(l, l.replace("_", " ").title()) for l in labels]
+    chart = {
+        "type": "doughnut",
+        "title": f"Prediction · {material_name}",
+        "labels": labels,
+        "values": values,
+        "unit": "%",
+        "center_label": f"{risk['risk_pct']}%",
+        "center_sub": "risk",
+    }
     return {
         "question": question,
         "answer": answer,
-        "chart": None,
+        "chart": chart,
         "provider": "ml-model",
         "cached": False,
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
         "ml_prediction": {"risk": risk, "severity": sev},
     }
 
@@ -333,8 +415,14 @@ def ask(question: str) -> dict:
     """Answer a free-text question about the batch data (+ optional chart)."""
     question = (question or "").strip()
     if not question:
-        return {"question": question, "answer": "Please ask a question about the dosing data.",
-                "chart": None, "provider": None, "cached": False}
+        return {
+            "question": question,
+            "answer": "Please ask a question about the dosing data.",
+            "chart": None,
+            "provider": None,
+            "cached": False,
+            "usage": None,
+        }
 
     predictive = _try_predictive_answer(question)
     if predictive is not None:
@@ -342,22 +430,23 @@ def ask(question: str) -> dict:
 
     prompt = (
         f"QUESTION: {question}\n\n"
-        "Answer in 2-4 sentences of plain prose (a short markdown list is fine only if the user asks to "
-        "rank or list items). Cite specific ingredient/product/batch names and figures from the DATA.\n\n"
-        f"DATA:\n{_context_json()}"
+        "Answer in ONE short sentence only (max 20 words). The UI shows a chart as the main answer — "
+        "your text is just a caption under it. Cite one key figure. No lists, no preamble.\n\n"
+        f"DATA:\n{_context_for_question(question)}"
     )
     result = providers.generate(SYSTEM_PROMPT, prompt, temperature=0.2)
+    chart = _auto_chart(question)
 
     if result["ok"]:
-        answer = result["text"].strip()
-        chart = _auto_chart(question)  # reliable, grounded chart by question intent
+        answer, model_chart = _extract_chart(result["text"])
         return {
             "question": question,
             "answer": answer,
-            "chart": chart,
+            "chart": chart or model_chart,
             "provider": result["provider"],
             "model": result["model"],
             "cached": False,
+            "usage": result.get("usage"),
         }
 
     # Offline / no-key fallback.
@@ -365,8 +454,9 @@ def ask(question: str) -> dict:
     return {
         "question": question,
         "answer": fallback["answer"],
-        "chart": fallback.get("chart"),
+        "chart": fallback.get("chart") or chart,
         "provider": None,
         "cached": True,
         "errors": result.get("errors", []),
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
     }

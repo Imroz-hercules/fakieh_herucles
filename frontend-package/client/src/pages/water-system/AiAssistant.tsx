@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
 import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayout'
 import { ChartComponent } from '../../components/water-system/ChartComponent'
@@ -13,25 +13,20 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Sparkles,
   Bot,
-  BrainCircuit,
   Send,
   Loader2,
   AlertTriangle,
-  CheckCircle2,
-  Target,
-  TrendingUp,
   Activity,
   Radio,
   RefreshCw,
   Play,
   Pause,
   ShieldCheck,
-  Gauge,
   FlaskConical,
   X,
 } from 'lucide-react'
+import './AiAssistant.css'
 
 const AI = '/api/ai'
 
@@ -62,6 +57,23 @@ interface ProductRow {
   accuracy_score: number
   count: number
 }
+interface MaterialInsight {
+  material_name: string
+  material_code?: string
+  count: number
+  mean_abs_dev_pct: number
+  mean_dev_pct: number
+  over: number
+  under: number
+  on_target: number
+}
+interface BatchInsight {
+  batch_name: string
+  product_name: string
+  accuracy_score: number
+  count: number
+  date?: string
+}
 interface Insights {
   summary: string
   provider: string | null
@@ -69,16 +81,26 @@ interface Insights {
   insights: {
     meta: { row_count: number; batch_count: number; product_count: number }
     overall: Overall
-    worst_materials: any[]
+    worst_materials: MaterialInsight[]
+    top_overdosed?: MaterialInsight[]
+    top_underdosed?: MaterialInsight[]
+    worst_batches?: BatchInsight[]
     product_summary: ProductRow[]
   }
 }
 interface ChartSpec {
-  type: 'bar' | 'line'
+  type: 'bar' | 'line' | 'doughnut'
   title?: string
   labels: string[]
   values: number[]
   unit?: string
+  center_label?: string
+  center_sub?: string
+}
+interface TokenUsage {
+  prompt_tokens?: number | null
+  completion_tokens?: number | null
+  total_tokens?: number | null
 }
 interface ChatMsg {
   role: 'user' | 'ai'
@@ -86,6 +108,16 @@ interface ChatMsg {
   chart?: ChartSpec | null
   provider?: string | null
   cached?: boolean
+  usage?: TokenUsage | null
+  mlPrediction?: {
+    risk: { risk_pct: number; band: string; prediction: string }
+    severity: {
+      severity: string
+      severity_label: string
+      confidence_pct: number
+      probabilities?: Record<string, number>
+    }
+  } | null
 }
 interface MLInfo {
   metrics: { accuracy: number; roc_auc: number | null }
@@ -182,39 +214,73 @@ interface LiveState {
 // ---- Helpers ---------------------------------------------------------------
 // Charts use the app's cyan accent so they read as native Hercules charts.
 const ACCENT = '#22d3ee'
-// Native input/select styling copied from the existing pages so form controls match.
-const FIELD =
-  'bg-slate-800 light:bg-white border-slate-700 light:border-gray-300 text-slate-300 light:text-gray-700'
+const FIELD = 'herc-field'
 
 function specToChartData(spec: ChartSpec) {
+  const isDoughnut = spec.type === 'doughnut'
+  if (isDoughnut) {
+    const palette = ['rgba(16,185,129,0.75)', 'rgba(245,158,11,0.75)', 'rgba(244,63,94,0.75)', 'rgba(34,211,238,0.65)']
+    const rims = ['#34d399', '#fbbf24', '#fb7185', '#67e8f9']
+    return {
+      labels: spec.labels,
+      datasets: [
+        {
+          data: spec.values,
+          backgroundColor: spec.labels.map((_, i) => palette[i % palette.length]),
+          borderColor: spec.labels.map((_, i) => rims[i % rims.length]),
+          borderWidth: 2,
+        },
+      ],
+    }
+  }
+  // Color bars by magnitude for ranking charts
+  const max = Math.max(...spec.values, 1)
   return {
     labels: spec.labels,
     datasets: [
       {
         label: spec.unit || 'Value',
         data: spec.values,
-        backgroundColor: 'rgba(34, 211, 238, 0.45)',
-        borderColor: ACCENT,
-        borderWidth: 2,
+        backgroundColor: spec.values.map((v) => {
+          const t = v / max
+          if (t >= 0.66) return 'rgba(244,63,94,0.7)'
+          if (t >= 0.33) return 'rgba(245,158,11,0.7)'
+          return 'rgba(34,211,238,0.55)'
+        }),
+        borderColor: spec.values.map((v) => {
+          const t = v / max
+          if (t >= 0.66) return '#fb7185'
+          if (t >= 0.33) return '#fbbf24'
+          return '#67e8f9'
+        }),
+        borderWidth: 1.5,
         tension: 0.3,
       },
     ],
   }
 }
 
-function bandColor(band: string) {
-  if (band === 'High') return 'text-red-400 bg-red-500/15 border-red-500/40'
-  if (band === 'Medium') return 'text-amber-400 bg-amber-500/15 border-amber-500/40'
-  return 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40'
+/** Short caption under chart — first sentence, capped. */
+function chartCaption(text: string) {
+  const t = (text || '').trim()
+  if (!t) return ''
+  const first = t.split(/(?<=[.!?])\s+/)[0] || t
+  return first.length > 120 ? `${first.slice(0, 117)}…` : first
 }
 
-const SEVERITY_META: Record<string, { label: string; text: string; bar: string; border: string }> = {
-  on_target: { label: 'On target', text: 'text-emerald-400', bar: 'bg-emerald-500', border: 'border-emerald-500/40' },
-  watch: { label: 'Watch', text: 'text-amber-400', bar: 'bg-amber-500', border: 'border-amber-500/40' },
-  severe: { label: 'Severe', text: 'text-red-400', bar: 'bg-red-500', border: 'border-red-500/40' },
+function bandPill(band: string) {
+  if (band === 'High') return 'pill rose'
+  if (band === 'Medium') return 'pill amber'
+  return 'pill green'
+}
+
+const SEVERITY_META: Record<string, { label: string; text: string; bar: string; pill: string }> = {
+  on_target: { label: 'On target', text: 'tone-green', bar: 'bar-green', pill: 'pill green' },
+  watch: { label: 'Watch', text: 'tone-amber', bar: 'bar-amber', pill: 'pill amber' },
+  severe: { label: 'Severe', text: 'tone-rose', bar: 'bar-rose', pill: 'pill rose' },
 }
 function severityMeta(cls: string) {
-  return SEVERITY_META[cls] || { label: cls, text: 'text-slate-400', bar: 'bg-slate-500', border: 'border-slate-500/40' }
+  return SEVERITY_META[cls] || { label: cls, text: 'herc-faint', bar: 'bar-slate', pill: 'pill slate' }
 }
 
 const SUGGESTED = [
@@ -224,9 +290,8 @@ const SUGGESTED = [
   'Why are micro-ingredients less accurate?',
 ]
 
-// ---- Native building blocks (match the existing Hercules pages) -------------
+// ---- Native building blocks (Hercules AI dark theme) -----------------------
 
-/** Card panel — identical styling to the Fakieh Dashboard's cards. */
 function Panel({
   title,
   icon,
@@ -241,143 +306,424 @@ function Panel({
   children: React.ReactNode
 }) {
   return (
-    <div
-      className={
-        'bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 ' +
-        'rounded-lg p-6 shadow-lg light:shadow-xl ' +
-        className
-      }
-    >
+    <div className={`erp-glow-card ${className}`}>
       {title && (
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {icon && <span className="text-cyan-400 light:text-cyan-600">{icon}</span>}
-            <h3 className="text-lg font-semibold text-white light:text-gray-900">{title}</h3>
+        <div className="card-head">
+          <div className="flex items-center gap-2 min-w-0">
+            {icon && <span className="tone-cyan shrink-0">{icon}</span>}
+            <h3 className="herc-title truncate">{title}</h3>
           </div>
           {right}
         </div>
       )}
-      {children}
+      <div className="card-body">{children}</div>
     </div>
   )
 }
 
-const STAT_COLORS: Record<string, { text: string; dot: string; chip: string; glow: string }> = {
-  green: { text: 'text-green-400', dot: 'bg-green-400', chip: 'from-green-500 to-green-600', glow: 'from-green-500/20 via-transparent to-green-500/20' },
-  blue: { text: 'text-blue-400', dot: 'bg-blue-400', chip: 'from-blue-500 to-blue-600', glow: 'from-blue-500/20 via-transparent to-blue-500/20' },
-  cyan: { text: 'text-cyan-400', dot: 'bg-cyan-400', chip: 'from-cyan-500 to-cyan-600', glow: 'from-cyan-500/20 via-transparent to-cyan-500/20' },
-  orange: { text: 'text-orange-400', dot: 'bg-orange-400', chip: 'from-orange-500 to-orange-600', glow: 'from-orange-500/20 via-transparent to-orange-500/20' },
-  red: { text: 'text-red-400', dot: 'bg-red-400', chip: 'from-red-500 to-red-600', glow: 'from-red-500/20 via-transparent to-red-500/20' },
+const TONE_HEX: Record<string, string> = {
+  green: '#10b981',
+  amber: '#f59e0b',
+  rose: '#f43f5e',
+  cyan: '#22d3ee',
+  blue: '#60a5fa',
 }
 
-/** KPI stat card — identical to the Fakieh Dashboard's KPI cards. */
-function StatCard({
+/** Map a 0–1 goodness score to green / amber / rose (spec thresholds). */
+function gaugeTone(pct: number, highGood: boolean): 'green' | 'amber' | 'rose' {
+  const v = Math.max(0, Math.min(100, pct)) / 100
+  const goodness = highGood ? v : 1 - v
+  if (goodness >= 0.66) return 'green'
+  if (goodness >= 0.33) return 'amber'
+  return 'rose'
+}
+
+/**
+ * Semicircle glow gauge — big number + arc tip light (Pepsi KPI style).
+ * `pct` drives the arc (0–100); `value` is the display string.
+ */
+function GaugeKpi({
   label,
   value,
+  unit,
+  pct,
+  highGood = true,
   subtitle,
-  icon,
-  color,
-  pulse = true,
 }: {
   label: string
   value: string
+  unit?: string
+  pct: number
+  highGood?: boolean
   subtitle?: string
-  icon: React.ReactNode
-  color: keyof typeof STAT_COLORS
-  pulse?: boolean
 }) {
-  const c = STAT_COLORS[color]
+  const tone = gaugeTone(pct, highGood)
+  const color = TONE_HEX[tone]
+  const clamped = Math.max(0, Math.min(100, pct))
+  // Upper semicircle (Pepsi-style): left → top → right.
+  // In SVG (y↓), clockwise sweep=1 is the TOP arc.
+  const angle = Math.PI * (1 - clamped / 100) // π @ 0% (left) → 0 @ 100% (right)
+  const cx = 80
+  const cy = 72
+  const r = 56
+  const tipX = cx + r * Math.cos(angle)
+  const tipY = cy - r * Math.sin(angle)
+  const arcLen = Math.PI * r
+  const dash = (clamped / 100) * arcLen
+
   return (
-    <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg p-6 shadow-lg light:shadow-xl relative overflow-hidden group hover:shadow-2xl transition-all duration-300">
-      <div className={`absolute inset-0 bg-gradient-to-r ${c.glow} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
-      <div className="relative z-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-400 light:text-gray-600">{label}</p>
-            <p className="text-2xl font-bold text-white light:text-gray-900">{value}</p>
-            {subtitle && (
-              <p className={`text-xs ${c.text} flex items-center`}>
-                <span className={`w-2 h-2 ${c.dot} rounded-full mr-2 ${pulse ? 'animate-pulse' : ''}`}></span>
-                {subtitle}
-              </p>
-            )}
-          </div>
-          <div className={`w-12 h-12 bg-gradient-to-br ${c.chip} rounded-lg flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-            {icon}
-          </div>
+    <div className="gauge-kpi">
+      <p className="gauge-kpi-label">{label}</p>
+      <div className="gauge-svg-wrap">
+        <svg viewBox="0 0 160 100" width="100%" height="110" aria-hidden>
+          {/* Track — TOP semicircle */}
+          <path
+            d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+            fill="none"
+            stroke="rgba(148,163,184,0.22)"
+            strokeWidth="8"
+            strokeLinecap="round"
+          />
+          {/* Glowing value arc */}
+          <path
+            d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+            fill="none"
+            stroke={color}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${arcLen}`}
+            style={{
+              filter: `drop-shadow(0 0 6px ${color}) drop-shadow(0 0 14px ${color}88)`,
+              transition: 'stroke-dasharray 0.7s cubic-bezier(0.22,1,0.36,1)',
+            }}
+          />
+          {/* Tip glow dot */}
+          <circle
+            cx={tipX}
+            cy={tipY}
+            r="5.5"
+            fill="#fff"
+            style={{
+              filter: `drop-shadow(0 0 6px ${color}) drop-shadow(0 0 14px ${color})`,
+            }}
+          />
+          <circle cx={tipX} cy={tipY} r="2.5" fill={color} />
+        </svg>
+        <div className="gauge-center">
+          <div className={`hero-num lg tone-${tone}`}>{value}</div>
+          {unit && <div className="gauge-unit">{unit}</div>}
         </div>
+      </div>
+      {subtitle && <div className="gauge-sub">{subtitle}</div>}
+    </div>
+  )
+}
+
+/** Risk / severity prediction pod with glowing vial fill + huge score. */
+function PredictPod({
+  label,
+  score,
+  scoreSuffix = '%',
+  tone,
+  detail,
+  meta,
+  fillPct,
+}: {
+  label: string
+  score: string | number
+  scoreSuffix?: string
+  tone: 'green' | 'amber' | 'rose' | 'cyan'
+  detail?: React.ReactNode
+  meta?: string
+  fillPct: number
+}) {
+  const h = Math.max(6, Math.min(100, fillPct))
+  return (
+    <div className="predict-pod">
+      <div className="vial" aria-hidden>
+        <div className={`vial-fill tone-${tone}`} style={{ height: `${h}%` }} />
+      </div>
+      <div className="predict-main">
+        <p className="herc-eyebrow">{label}</p>
+        <div className={`predict-score tone-${tone} mt-1`}>
+          {score}
+          {scoreSuffix}
+        </div>
+        {detail && <div className="mt-2">{detail}</div>}
+        {meta && <div className="herc-feed-meta mt-2">{meta}</div>}
       </div>
     </div>
   )
 }
 
-/** Compact secondary metric tile (for dense model rows). */
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-700/50 light:border-gray-200 bg-slate-900/40 light:bg-gray-50 p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-400 light:text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold text-white light:text-gray-900">{value}</div>
+    <div className="herc-pod">
+      <div className="pod-label">{label}</div>
+      <div className="pod-value">{value}</div>
+    </div>
+  )
+}
+
+/**
+ * Hero forecast bridge — one metric, Current → Predicted.
+ * Big numbers, glowing vials, delta chip in the middle.
+ */
+function ForecastBridge({
+  label,
+  unit = '%',
+  current,
+  predicted,
+  highGood,
+  currentHint = 'current',
+  predictedHint = 'forecast',
+}: {
+  label: string
+  unit?: string
+  current: number
+  predicted: number
+  /** true = higher is better (yield); false = lower is better (error) */
+  highGood: boolean
+  currentHint?: string
+  predictedHint?: string
+}) {
+  const delta = predicted - current
+  const improving = highGood ? delta > 0.05 : delta < -0.05
+  const worsening = highGood ? delta < -0.05 : delta > 0.05
+  const deltaTone = improving ? 'green' : worsening ? 'rose' : 'cyan'
+  const curTone = gaugeTone(current, highGood)
+  const predTone = gaugeTone(predicted, highGood)
+  const deltaAbs = Math.abs(delta)
+  const deltaSign = delta > 0.05 ? '+' : delta < -0.05 ? '−' : ''
+
+  return (
+    <div className="forecast-bridge">
+      <div className="forecast-bridge-head">
+        <p className="herc-eyebrow">{label}</p>
+        <span className={`pill ${deltaTone}`}>
+          {deltaAbs < 0.05 ? 'stable' : improving ? 'improving' : 'watch'}
+        </span>
+      </div>
+
+      <div className="forecast-bridge-body">
+        {/* Current */}
+        <div className="forecast-side">
+          <div className="vial forecast-vial" aria-hidden>
+            <div
+              className={`vial-fill tone-${curTone}`}
+              style={{ height: `${Math.max(8, Math.min(100, highGood ? current : current))}%` }}
+            />
+          </div>
+          <div className="forecast-nums">
+            <span className="forecast-tag">Current</span>
+            <div className={`forecast-hero tone-${curTone}`}>
+              {current.toFixed(1)}
+              <span className="forecast-unit">{unit}</span>
+            </div>
+            <span className="forecast-hint">{currentHint}</span>
+          </div>
+        </div>
+
+        {/* Bridge / delta */}
+        <div className="forecast-mid">
+          <div className={`forecast-delta tone-${deltaTone}`}>
+            {deltaSign}
+            {deltaAbs.toFixed(1)}
+            <span>pp</span>
+          </div>
+          <div className="forecast-arrow" aria-hidden>
+            <span className="forecast-arrow-line" />
+            <span className="forecast-arrow-head" />
+          </div>
+          <span className="forecast-mid-label">predicted</span>
+        </div>
+
+        {/* Predicted */}
+        <div className="forecast-side forecast-side-pred">
+          <div className="forecast-nums">
+            <span className="forecast-tag tone-cyan">Forecast</span>
+            <div className={`forecast-hero tone-${predTone}`}>
+              {predicted.toFixed(1)}
+              <span className="forecast-unit">{unit}</span>
+            </div>
+            <span className="forecast-hint">{predictedHint}</span>
+          </div>
+          <div className="vial forecast-vial" aria-hidden>
+            <div
+              className={`vial-fill tone-${predTone}`}
+              style={{ height: `${Math.max(8, Math.min(100, highGood ? predicted : predicted))}%` }}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
 // ---- Live-monitor building blocks ------------------------------------------
-const DRIFT_META: Record<string, { label: string; text: string; dot: string; ring: string }> = {
-  warming: { label: 'Warming up', text: 'text-slate-300 light:text-gray-600', dot: 'bg-slate-400', ring: 'border-slate-600/50 light:border-gray-300' },
-  healthy: { label: 'In distribution', text: 'text-emerald-400', dot: 'bg-emerald-400', ring: 'border-emerald-500/40' },
-  watch: { label: 'Watch', text: 'text-amber-400', dot: 'bg-amber-400', ring: 'border-amber-500/40' },
-  drift: { label: 'Drift detected', text: 'text-red-400', dot: 'bg-red-400', ring: 'border-red-500/40' },
+const DRIFT_META: Record<string, { label: string; text: string; dot: string; pill: string }> = {
+  warming: { label: 'Warming up', text: 'herc-muted', dot: 'dot-slate', pill: 'pill slate' },
+  healthy: { label: 'In distribution', text: 'tone-green', dot: 'dot-green', pill: 'pill green' },
+  watch: { label: 'Watch', text: 'tone-amber', dot: 'dot-amber', pill: 'pill amber' },
+  drift: { label: 'Drift detected', text: 'tone-rose', dot: 'dot-rose', pill: 'pill rose' },
 }
 
 function outcomeTag(f: LiveFeedItem): { t: string; c: string } {
-  if (f.actual_status === 'on_target') return { t: 'on target', c: 'text-emerald-400' }
-  if (f.actual_status === 'over') return { t: `over +${f.actual_pct}%`, c: 'text-red-400' }
-  if (f.actual_status === 'under') return { t: `under ${f.actual_pct}%`, c: 'text-red-400' }
-  return { t: '—', c: 'text-slate-500' }
+  if (f.actual_status === 'on_target') return { t: 'on target', c: 'tone-green' }
+  if (f.actual_status === 'over') return { t: `over +${f.actual_pct}%`, c: 'tone-rose' }
+  if (f.actual_status === 'under') return { t: `under ${f.actual_pct}%`, c: 'tone-rose' }
+  return { t: '—', c: 'herc-faint' }
 }
 
-/** One scored batch in the live operator feed. Flagged doses show the full
- *  operator guidance inline (before the batch runs). */
-function FeedRow({ f }: { f: LiveFeedItem }) {
-  const dot = f.band === 'High' ? 'bg-red-500' : f.band === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500'
-  const wrap = f.flagged
-    ? f.band === 'High'
-      ? 'border-red-500/40 bg-red-500/5 light:bg-red-50'
-      : 'border-amber-500/40 bg-amber-500/5 light:bg-amber-50'
-    : 'border-slate-700/50 light:border-gray-200 bg-slate-900/40 light:bg-gray-50'
+// ---- Feed card severity (loss-prediction vial scale) -----------------------
+const SEV_GREEN = [16, 185, 129]
+const SEV_AMBER = [245, 158, 11]
+const SEV_RED = [244, 63, 94]
+const RISK_VIAL_MAX = 100
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t)
+const sevRgb = (c: number[]) => `rgb(${c[0]}, ${c[1]}, ${c[2]})`
+const sevDarken = (c: number[], f: number) =>
+  `rgb(${Math.round(c[0] * f)}, ${Math.round(c[1] * f)}, ${Math.round(c[2] * f)})`
+
+/** Severity ramp for 0–100% dosing risk. */
+function riskSevRgb(risk: number): number[] {
+  const t = clamp01(risk / RISK_VIAL_MAX)
+  if (t <= 0.5) {
+    const u = t * 2
+    return [lerp(SEV_GREEN[0], SEV_AMBER[0], u), lerp(SEV_GREEN[1], SEV_AMBER[1], u), lerp(SEV_GREEN[2], SEV_AMBER[2], u)]
+  }
+  const u = (t - 0.5) * 2
+  return [lerp(SEV_AMBER[0], SEV_RED[0], u), lerp(SEV_AMBER[1], SEV_RED[1], u), lerp(SEV_AMBER[2], SEV_RED[2], u)]
+}
+
+function riskFillPct(risk: number) {
+  return Math.round(clamp01(risk / RISK_VIAL_MAX) * 100)
+}
+
+/** Abbreviate long ingredient names for compact cards. */
+function abbrevName(name: string, max = 14) {
+  if (name.length <= max) return name
+  return `${name.slice(0, max - 1)}…`
+}
+
+/** Bottle-pod dose card — fc-pod layout (186px, glass vial, hero score). */
+function FeedDoseCard({ f }: { f: LiveFeedItem }) {
   const out = outcomeTag(f)
+  const sc = riskSevRgb(f.risk_pct)
+  const color = sevRgb(sc)
+  const fill = riskFillPct(f.risk_pct)
+  const flaggedCls = f.flagged ? (f.band === 'High' ? ' flagged-high' : ' flagged-med') : ''
+
   return (
-    <div className={`animate-in fade-in slide-in-from-top-2 duration-300 rounded-lg border px-3 py-2 ${wrap}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot}`}></span>
-          <div className="min-w-0">
-            <div className="truncate text-sm text-slate-200 light:text-gray-800">
-              {f.material_name} <span className="text-slate-500 light:text-gray-400">· {f.setpoint} kg</span>
-            </div>
-            <div className="truncate text-xs text-slate-500 light:text-gray-500">
-              {f.product_name} · batch {f.batch_name}
-            </div>
+    <div
+      className={`fc-pod animate-in fade-in slide-in-from-top-2 duration-300${flaggedCls}`}
+      title={`${f.material_name} · ${f.product_name} · batch ${f.batch_name}`}
+    >
+      <div className="fc-pod-name">{abbrevName(f.material_name.toUpperCase())}</div>
+
+      <div className="fc-pod-stage fc-pod-stage--vial-only">
+        <div className="fc-vial" aria-hidden="true">
+          <div className="fc-vial-glass">
+            <div
+              className="fc-vial-liquid"
+              style={{
+                height: `${Math.max(4, fill)}%`,
+                background: `linear-gradient(180deg, ${sevRgb(sc)}, ${sevDarken(sc, 0.5)})`,
+                boxShadow: `0 0 16px ${color}, inset 0 2px 0 rgba(255,255,255,0.5)`,
+              }}
+            />
+            <span className="fc-vial-ticks" />
+            <span className="fc-vial-gloss" />
           </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <span className={`rounded-full border px-2 py-0.5 text-xs ${bandColor(f.band)}`}>{f.risk_pct}%</span>
-          <div className={`mt-0.5 text-[10px] uppercase tracking-wide ${out.c}`}>{out.t}</div>
+          <span className="fc-vial-cap">100%</span>
         </div>
       </div>
-      {f.flagged && (
-        <div className="mt-2 flex items-start gap-2 border-t border-slate-700/40 light:border-gray-200 pt-2 text-xs text-slate-300 light:text-gray-600">
-          <AlertTriangle className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${f.band === 'High' ? 'text-red-400' : 'text-amber-400'}`} />
-          <span>
-            {f.recommendation}
-            {f.severity_label && (
-              <>
-                {' '}· <span className={severityMeta(f.severity || '').text}>Severity: {f.severity_label}</span>
-              </>
-            )}
-          </span>
+
+      <div className="fc-pod-score" style={{ color }}>
+        {f.risk_pct.toFixed(1)}
+        <span className="fc-pod-pct">%</span>
+        <span className="fc-pod-score-l">Predicted risk</span>
+      </div>
+
+      <div className="fc-pod-read">
+        <div className="fc-prow">
+          <span className="fc-psize">{f.setpoint}kg</span>
+          <span className="fc-ppk">{f.band}</span>
+          <span className="fc-pbk">{out.t}</span>
         </div>
-      )}
+        <div className="fc-prow">
+          <span className="fc-psize">batch</span>
+          <span className="fc-ppk fc-prow-span">{abbrevName(f.batch_name, 10)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Detail KPI card — RUNTIMES-style (hero + split bar + sub-grid + footer). */
+function DriftKpiCard({
+  md,
+  dr,
+  driftMeta,
+}: {
+  md?: LiveModel
+  dr?: LiveDrift
+  driftMeta: { label: string; text: string; dot: string; pill: string }
+}) {
+  const ood = dr?.novel_rate ?? 0
+  const status = dr?.status || 'warming'
+  const tone = status === 'drift' ? 'rose' : status === 'watch' ? 'amber' : 'green'
+  const acc = md?.accuracy != null ? Math.round(md.accuracy * 100) : null
+  const psi = dr?.setpoint_psi ?? null
+  const safePct = Math.max(0, 100 - Math.min(ood, 100))
+
+  return (
+    <div className="kpi-glow-card kpi-detail-card">
+      <p className="gauge-kpi-label kpi-detail-label">Model • drift</p>
+      <div className={`hero-num lg tone-${tone}`}>{dr?.novel_rate != null ? `${ood}%` : '—'}</div>
+      <div className="kpi-detail-sub">
+        <span className={`h-1.5 w-1.5 rounded-full ${driftMeta.dot}`} />
+        {driftMeta.label}
+      </div>
+
+      <div className="kpi-split-track" aria-hidden>
+        <span
+          className={`kpi-split-fill bar-${tone === 'rose' ? 'rose' : tone === 'amber' ? 'amber' : 'green'}`}
+          style={{ width: `${Math.min(ood, 100)}%` }}
+        />
+        <span className="kpi-split-rest" style={{ width: `${safePct}%` }} />
+        <span className="kpi-split-threshold" style={{ left: '25%' }} title="25% retrain threshold" />
+      </div>
+
+      <div className="kpi-detail-grid">
+        <div className="kpi-detail-cell">
+          <div className="kpi-detail-cell-head">
+            <span className="dot-cyan h-1.5 w-1.5 rounded-full" />
+            <span>Model</span>
+          </div>
+          <div className="kpi-detail-val tone-cyan">v{md?.version ?? 1}</div>
+        </div>
+        <div className="kpi-detail-cell">
+          <div className="kpi-detail-cell-head">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${acc != null && acc >= 80 ? 'dot-green' : acc != null && acc >= 65 ? 'dot-amber' : 'dot-rose'}`}
+            />
+            <span>Accuracy</span>
+          </div>
+          <div
+            className={`kpi-detail-val ${acc != null && acc >= 80 ? 'tone-green' : acc != null && acc >= 65 ? 'tone-amber' : 'tone-rose'}`}
+          >
+            {acc != null ? `${acc}%` : '—'}
+          </div>
+        </div>
+      </div>
+
+      <div className="kpi-detail-foot">
+        <span>Trained {md?.trained_on ?? 0}</span>
+        <span>PSI {psi != null ? psi.toFixed(2) : '—'}</span>
+      </div>
     </div>
   )
 }
@@ -404,6 +750,7 @@ export function AiAssistant() {
 
   // Live monitor
   const [live, setLive] = useState<LiveState | null>(null)
+  const [feedMaterialPick, setFeedMaterialPick] = useState<Set<string>>(new Set())
   const [toasts, setToasts] = useState<LiveNotif[]>([])
   const seenNotif = useRef<Set<string>>(new Set())
   const firstLoad = useRef(true)
@@ -486,6 +833,13 @@ export function AiAssistant() {
           chart: data.chart,
           provider: data.provider,
           cached: data.cached,
+          usage: data.usage ?? null,
+          mlPrediction: data.ml_prediction
+            ? {
+                risk: data.ml_prediction.risk,
+                severity: data.ml_prediction.severity,
+              }
+            : null,
         },
       ])
     } catch (e) {
@@ -527,46 +881,61 @@ export function AiAssistant() {
     }
   }
 
-  // ---- Derived chart data (Tab 1) ------------------------------------------
+  // ---- Derived metrics -----------------------------------------------------
   const overall = insights?.insights.overall
-  const distData = overall
-    ? {
-        labels: ['On target', 'Over-dosed', 'Under-dosed'],
-        datasets: [
-          {
-            data: [overall.on_target, overall.over, overall.under],
-            backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-            borderColor: '#0f172a',
-            borderWidth: 2,
-          },
-        ],
-      }
-    : null
-
-  const worstProducts = (insights?.insights.product_summary || []).slice(0, 8)
-  const productData = worstProducts.length
-    ? {
-        labels: worstProducts.map((p) => p.product_name),
-        datasets: [
-          {
-            label: 'Accuracy %',
-            data: worstProducts.map((p) => p.accuracy_score),
-            backgroundColor: 'rgba(34, 211, 238, 0.45)',
-            borderColor: ACCENT,
-            borderWidth: 2,
-          },
-        ],
-      }
-    : null
-
   const liveProvider = health?.providers.find((p) => p.configured)
 
-  // ---- Derived data (Tab 2 — live monitor) ---------------------------------
   const st = live?.stats
   const dr = live?.drift
   const md = live?.model
   const driftMeta = DRIFT_META[dr?.status || 'warming']
   const onTargetRate = st && st.processed ? Math.round((st.on_target / st.processed) * 100) : 0
+
+  // Two hero metrics: Error rate + Yield — Current → Forecast
+  const errorCurrent =
+    overall && overall.count
+      ? Math.round((overall.flagged / overall.count) * 1000) / 10
+      : 0
+  const yieldCurrent = overall?.on_target_pct ?? 0
+
+  // Forecast: prefer live rolling rates once enough batches scored; else ML positive rate
+  const liveReady = !!(st && st.processed >= 8)
+  const errorPredicted = liveReady
+    ? Math.round((st!.flagged / st!.processed) * 1000) / 10
+    : mlInfo?.positive_rate != null
+      ? Math.round(mlInfo.positive_rate * 1000) / 10
+      : errorCurrent
+  const yieldPredicted = liveReady
+    ? onTargetRate
+    : Math.round(Math.max(0, Math.min(100, 100 - errorPredicted)) * 10) / 10
+
+  const feedMaterials = useMemo(() => {
+    if (!live?.feed.length) return [] as { code: string; name: string }[]
+    const seen = new Map<string, string>()
+    for (const f of live.feed) {
+      if (!seen.has(f.material_code)) seen.set(f.material_code, f.material_name)
+    }
+    return [...seen.entries()].map(([code, name]) => ({ code, name }))
+  }, [live?.feed])
+
+  const showAllFeedMaterials = feedMaterialPick.size === 0
+
+  const filteredFeed = useMemo(() => {
+    if (!live?.feed.length) return []
+    if (showAllFeedMaterials) return live.feed
+    return live.feed.filter((f) => feedMaterialPick.has(f.material_code))
+  }, [live?.feed, feedMaterialPick, showAllFeedMaterials])
+
+  const selectAllFeedMaterials = () => setFeedMaterialPick(new Set())
+
+  const toggleFeedMaterial = (code: string) => {
+    setFeedMaterialPick((prev) => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code)
+      else next.add(code)
+      return next
+    })
+  }
 
   // Rolling risk trend across the most recent batches (oldest -> newest).
   const recent = live ? [...live.feed].slice(0, 18).reverse() : []
@@ -579,13 +948,15 @@ export function AiAssistant() {
             data: recent.map((f) => f.risk_pct),
             backgroundColor: recent.map((f) =>
               f.band === 'High'
-                ? 'rgba(239,68,68,0.7)'
+                ? 'rgba(244,63,94,0.72)'
                 : f.band === 'Medium'
-                  ? 'rgba(245,158,11,0.7)'
-                  : 'rgba(34,211,238,0.5)'
+                  ? 'rgba(245,158,11,0.72)'
+                  : 'rgba(34,211,238,0.55)'
             ),
-            borderColor: ACCENT,
-            borderWidth: 1,
+            borderColor: recent.map((f) =>
+              f.band === 'High' ? '#fb7185' : f.band === 'Medium' ? '#fbbf24' : '#67e8f9'
+            ),
+            borderWidth: 1.5,
           },
         ],
       }
@@ -597,7 +968,7 @@ export function AiAssistant() {
         datasets: [
           {
             data: [st.on_target, st.over, st.under],
-            backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+            backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'],
             borderColor: '#0f172a',
             borderWidth: 2,
           },
@@ -615,30 +986,27 @@ export function AiAssistant() {
     <WaterSystemLayout
       title="Hercules AI"
       subtitle="Generative insights and an automatic live dosing-quality monitor over the Fakieh plant data"
+      showPageTitle={false}
     >
-      {/* Drift / retrain popups (native card styling, auto-dismiss) */}
+      <div className="hercules-ai-page space-y-5 p-4 sm:p-5">
+      {/* Drift / retrain popups */}
       <div className="pointer-events-none fixed right-4 top-24 z-50 flex w-[380px] max-w-[92vw] flex-col gap-2">
         {toasts.map((n) => (
           <div
             key={n.id}
-            className={
-              'pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-300 rounded-lg border p-4 shadow-2xl backdrop-blur ' +
-              (n.kind === 'drift'
-                ? 'border-amber-500/50 bg-amber-950/85 light:bg-amber-50 light:border-amber-300'
-                : 'border-cyan-500/50 bg-cyan-950/85 light:bg-cyan-50 light:border-cyan-300')
-            }
+            className={`pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-300 herc-toast ${n.kind === 'drift' ? 'drift' : 'retrain'}`}
           >
             <div className="flex items-start gap-3">
-              <span className={n.kind === 'drift' ? 'text-amber-400' : 'text-cyan-400 light:text-cyan-600'}>
+              <span className={n.kind === 'drift' ? 'tone-amber' : 'tone-cyan'}>
                 {n.kind === 'drift' ? <AlertTriangle className="h-5 w-5" /> : <RefreshCw className="h-5 w-5" />}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-white light:text-gray-900">{n.title}</div>
-                <div className="mt-1 text-xs leading-relaxed text-slate-300 light:text-gray-600">{n.message}</div>
+                <div className="herc-title text-[15px]">{n.title}</div>
+                <div className="mt-1 text-xs leading-relaxed herc-muted">{n.message}</div>
               </div>
               <button
                 onClick={() => setToasts((t) => t.filter((x) => x.id !== n.id))}
-                className="text-slate-500 transition hover:text-slate-300 light:hover:text-gray-700"
+                className="herc-faint transition hover:text-[var(--herc-cyan-2)]"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -647,27 +1015,26 @@ export function AiAssistant() {
         ))}
       </div>
 
+      <header className="mb-1">
+        <p className="herc-eyebrow">Fakieh · dosing intelligence</p>
+        <h1 className="herc-title mt-1">Hercules AI</h1>
+        <p className="herc-subtitle">
+          Error rate &amp; yield — current vs forecast. Ask Hercules for detail.
+        </p>
+      </header>
+
       <div className="space-y-6">
-        {/* Status row — matches the Orders page live-status indicators */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <span className="flex items-center text-slate-300 light:text-gray-700">
-            <span
-              className={`mr-2 h-2 w-2 rounded-full ${
-                liveProvider ? 'animate-pulse bg-green-400' : 'bg-slate-500'
-              }`}
-            ></span>
+        <div className="herc-status-bar">
+          <span className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${liveProvider ? 'animate-pulse dot-green' : 'dot-slate'}`} />
             {liveProvider ? `AI live · ${liveProvider.provider} (${liveProvider.model})` : 'AI offline · cached answers'}
           </span>
-          <span className="flex items-center text-slate-300 light:text-gray-700">
-            <span
-              className={`mr-2 h-2 w-2 rounded-full ${
-                health?.ml_model_ready ? 'animate-pulse bg-green-400' : 'bg-red-400'
-              }`}
-            ></span>
+          <span className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${health?.ml_model_ready ? 'animate-pulse dot-green' : 'dot-rose'}`} />
             ML models {health?.ml_model_ready ? 'ready' : 'not trained'}
           </span>
           {insights && (
-            <span className="text-slate-400 light:text-gray-500">
+            <span className="herc-faint">
               {insights.insights.meta.row_count.toLocaleString()} doses ·{' '}
               {insights.insights.meta.batch_count} batches · {insights.insights.meta.product_count} products
             </span>
@@ -675,7 +1042,7 @@ export function AiAssistant() {
         </div>
 
         <Tabs defaultValue="assistant" className="w-full">
-          <TabsList className="mb-4">
+          <TabsList data-herc-tabs className="mb-4">
             <TabsTrigger value="assistant">
               <Bot className="mr-2 h-4 w-4" /> AI Assistant
             </TabsTrigger>
@@ -684,100 +1051,180 @@ export function AiAssistant() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ================= USE CASE 1 — Generative ================= */}
           <TabsContent value="assistant" className="space-y-6">
-            {overall && (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Accuracy score" value={`${overall.accuracy_score}%`} subtitle="overall dosing accuracy" icon={<Target className="h-6 w-6 text-white" />} color="blue" />
-                <StatCard label="On target" value={`${overall.on_target_pct}%`} subtitle={`${overall.on_target} doses`} icon={<CheckCircle2 className="h-6 w-6 text-white" />} color="green" />
-                <StatCard label="Over-dosed" value={`${overall.over}`} subtitle="doses above tolerance" icon={<TrendingUp className="h-6 w-6 text-white" />} color="orange" />
-                <StatCard label="Flagged doses" value={`${overall.flagged}`} subtitle="need review" icon={<AlertTriangle className="h-6 w-6 text-white" />} color="red" />
+            {insightsLoading && !overall ? (
+              <div className="flex items-center gap-2 herc-muted py-10 justify-center">
+                <Loader2 className="h-5 w-5 animate-spin" /> Loading forecast…
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <ForecastBridge
+                  label="Error rate"
+                  current={errorCurrent}
+                  predicted={errorPredicted}
+                  highGood={false}
+                  currentHint="historical doses"
+                  predictedHint={liveReady ? 'live model window' : 'ML expected rate'}
+                />
+                <ForecastBridge
+                  label="Yield"
+                  current={yieldCurrent}
+                  predicted={yieldPredicted}
+                  highGood
+                  currentHint="on-target rate"
+                  predictedHint={liveReady ? 'live model window' : 'ML forecast'}
+                />
               </div>
             )}
 
-            <Panel title="AI Dosing-Accuracy Briefing" icon={<Sparkles className="h-5 w-5" />}>
-              {insightsLoading ? (
-                <div className="flex items-center gap-2 text-slate-400 light:text-gray-500">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Generating briefing…
-                </div>
-              ) : (
-                <>
-                  <p className="leading-relaxed text-slate-200 light:text-gray-700">{insights?.summary}</p>
-                  {insights?.provider && (
-                    <p className="mt-3 text-[10px] uppercase tracking-wide text-slate-500 light:text-gray-400">
-                      {insights.cached ? 'offline · cached' : `written by ${insights.provider}`}
-                    </p>
-                  )}
-                </>
-              )}
-            </Panel>
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {distData && <ChartComponent type="doughnut" data={distData} title="Dose outcomes" height={240} />}
-              {productData && <ChartComponent type="bar" data={productData} title="Accuracy by product (lowest 8)" height={240} />}
-            </div>
-
-            <Panel title="Ask Hercules" icon={<Bot className="h-5 w-5" />}>
+            <Panel title="Ask Hercules" icon={<Bot className="h-4 w-4" />}>
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
                   {SUGGESTED.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => handleAsk(s)}
-                      disabled={asking}
-                      className="rounded-full border border-slate-600/50 light:border-gray-300 bg-slate-900/40 light:bg-white px-3 py-1 text-xs text-slate-300 light:text-gray-700 transition hover:border-cyan-500/50 hover:text-cyan-300 light:hover:text-cyan-600 disabled:opacity-50"
-                    >
+                    <button key={s} onClick={() => handleAsk(s)} disabled={asking} className="herc-chip">
                       {s}
                     </button>
                   ))}
                 </div>
 
-                <div className="max-h-[420px] space-y-3 overflow-y-auto rounded-lg border border-slate-700/50 light:border-gray-200 bg-slate-900/40 light:bg-gray-50 p-4">
+                <div className="herc-chat-pane max-h-[520px] overflow-y-auto">
                   {messages.length === 0 && (
-                    <p className="text-sm text-slate-500 light:text-gray-400">
-                      Ask anything about the plant's dosing accuracy — over/under-dosing, worst batches,
-                      product comparisons, or a live prediction (e.g. "will 0.9kg of Copper proteinate overdose?").
+                    <p className="text-sm herc-faint">
+                      Ask about dosing accuracy, worst batches, or a live prediction.
                     </p>
                   )}
-                  {messages.map((m, i) => (
-                    <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-                      <div
-                        className={
-                          'inline-block max-w-[85%] rounded-2xl px-4 py-2 text-sm ' +
-                          (m.role === 'user'
-                            ? 'bg-cyan-600/20 text-cyan-100 light:bg-cyan-100 light:text-cyan-900'
-                            : 'border border-slate-700/50 light:border-gray-200 bg-slate-800 light:bg-white text-slate-100 light:text-gray-900')
+                  <div className="herc-chat-grid">
+                    {(() => {
+                      // Pair each user question with its following AI answer so
+                      // each visual fills one grid cell (side-by-side when space).
+                      const cells: { q?: string; a?: (typeof messages)[0]; key: string }[] = []
+                      for (let i = 0; i < messages.length; i++) {
+                        const m = messages[i]
+                        if (m.role === 'user') {
+                          const next = messages[i + 1]
+                          if (next && next.role === 'ai') {
+                            cells.push({ q: m.text, a: next, key: `qa-${i}` })
+                            i++
+                          } else {
+                            cells.push({ q: m.text, key: `q-${i}` })
+                          }
+                        } else {
+                          cells.push({ a: m, key: `a-${i}` })
                         }
-                      >
-                        <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>
-                        {m.chart && m.chart.labels?.length > 0 && (
-                          <div className="mt-3 w-[min(520px,70vw)]">
-                            <ChartComponent
-                              type={m.chart.type === 'line' ? 'line' : 'bar'}
-                              data={specToChartData(m.chart)}
-                              title={m.chart.title || 'Chart'}
-                              height={200}
-                            />
-                          </div>
-                        )}
-                        {m.role === 'ai' && m.provider && (
-                          <div className="mt-1 text-[10px] uppercase tracking-wide text-slate-500 light:text-gray-400">
-                            {m.cached
-                              ? 'offline · cached'
-                              : m.provider === 'ml-model'
-                                ? 'via trained ML model (live prediction)'
-                                : `via ${m.provider}`}
-                          </div>
-                        )}
+                      }
+                      return cells.map((cell) => (
+                        <div key={cell.key} className="herc-answer-visual">
+                          {cell.q && (
+                            <div className="herc-chat-q">
+                              <span className="herc-eyebrow">You asked</span>
+                              <p className="herc-chat-q-text">{cell.q}</p>
+                            </div>
+                          )}
+                          {cell.a && (
+                            <>
+                              {cell.a.chart && cell.a.chart.labels?.length > 0 && (
+                                <div className="herc-chart">
+                                  <ChartComponent
+                                    type={
+                                      cell.a.chart.type === 'line'
+                                        ? 'line'
+                                        : cell.a.chart.type === 'doughnut'
+                                          ? 'doughnut'
+                                          : 'bar'
+                                    }
+                                    data={specToChartData(cell.a.chart)}
+                                    title={cell.a.chart.title || 'Insight'}
+                                    height={cell.a.chart.type === 'doughnut' ? 200 : 220}
+                                    variant="glow"
+                                    centerLabel={cell.a.chart.center_label}
+                                    centerSubLabel={cell.a.chart.center_sub}
+                                  />
+                                </div>
+                              )}
+
+                              {cell.a.mlPrediction && (
+                                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                  <PredictPod
+                                    label="Risk prediction"
+                                    score={cell.a.mlPrediction.risk.risk_pct}
+                                    tone={
+                                      cell.a.mlPrediction.risk.band === 'High'
+                                        ? 'rose'
+                                        : cell.a.mlPrediction.risk.band === 'Medium'
+                                          ? 'amber'
+                                          : 'green'
+                                    }
+                                    fillPct={cell.a.mlPrediction.risk.risk_pct}
+                                    detail={
+                                      <span className={bandPill(cell.a.mlPrediction.risk.band)}>
+                                        {cell.a.mlPrediction.risk.band} ·{' '}
+                                        {cell.a.mlPrediction.risk.prediction}
+                                      </span>
+                                    }
+                                  />
+                                  <PredictPod
+                                    label="Severity"
+                                    score={cell.a.mlPrediction.severity.severity_label}
+                                    scoreSuffix=""
+                                    tone={
+                                      cell.a.mlPrediction.severity.severity === 'severe'
+                                        ? 'rose'
+                                        : cell.a.mlPrediction.severity.severity === 'watch'
+                                          ? 'amber'
+                                          : 'green'
+                                    }
+                                    fillPct={cell.a.mlPrediction.severity.confidence_pct}
+                                    meta={`${cell.a.mlPrediction.severity.confidence_pct}% confidence`}
+                                  />
+                                </div>
+                              )}
+
+                              {cell.a.text && (
+                                <p className="herc-answer-caption mt-2">
+                                  {cell.a.chart || cell.a.mlPrediction
+                                    ? chartCaption(cell.a.text)
+                                    : cell.a.text}
+                                </p>
+                              )}
+
+                              {(cell.a.provider || cell.a.cached || cell.a.usage) && (
+                                <div className="herc-eyebrow mt-2 opacity-70 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span>
+                                    {cell.a.cached
+                                      ? 'offline · cached · 0 tokens'
+                                      : cell.a.provider === 'ml-model'
+                                        ? 'ML forecast · 0 tokens'
+                                        : cell.a.provider
+                                          ? `via ${cell.a.provider}`
+                                          : 'offline · cached · 0 tokens'}
+                                  </span>
+                                  {cell.a.usage && (cell.a.usage.total_tokens != null || cell.a.usage.prompt_tokens != null) && !cell.a.cached && cell.a.provider !== 'ml-model' && (
+                                    <span className="tone-cyan">
+                                      · {cell.a.usage.total_tokens ?? ((cell.a.usage.prompt_tokens || 0) + (cell.a.usage.completion_tokens || 0))} tokens
+                                      {cell.a.usage.prompt_tokens != null && cell.a.usage.completion_tokens != null
+                                        ? ` (${cell.a.usage.prompt_tokens} in · ${cell.a.usage.completion_tokens} out)`
+                                        : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {cell.q && !cell.a && asking && (
+                            <div className="flex items-center gap-2 text-sm herc-muted py-4">
+                              <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    })()}
+                    {asking && messages.length > 0 && messages[messages.length - 1]?.role === 'ai' && (
+                      <div className="herc-chat-status flex items-center gap-2 text-sm herc-muted">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Hercules AI is thinking…
                       </div>
-                    </div>
-                  ))}
-                  {asking && (
-                    <div className="flex items-center gap-2 text-sm text-slate-400 light:text-gray-500">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Hercules AI is thinking…
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
+                    )}
+                    <div ref={chatEndRef} className="herc-chat-anchor" />
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -788,7 +1235,7 @@ export function AiAssistant() {
                     placeholder="Ask about dosing accuracy…"
                     className={FIELD}
                   />
-                  <Button onClick={() => handleAsk()} disabled={asking || !question.trim()}>
+                  <Button data-herc-btn="primary" onClick={() => handleAsk()} disabled={asking || !question.trim()}>
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
@@ -796,192 +1243,182 @@ export function AiAssistant() {
             </Panel>
           </TabsContent>
 
-          {/* ================= USE CASE 2 — Automatic live monitoring ================= */}
           <TabsContent value="predict" className="space-y-6">
-            {/* Live control / status bar */}
-            <div className="flex flex-col gap-3 rounded-lg border border-slate-700/50 light:border-gray-200 bg-slate-800/50 light:bg-white p-4 shadow-lg light:shadow-xl md:flex-row md:items-center md:justify-between">
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                <span className="flex items-center gap-2 text-slate-300 light:text-gray-700">
-                  <Radio className={`h-4 w-4 ${live?.running ? 'text-green-400' : 'text-slate-500'}`} />
-                  <span className={`h-2 w-2 rounded-full ${live?.running ? 'animate-pulse bg-green-400' : 'bg-slate-500'}`}></span>
+            <div className="herc-control-bar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <span className="flex items-center gap-2 herc-muted font-mono text-[11px] tracking-wide">
+                  <Radio className={`h-4 w-4 ${live?.running ? 'tone-green' : 'herc-faint'}`} />
+                  <span className={`h-2 w-2 rounded-full ${live?.running ? 'animate-pulse dot-green' : 'dot-slate'}`} />
                   {live?.running ? 'Live · scoring every batch' : 'Paused'}
                 </span>
-                <span className="hidden text-slate-500 light:text-gray-400 sm:inline">{live?.source}</span>
-                <span className={`flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-xs ${driftMeta.ring} ${driftMeta.text}`}>
-                  <span className={`h-2 w-2 rounded-full ${driftMeta.dot} ${dr?.status === 'drift' ? 'animate-pulse' : ''}`}></span>
+                <span className="hidden herc-faint font-mono text-[10px] sm:inline">{live?.source}</span>
+                <span className={driftMeta.pill}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${driftMeta.dot} ${dr?.status === 'drift' ? 'animate-pulse' : ''}`} />
                   {live?.retraining ? 'Retraining…' : driftMeta.label}
                 </span>
-                <span className="flex items-center gap-1.5 text-xs text-slate-400 light:text-gray-500">
-                  <ShieldCheck className="h-3.5 w-3.5 text-cyan-400 light:text-cyan-600" /> Model v{md?.version ?? 1}
+                <span className="flex items-center gap-1.5 font-mono text-[10px] herc-faint tracking-wide uppercase">
+                  <ShieldCheck className="h-3.5 w-3.5 tone-cyan" /> Model v{md?.version ?? 1}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="mr-1 flex items-center overflow-hidden rounded-md border border-slate-700 light:border-gray-300">
+                <div className="mr-1 flex items-center overflow-hidden rounded-md border border-[rgba(96,165,250,0.18)]">
                   {speedPresets.map((s) => (
                     <button
                       key={s.label}
                       onClick={() => control('speed', s.value)}
-                      className={`px-2.5 py-1 text-xs transition ${
-                        Math.abs((live?.speed ?? 1.1) - s.value) < 0.05
-                          ? 'bg-cyan-600 text-white'
-                          : 'text-slate-400 light:text-gray-500 hover:text-slate-200 light:hover:text-gray-800'
+                      className={`herc-chip rounded-none border-0 px-2.5 py-1 ${
+                        Math.abs((live?.speed ?? 1.1) - s.value) < 0.05 ? 'active' : ''
                       }`}
                     >
                       {s.label}
                     </button>
                   ))}
                 </div>
-                <Button variant="outline" size="sm" onClick={() => control(live?.running ? 'pause' : 'start')}>
+                <Button data-herc-btn="ghost" variant="outline" size="sm" onClick={() => control(live?.running ? 'pause' : 'start')}>
                   {live?.running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => control('reset')}>
+                <Button data-herc-btn="ghost" variant="outline" size="sm" onClick={() => control('reset')}>
                   <RefreshCw className="mr-1.5 h-4 w-4" /> Restart
                 </Button>
               </div>
             </div>
 
-            {/* Live KPI row */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <GaugeKpi
                 label="Batches monitored"
                 value={`${st?.processed ?? 0}`}
+                unit="batches"
+                pct={live && live.total ? Math.min(100, (live.cursor / live.total) * 100) : 0}
+                highGood
                 subtitle={live ? `${live.cursor} of ${live.total} streamed` : 'starting…'}
-                icon={<Activity className="h-6 w-6 text-white" />}
-                color="blue"
               />
-              <StatCard
+              <GaugeKpi
                 label="Flagged for review"
                 value={`${st?.flagged ?? 0}`}
-                subtitle="risky doses caught pre-batch"
-                icon={<AlertTriangle className="h-6 w-6 text-white" />}
-                color="red"
+                unit="risky doses"
+                pct={st?.processed ? Math.min(100, (st.flagged / st.processed) * 100) : 0}
+                highGood={false}
+                subtitle="caught pre-batch"
               />
-              <StatCard
+              <GaugeKpi
                 label="On-target rate"
-                value={`${onTargetRate}%`}
-                subtitle="live production quality"
-                icon={<CheckCircle2 className="h-6 w-6 text-white" />}
-                color="green"
+                value={`${onTargetRate}`}
+                unit="% quality"
+                pct={onTargetRate}
+                highGood
+                subtitle="live production"
               />
-              <StatCard
-                label="Model accuracy (live)"
-                value={st?.rolling_accuracy != null ? `${st.rolling_accuracy}%` : '—'}
-                subtitle="predictions vs actual outcome"
-                icon={<Gauge className="h-6 w-6 text-white" />}
-                color="cyan"
+              <GaugeKpi
+                label="Model accuracy"
+                value={st?.rolling_accuracy != null ? `${st.rolling_accuracy}` : '—'}
+                unit="% live hit"
+                pct={st?.rolling_accuracy ?? 0}
+                highGood
+                subtitle="predictions vs actual"
               />
+              <DriftKpiCard md={md} dr={dr} driftMeta={driftMeta} />
             </div>
 
-            {/* Feed + model/drift health */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <Panel
-                title="Live operator feed"
-                icon={<Radio className="h-5 w-5" />}
-                className="lg:col-span-2"
-                right={
-                  <span className="flex items-center gap-1.5 text-xs text-slate-400 light:text-gray-500">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-green-400"></span> streaming
+            <div className="herc-live-workspace">
+              <div className="erp-glow-card fc-panel">
+                <div className="card-head">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Radio className="h-4 w-4 tone-cyan shrink-0" />
+                    <p className="herc-eyebrow m-0">Live operator feed</p>
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full dot-green shrink-0" />
+                  </div>
+                  <span className="meta flex flex-wrap items-center gap-2">
+                    <span className="pill green">on target</span>
+                    <span className="pill amber">watch</span>
+                    <span className="pill rose">flag</span>
                   </span>
-                }
-              >
-                <p className="mb-3 text-xs leading-relaxed text-slate-400 light:text-gray-500">
-                  Every batch is scored the moment it arrives from the plant — <b>before it runs</b>. Risky
-                  doses are flagged with the recommended action so the operator can act in time. No manual entry.
-                </p>
-                <div className="max-h-[460px] space-y-2 overflow-y-auto pr-1">
+                </div>
+
+                {feedMaterials.length > 0 && (
+                  <div className="fc-sel" role="group" aria-label="Choose which ingredients to show">
+                    <button
+                      type="button"
+                      className={`fc-chip${showAllFeedMaterials ? ' active' : ''}`}
+                      onClick={selectAllFeedMaterials}
+                    >
+                      All ingredients
+                    </button>
+                    {feedMaterials.map(({ code, name }) => (
+                      <button
+                        key={code}
+                        type="button"
+                        className={`fc-chip${feedMaterialPick.has(code) ? ' active' : ''}`}
+                        onClick={() => toggleFeedMaterial(code)}
+                      >
+                        {abbrevName(name, 20)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="fc-grid">
                   {(!live || live.feed.length === 0) && (
-                    <div className="flex items-center gap-2 py-6 text-sm text-slate-500 light:text-gray-400">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Waiting for the first batch…
+                    <div className="fc-empty">
+                      <Loader2 className="h-4 w-4 animate-spin inline" />
+                      <span> Waiting for the first batch…</span>
                     </div>
                   )}
-                  {live?.feed.map((f) => (
-                    <FeedRow key={f.id} f={f} />
+                  {live && live.feed.length > 0 && filteredFeed.length === 0 && (
+                    <div className="fc-empty">No cards match the selected ingredients.</div>
+                  )}
+                  {filteredFeed.map((f) => (
+                    <FeedDoseCard key={f.id} f={f} />
                   ))}
                 </div>
-              </Panel>
+              </div>
 
-              <Panel title="Model &amp; drift health" icon={<ShieldCheck className="h-5 w-5" />}>
-                <div className="space-y-4">
-                  <div>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="uppercase tracking-wide text-slate-400 light:text-gray-500">
-                        Out-of-distribution rate
-                      </span>
-                      <span className={driftMeta.text}>{dr?.novel_rate != null ? `${dr.novel_rate}%` : '—'}</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-800 light:bg-gray-200">
-                      <div
-                        className={`h-full transition-all duration-500 ${
-                          dr?.status === 'drift' ? 'bg-red-500' : dr?.status === 'watch' ? 'bg-amber-500' : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${Math.min(dr?.novel_rate ?? 0, 100)}%` }}
-                      ></div>
-                    </div>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 light:text-gray-500">
-                      Share of recent batches whose product recipe the model was barely trained on. Above 25%
-                      triggers an automatic retrain.
-                    </p>
-                  </div>
-
-                  {dr?.new_recipes && dr.new_recipes.length > 0 && (
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 light:bg-amber-50 p-2.5">
-                      <div className="text-[11px] uppercase tracking-wide text-amber-400">New recipes in feed</div>
-                      <div className="mt-1 text-xs text-slate-300 light:text-gray-700">
-                        {dr.new_recipes.slice(0, 4).join(', ')}
-                        {dr.new_recipes.length > 4 ? '…' : ''}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <MiniStat label="Model version" value={`v${md?.version ?? 1}`} />
-                    <MiniStat label="Trained on" value={`${md?.trained_on ?? 0}`} />
-                    <MiniStat
-                      label="Model accuracy"
-                      value={md?.accuracy != null ? `${(md.accuracy * 100).toFixed(0)}%` : '—'}
+              <div className="herc-live-charts">
+                {riskTrend && (
+                  <div className="herc-chart">
+                    <ChartComponent
+                      type="bar"
+                      data={riskTrend}
+                      title="Predicted risk — most recent batches"
+                      height={300}
+                      variant="glow"
                     />
-                    <MiniStat label="Setpoint PSI" value={dr?.setpoint_psi != null ? `${dr.setpoint_psi}` : '—'} />
                   </div>
-
-                  <div className="rounded-lg border border-slate-700/50 light:border-gray-200 bg-slate-900/40 light:bg-gray-50 p-3 text-[11px] leading-relaxed text-slate-400 light:text-gray-600">
-                    The monitor watches the incoming batch mix against the model's training data. When the plant
-                    switches to recipes the model hasn't seen, it retrains itself on the latest data and hot-swaps
-                    the new model in — <b>with zero downtime</b>. The operator only sees a confirmation popup.
+                )}
+                {outcomeMix && (
+                  <div className="herc-chart">
+                    <ChartComponent
+                      type="doughnut"
+                      data={outcomeMix}
+                      title="Live dose outcomes (this session)"
+                      height={300}
+                      variant="glow"
+                      centerLabel={st?.rolling_accuracy != null ? `${st.rolling_accuracy}%` : `${onTargetRate}%`}
+                      centerSubLabel={st?.rolling_accuracy != null ? 'model hit' : 'on target'}
+                    />
                   </div>
-                </div>
-              </Panel>
+                )}
+              </div>
             </div>
 
-            {/* Live charts */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {riskTrend && (
-                <ChartComponent type="bar" data={riskTrend} title="Predicted risk — most recent batches" height={240} />
-              )}
-              {outcomeMix && (
-                <ChartComponent type="doughnut" data={outcomeMix} title="Live dose outcomes (this session)" height={240} />
-              )}
-            </div>
-
-            {/* Engineer what-if (hidden by default) */}
             <Panel
               title="Engineer what-if"
-              icon={<FlaskConical className="h-5 w-5" />}
+              icon={<FlaskConical className="h-4 w-4" />}
               right={
-                <Button variant="outline" size="sm" onClick={() => setWhatIfOpen((v) => !v)}>
+                <Button data-herc-btn="ghost" variant="outline" size="sm" onClick={() => setWhatIfOpen((v) => !v)}>
                   {whatIfOpen ? 'Hide' : 'Open'}
                 </Button>
               }
             >
               {!whatIfOpen ? (
-                <p className="text-sm text-slate-400 light:text-gray-500">
-                  Operators don't use this — the plant feed is scored automatically above. This is a manual
-                  sandbox for engineers/commissioning to test a hypothetical dose against both trained models.
-                </p>
+                <div className="flex items-center gap-3 herc-muted text-sm">
+                  <FlaskConical className="h-5 w-5 tone-cyan shrink-0" />
+                  <span className="herc-eyebrow">Engineer sandbox — click Open</span>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-xs uppercase tracking-wide text-slate-400 light:text-gray-500">Ingredient</label>
+                      <label className="herc-eyebrow">Ingredient</label>
                       <Select value={material} onValueChange={setMaterial}>
                         <SelectTrigger className={FIELD}>
                           <SelectValue placeholder="Select ingredient" />
@@ -996,7 +1433,7 @@ export function AiAssistant() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs uppercase tracking-wide text-slate-400 light:text-gray-500">Product recipe</label>
+                      <label className="herc-eyebrow">Product recipe</label>
                       <Select value={product} onValueChange={setProduct}>
                         <SelectTrigger className={FIELD}>
                           <SelectValue placeholder="Select product" />
@@ -1011,56 +1448,63 @@ export function AiAssistant() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs uppercase tracking-wide text-slate-400 light:text-gray-500">Target weight (kg)</label>
+                      <label className="herc-eyebrow">Target weight (kg)</label>
                       <Input type="number" step="0.1" value={setpoint} onChange={(e) => setSetpoint(e.target.value)} className={FIELD} />
                     </div>
-                    <Button onClick={handlePredict} disabled={predicting} className="w-full">
+                    <Button data-herc-btn="primary" onClick={handlePredict} disabled={predicting} className="w-full">
                       {predicting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Predict dosing risk'}
                     </Button>
                   </div>
 
                   <div className="space-y-4">
                     {prediction && (
-                      <div className={`rounded-lg border p-4 text-center ${bandColor(prediction.band)}`}>
-                        <div className="text-xs font-medium uppercase tracking-wide text-slate-400 light:text-gray-500">Risk model</div>
-                        <div className="text-4xl font-bold">{prediction.risk_pct}%</div>
-                        <div className="mt-1 text-sm font-medium">
-                          {prediction.band} risk · {prediction.prediction}
-                        </div>
-                        <div className="mt-2 text-xs text-slate-400 light:text-gray-500">
-                          {prediction.inputs.material_name} · {prediction.inputs.setpoint} kg · {prediction.inputs.product_name}
-                        </div>
-                      </div>
+                      <PredictPod
+                        label="Risk prediction"
+                        score={prediction.risk_pct}
+                        tone={prediction.band === 'High' ? 'rose' : prediction.band === 'Medium' ? 'amber' : 'green'}
+                        fillPct={prediction.risk_pct}
+                        detail={
+                          <span className={bandPill(prediction.band)}>
+                            {prediction.band} risk · {prediction.prediction}
+                          </span>
+                        }
+                        meta={`${prediction.inputs.material_name} · ${prediction.inputs.setpoint} kg · ${prediction.inputs.product_name}`}
+                      />
                     )}
                     {severityPrediction && (
-                      <div className={`rounded-lg border p-4 ${severityMeta(severityPrediction.severity).border} bg-slate-900/40 light:bg-gray-50`}>
-                        <div className="text-center">
-                          <div className="text-xs font-medium uppercase tracking-wide text-slate-400 light:text-gray-500">Severity triage model</div>
-                          <div className={`text-2xl font-bold ${severityMeta(severityPrediction.severity).text}`}>
-                            {severityPrediction.severity_label}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-400 light:text-gray-500">
-                            {severityPrediction.confidence_pct}% confidence
-                          </div>
-                        </div>
-                        <div className="mt-3 space-y-1.5">
-                          {Object.entries(severityPrediction.probabilities).map(([cls, pct]) => {
-                            const meta = severityMeta(cls)
-                            return (
-                              <div key={cls} className="flex items-center gap-2">
-                                <span className={`w-14 shrink-0 text-[11px] ${meta.text}`}>{meta.label}</span>
-                                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-800 light:bg-gray-200">
-                                  <div className={`h-full ${meta.bar}`} style={{ width: `${pct}%` }} />
+                      <PredictPod
+                        label="Severity triage"
+                        score={severityPrediction.severity_label}
+                        scoreSuffix=""
+                        tone={
+                          severityPrediction.severity === 'severe'
+                            ? 'rose'
+                            : severityPrediction.severity === 'watch'
+                              ? 'amber'
+                              : 'green'
+                        }
+                        fillPct={severityPrediction.confidence_pct}
+                        detail={
+                          <div className="mt-1 space-y-1.5">
+                            {Object.entries(severityPrediction.probabilities).map(([cls, pct]) => {
+                              const meta = severityMeta(cls)
+                              return (
+                                <div key={cls} className="flex items-center gap-2">
+                                  <span className={`w-14 shrink-0 font-mono text-[10px] ${meta.text}`}>{meta.label}</span>
+                                  <div className="herc-track flex-1">
+                                    <div className={meta.bar} style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <span className="w-10 shrink-0 text-right font-mono text-[10px] herc-faint">{pct}%</span>
                                 </div>
-                                <span className="w-10 shrink-0 text-right text-[11px] text-slate-400 light:text-gray-500">{pct}%</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
+                              )
+                            })}
+                          </div>
+                        }
+                        meta={`${severityPrediction.confidence_pct}% confidence`}
+                      />
                     )}
                     {!prediction && !severityPrediction && (
-                      <p className="text-sm text-slate-500 light:text-gray-400">
+                      <p className="text-sm herc-faint">
                         Pick an ingredient, recipe and target weight, then run both models.
                       </p>
                     )}
@@ -1070,6 +1514,7 @@ export function AiAssistant() {
             </Panel>
           </TabsContent>
         </Tabs>
+      </div>
       </div>
     </WaterSystemLayout>
   )

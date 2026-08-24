@@ -188,8 +188,11 @@ export function BatchHistoricalReports() {
 
     data.forEach((item: any) => {
       const productName = item.productName || 'Unknown';
-      if (!groups[productName]) {
-        groups[productName] = {
+      const productCode = item.productCode || '';
+      const groupKey = `${productCode}|||${productName}`;
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          productCode,
           productName,
           noOfBatches: 0,
           sumSP: 0,
@@ -201,16 +204,16 @@ export function BatchHistoricalReports() {
       }
 
       // Only increment batch count for unique batches (like old system)
-      const batchKey = `${item.batchGuid}-${item.productName}`;
-      if (!groups[productName].countedBatches.has(batchKey)) {
-        groups[productName].countedBatches.add(batchKey);
-        groups[productName].noOfBatches++;
+      const batchKey = `${item.batchGuid}-${groupKey}`;
+      if (!groups[groupKey].countedBatches.has(batchKey)) {
+        groups[groupKey].countedBatches.add(batchKey);
+        groups[groupKey].noOfBatches++;
       }
 
       // For Daily Report, sum ALL occurrences of materials (even duplicates in same batch)
       // This ensures proper aggregation when same material appears multiple times in one batch
-      groups[productName].sumSP += Number(item.setPointFloat) || 0;
-      groups[productName].sumAct += Number(item.actualValueFloat) || 0;
+      groups[groupKey].sumSP += Number(item.setPointFloat) || 0;
+      groups[groupKey].sumAct += Number(item.actualValueFloat) || 0;
     });
 
     // Calculate error values
@@ -383,6 +386,7 @@ export function BatchHistoricalReports() {
         batchName: item["Batch Name"] || item.batchName || "Unknown",
         batchGuid: item["Batch GUID"] || item.batchGuid || "Unknown",
         productName: item["Product Name"] || item.productName || "Unknown",
+        productCode: item["ProductCode"] || item.productCode || "",
         materialName: item["Material Name"] || item.materialName || "Unknown",
         materialCode: item["Material Code"] || item.materialCode || "Unknown",
         batchStart: item["Batch Act Start"] || item.batchStart || "N/A",
@@ -563,9 +567,9 @@ export function BatchHistoricalReports() {
 
       const details = Array.isArray(detRes.data) ? detRes.data : [];
       const rowAgg = aggregateByProduct(rows, 'day');
-      const rowByName: Record<string, any> = {};
+      const rowByKey: Record<string, any> = {};
       rowAgg.forEach((p) => {
-        rowByName[p.productName] = p;
+        rowByKey[`${p.productCode || ''}|||${p.productName}`] = p;
       });
 
       const detailActSum = details.reduce((s: number, x: any) => s + (Number(x.quantity_kg) || 0), 0);
@@ -577,13 +581,15 @@ export function BatchHistoricalReports() {
         // Prefer calendar details for SUM ACT (matches popup); SP / batch counts from rows when missing
         products = details.map((x: any) => {
           const name = x.product_name;
-          const row = rowByName[name];
+          const code = x.product_code || x.productCode || '';
+          const row = rowByKey[`${code}|||${name}`] || rowByKey[`|||${name}`];
           const sumAct = Number(x.quantity_kg) || 0;
           const sumSP = Number(x.sum_sp) > 0 ? Number(x.sum_sp) : Number(row?.sumSP) || 0;
           const noOfBatches =
             Number(x.batch_count) > 0 ? Number(x.batch_count) : Number(row?.noOfBatches) || 0;
           const errKg = Math.abs(sumAct - sumSP);
           return {
+            productCode: code || row?.productCode || '',
             productName: name,
             noOfBatches,
             sumSP: round2(sumSP),
@@ -646,6 +652,7 @@ export function BatchHistoricalReports() {
               batchStart: item["Batch Act Start"] || "N/A",
               batchEnd: item["Batch Act End"] || "N/A",
               productName: item["Product Name"] || "Unknown",
+              productCode: item["ProductCode"] || item.productCode || "",
               materialName: item["Material Name"] || "Unknown",
               materialCode: item["Material Code"] || "Unknown",
               quantity: item["Quantity"] || 0,
@@ -1225,11 +1232,11 @@ export function BatchHistoricalReports() {
   const getTableHeaders = (tabName: string) => {
     switch (tabName) {
       case "Product Batch Summary":
-        return ["Batch Name", "Product Name", "Batch Start", "Batch End", "Batch Quantity"];
+        return ["Batch Name", "Product Code", "Product Name", "Batch Start", "Batch End", "Batch Quantity"];
       case "Weekly":
       case "Monthly":
       case "Daily Report":
-        return ["Product Name", "No Of Batches", "Sum SP", "Sum Act", "Err Kg", "Err %"];
+        return ["Product Code", "Product Name", "No Of Batches", "Sum SP", "Sum Act", "Err Kg", "Err %"];
       case "Detailed Report":
         return ["Batch", "Material Name", "Code", "Set Point", "Actual", "Err Kg", "Err %"];
       case "Material Consumption Report":
@@ -1351,6 +1358,7 @@ export function BatchHistoricalReports() {
             <td className={cell}></td>
             <td className={cell}></td>
             <td className={cell}></td>
+            <td className={cell}></td>
             <td className={cell}>{totals.totalQuantity.toFixed(2)}</td>
           </tr>
         </tfoot>
@@ -1361,6 +1369,7 @@ export function BatchHistoricalReports() {
         <tfoot>
           <tr className={rowClass}>
             <td className={cell}>{totals.label}</td>
+            <td className={cell}></td>
             <td className={cell}>{totals.totalBatches}</td>
             <td className={cell}>{totals.totalSP.toFixed(2)}</td>
             <td className={cell}>{totals.totalAct.toFixed(2)}</td>
@@ -1422,6 +1431,7 @@ export function BatchHistoricalReports() {
         return (
           <tr key={index} className={baseRowClasses}>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.batchName}</td>
+            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.productCode || '-'}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{item.productName}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatSaudiTime(item.batchStart, true)}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm w-auto">{formatSaudiTime(item.batchEnd, true)}</td>
@@ -1433,6 +1443,7 @@ export function BatchHistoricalReports() {
       case "Daily Report":
         return (
           <tr key={index} className={baseRowClasses}>
+            <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.productCode || '-'}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.productName}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.noOfBatches}</td>
             <td className="px-4 py-2 text-slate-900 dark:text-white text-sm">{item.sumSP?.toFixed(2) || '-'}</td>
@@ -1454,6 +1465,10 @@ export function BatchHistoricalReports() {
                   <div className="border-b border-slate-300 dark:border-slate-600 pb-1">
                     <div className="text-cyan-600 dark:text-cyan-300 font-bold text-xs uppercase tracking-wide">Product</div>
                     <div className="text-slate-900 dark:text-white font-medium">{batchGroup?.productName || 'N/A'}</div>
+                  </div>
+                  <div className="border-b border-slate-300 dark:border-slate-600 pb-1">
+                    <div className="text-cyan-600 dark:text-cyan-300 font-bold text-xs uppercase tracking-wide">Product Code</div>
+                    <div className="text-slate-900 dark:text-white font-medium">{batchGroup?.productCode || 'N/A'}</div>
                   </div>
                   <div className="border-b border-slate-300 dark:border-slate-600 pb-1">
                     <div className="text-cyan-600 dark:text-cyan-300 font-bold text-xs uppercase tracking-wide">Started</div>
@@ -1598,6 +1613,9 @@ export function BatchHistoricalReports() {
             case 'Product Name':
               value = item.productName || '';
               break;
+            case 'Product Code':
+              value = item.productCode || '';
+              break;
             case 'Batch Start':
               value = formatSaudiTime(item.batchStart || '', true);
               break;
@@ -1707,7 +1725,7 @@ export function BatchHistoricalReports() {
         return;
       }
 
-      const headers = ['Batch Name', 'Product Name', 'Batch Start', 'Batch End', 'Batch Quantity', 'Material Name', 'Material Code', 'Set Point', 'Actual', 'Err Kg', 'Err %'];
+      const headers = ['Batch Name', 'Product Name', 'Product Code', 'Batch Start', 'Batch End', 'Batch Quantity', 'Material Name', 'Material Code', 'Set Point', 'Actual', 'Err Kg', 'Err %'];
       let csvContent = '';
 
       // Add BOM for Excel compatibility
@@ -1742,6 +1760,7 @@ export function BatchHistoricalReports() {
           const row = [
             item.batchName || '',
             item.productName || '',
+            item.productCode || '',
             formatSaudiTime(item.batchStart || '', true),
             formatSaudiTime(item.batchEnd || '', true),
             item.batchQuantity || '',
@@ -2201,6 +2220,7 @@ export function BatchHistoricalReports() {
                 <td rowspan="${batchRowSpan}">
                   <strong>Batch:</strong> ${item.batchName || 'N/A'}<br>
                   <strong>Product:</strong> ${item.productName || 'N/A'}<br>
+                  <strong>Product Code:</strong> ${item.productCode || 'N/A'}<br>
                   <strong>Start:</strong> ${formatSaudiTime(item.batchStart || 'N/A', true)}<br>
                   <strong>End:</strong> ${formatSaudiTime(item.batchEnd || 'N/A', true)}<br>
                   <strong>Quantity:</strong> ${item.batchQuantity || 'N/A'}
@@ -2240,6 +2260,9 @@ export function BatchHistoricalReports() {
                 break;
               case 'Product Name':
                 value = item.productName || '';
+                break;
+              case 'Product Code':
+                value = item.productCode || '';
                 break;
               case 'Batch Start':
                 value = formatSaudiTime(item.batchStart || '', true);
@@ -2314,7 +2337,7 @@ export function BatchHistoricalReports() {
         htmlContent += `
           <tr class="total-row">
             <td>${totals.label}</td>
-            <td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td>
             <td>${totals.totalQuantity.toFixed(2)}</td>
           </tr>
         `;
@@ -2322,6 +2345,7 @@ export function BatchHistoricalReports() {
         htmlContent += `
           <tr class="total-row">
             <td>${totals.label}</td>
+            <td></td>
             <td>${totals.totalBatches}</td>
             <td>${totals.totalSP.toFixed(2)}</td>
             <td>${totals.totalAct.toFixed(2)}</td>

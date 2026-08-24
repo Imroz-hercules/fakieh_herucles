@@ -16,14 +16,36 @@ breaks the app — that provider is simply skipped.
 from __future__ import annotations
 
 import os
+from typing import Any
 
-# Load Backend/.env if python-dotenv is installed (optional convenience).
-try:  # pragma: no cover - best effort
-    from dotenv import load_dotenv
 
-    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
-except Exception:
-    pass
+def _load_env_file() -> None:
+    """Load Backend/.env without requiring python-dotenv."""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(env_path)
+        return
+    except Exception:
+        pass
+    try:
+        with open(env_path, encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, val = line.split("=", 1)
+                key = key.strip()
+                val = val.strip().strip('"').strip("'")
+                if key:
+                    # .env is source of truth for local AI keys.
+                    os.environ[key] = val
+    except Exception:
+        pass
+
+
+_load_env_file()
 
 
 # "gemini-flash-lite-latest" is a fast, free-tier alias that answers in ~1s
@@ -53,7 +75,21 @@ def _deepseek_key() -> str | None:
     return os.getenv("DEEPSEEK_API_KEY")
 
 
-def _call_gemini(system: str, prompt: str, temperature: float) -> str:
+def _usage(
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+    total_tokens: int | None = None,
+) -> dict[str, int | None]:
+    if total_tokens is None and prompt_tokens is not None and completion_tokens is not None:
+        total_tokens = prompt_tokens + completion_tokens
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+def _call_gemini(system: str, prompt: str, temperature: float) -> tuple[str, dict[str, Any]]:
     from google import genai
     from google.genai import types
 
@@ -79,10 +115,17 @@ def _call_gemini(system: str, prompt: str, temperature: float) -> str:
     text = (resp.text or "").strip()
     if not text:
         raise RuntimeError("Gemini returned an empty response")
-    return text
+
+    meta = getattr(resp, "usage_metadata", None)
+    usage = _usage(
+        prompt_tokens=getattr(meta, "prompt_token_count", None) if meta else None,
+        completion_tokens=getattr(meta, "candidates_token_count", None) if meta else None,
+        total_tokens=getattr(meta, "total_token_count", None) if meta else None,
+    )
+    return text, usage
 
 
-def _call_claude(system: str, prompt: str, temperature: float) -> str:
+def _call_claude(system: str, prompt: str, temperature: float) -> tuple[str, dict[str, Any]]:
     import anthropic
 
     client = anthropic.Anthropic(api_key=_anthropic_key())
@@ -96,10 +139,16 @@ def _call_claude(system: str, prompt: str, temperature: float) -> str:
     text = "\n".join(parts).strip()
     if not text:
         raise RuntimeError("Claude returned an empty response")
-    return text
+
+    u = getattr(resp, "usage", None)
+    usage = _usage(
+        prompt_tokens=getattr(u, "input_tokens", None) if u else None,
+        completion_tokens=getattr(u, "output_tokens", None) if u else None,
+    )
+    return text, usage
 
 
-def _call_deepseek(system: str, prompt: str, temperature: float) -> str:
+def _call_deepseek(system: str, prompt: str, temperature: float) -> tuple[str, dict[str, Any]]:
     # DeepSeek is OpenAI-API-compatible; call it with plain requests to avoid
     # any SDK/httpx version conflicts.
     import requests
@@ -123,10 +172,18 @@ def _call_deepseek(system: str, prompt: str, temperature: float) -> str:
         timeout=30,
     )
     resp.raise_for_status()
-    text = (resp.json()["choices"][0]["message"]["content"] or "").strip()
+    data = resp.json()
+    text = (data["choices"][0]["message"]["content"] or "").strip()
     if not text:
         raise RuntimeError("DeepSeek returned an empty response")
-    return text
+
+    u = data.get("usage") or {}
+    usage = _usage(
+        prompt_tokens=u.get("prompt_tokens"),
+        completion_tokens=u.get("completion_tokens"),
+        total_tokens=u.get("total_tokens"),
+    )
+    return text, usage
 
 
 _HANDLERS = {
@@ -155,8 +212,10 @@ def any_configured() -> bool:
 def generate(system: str, prompt: str, temperature: float = 0.25) -> dict:
     """Generate text using the first available provider.
 
-    Returns ``{"text", "provider", "model", "ok", "errors"}``. On total failure
-    ``ok`` is False and the caller should fall back to a cached answer.
+    Returns ``{"text", "provider", "model", "ok", "errors", "usage"}``.
+    ``usage`` is ``{prompt_tokens, completion_tokens, total_tokens}`` when the
+    provider reports it. On total failure ``ok`` is False and the caller should
+    fall back to a cached answer.
     """
     errors: list[str] = []
     for name in PROVIDER_ORDER:
@@ -167,9 +226,23 @@ def generate(system: str, prompt: str, temperature: float = 0.25) -> dict:
         if not key_fn():
             continue
         try:
-            text = call_fn(system, prompt, temperature)
-            return {"text": text, "provider": name, "model": model, "ok": True, "errors": errors}
+            text, usage = call_fn(system, prompt, temperature)
+            return {
+                "text": text,
+                "provider": name,
+                "model": model,
+                "ok": True,
+                "errors": errors,
+                "usage": usage,
+            }
         except Exception as exc:  # try the next provider
             errors.append(f"{name}: {exc}")
 
-    return {"text": "", "provider": None, "model": None, "ok": False, "errors": errors}
+    return {
+        "text": "",
+        "provider": None,
+        "model": None,
+        "ok": False,
+        "errors": errors,
+        "usage": None,
+    }

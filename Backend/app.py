@@ -199,5 +199,13 @@ if __name__ == '__main__':
         except Exception as _queue_disp_err:
             print(f"Queue dispatcher not started: {_queue_disp_err}")
 
+        # Always-on PLC broadcast: live plant orders + silo snapshot for the UI.
+        # Operators no longer Start/Stop this from Live Orders.
+        try:
+            from routes.websocket_routes import ensure_broadcast_running
+            ensure_broadcast_running(app)
+        except Exception as _broadcast_err:
+            print(f"PLC broadcast not started: {_broadcast_err}")
+
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, debug=False, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)

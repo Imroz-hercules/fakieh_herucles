@@ -1,0 +1,376 @@
+FINAL SRC CAPTURE @ local 2026-07-23T22:21:33.351661 (READ-ONLY)
+
+===== 1.FAKIEH_SERVER1.version =====
+v
+Microsoft SQL Server 2017 (RTM) - 14.0.1000.169 (X64) 
+	Aug 22 2017 17:04:49 
+	Copyright (C) 2017 Microsoft Corporation
+	Standard Edition (64-bit) on Windows Server 2019 Standard 10.0 <X64> (Build 17763: ) (Hypervisor)
+
+
+===== 1.FAKIEH_SERVER1.props =====
+edition | collation | major | product_version | now_offset
+Standard Edition (64-bit) | Latin1_General_100_CI_AS_KS_WS | 14 | 14.0.1000.169 | 2026-07-23 22:19:58.4901668 +03:00
+
+===== 1.FAKIEH_SERVER2.version =====
+v
+Microsoft SQL Server 2017 (RTM) - 14.0.1000.169 (X64) 
+	Aug 22 2017 17:04:49 
+	Copyright (C) 2017 Microsoft Corporation
+	Standard Edition (64-bit) on Windows Server 2019 Standard 10.0 <X64> (Build 17763: ) (Hypervisor)
+
+
+===== 1.FAKIEH_SERVER2.props =====
+edition | collation | major | product_version | now_offset
+Standard Edition (64-bit) | Latin1_General_100_CI_AS_KS_WS | 14 | 14.0.1000.169 | 2026-07-23 22:20:21.5114370 +03:00
+
+===== 2.FAKIEH_SERVER1.databases =====
+name
+master
+tempdb
+model
+msdb
+ReportServer
+ReportServerTempDB
+SimaticBatch
+ASMBatchReports
+ASMBatchReports_ETL2
+
+===== 2.FAKIEH_SERVER1.simatic_schemas =====
+TABLE_SCHEMA
+SIMATIC_BATCH
+
+===== 2.FAKIEH_SERVER1.version_tables =====
+TABLE_SCHEMA | TABLE_NAME
+
+===== 2.FAKIEH_SERVER1.db_extended_properties =====
+name | value
+
+===== 2.FAKIEH_SERVER1.try SIMATIC_BATCH.Version =====
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'SimaticBatch.SIMATIC_BATCH.Version\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 2.FAKIEH_SERVER1.try SIMATIC_BATCH.DBVersion =====
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'SimaticBatch.SIMATIC_BATCH.DBVersion\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 2.FAKIEH_SERVER1.try SIMATIC_BATCH.DBInfo =====
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'SimaticBatch.SIMATIC_BATCH.DBInfo\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 2.FAKIEH_SERVER2.databases =====
+name
+master
+tempdb
+model
+msdb
+ReportServer
+ReportServerTempDB
+SimaticBatch
+ASMBatchReports_ETL2
+ASMBatchReports
+
+===== 2.FAKIEH_SERVER2.simatic_schemas =====
+TABLE_SCHEMA
+SIMATIC_BATCH
+
+===== 2.FAKIEH_SERVER2.version_tables =====
+TABLE_SCHEMA | TABLE_NAME
+
+===== 2.FAKIEH_SERVER2.db_extended_properties =====
+name | value
+
+===== 2.FAKIEH_SERVER2.try SIMATIC_BATCH.Version =====
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'SimaticBatch.SIMATIC_BATCH.Version\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER2" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 2.FAKIEH_SERVER2.try SIMATIC_BATCH.DBVersion =====
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'SimaticBatch.SIMATIC_BATCH.DBVersion\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER2" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 2.FAKIEH_SERVER2.try SIMATIC_BATCH.DBInfo =====
+ERROR: ('42S02', '[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid object name \'SimaticBatch.SIMATIC_BATCH.DBInfo\'. (208) (SQLExecDirectW); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER2" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 3.FAKIEH_SERVER1.vendor_schema -> 121 cols captured to _ro_vendor_schema.csv =====
+
+===== 3.FAKIEH_SERVER1.KEY_TYPES =====
+tbl | col | type | max_length | is_nullable
+Batch | BatchTransferTime | datetimeoffset | 9 | True
+ParValueOnline | Name | nvarchar | 512 | False
+ParValueOnline | sp_prot | int | 4 | True
+ParValueOnline | TimeStamp | datetimeoffset | 9 | False
+
+===== 3.FAKIEH_SERVER1.BATCH_COL_PRESENCE =====
+name
+CreationDateTime
+FormulaGUID
+FormulaName
+MRecipeGUID
+MRecipeName
+PCellGUID
+PlanEnd
+
+===== 3.FAKIEH_SERVER2.vendor_schema -> 121 cols captured to _ro_vendor_schema.csv =====
+
+===== 3.FAKIEH_SERVER2.KEY_TYPES =====
+tbl | col | type | max_length | is_nullable
+Batch | BatchTransferTime | datetimeoffset | 9 | True
+ParValueOnline | Name | nvarchar | 512 | False
+ParValueOnline | sp_prot | int | 4 | True
+ParValueOnline | TimeStamp | datetimeoffset | 9 | False
+
+===== 3.FAKIEH_SERVER2.BATCH_COL_PRESENCE =====
+name
+CreationDateTime
+FormulaGUID
+FormulaName
+MRecipeGUID
+MRecipeName
+PCellGUID
+PlanEnd
+
+===== 4.FAKIEH_SERVER1.capture_trigger_summary =====
+parent | trig | is_disabled | is_instead_of_trigger | exec_as | def_chars
+Batch | CopyBatch | False | False |  | 
+Batch | tr_BatchMerger | False | True |  | 
+BatchChanges | CopyBatchChanges | False | False |  | 
+BatchChanges | tr_BatchChangesMerger | False | True |  | 
+Order | tr_Order | False | True |  | 
+Order | trgInsertOrderDetailsOnOrder | False | False |  | 
+OrderCategory | tr_OrderCategory | False | True |  | 
+OrderCategory | trgInsertOrderDetailsOnOrderCategory | False | False |  | 
+ParValueOnline | CopyParValueOnline | False | False |  | 
+
+===== 4.FAKIEH_SERVER1.ALL_vendor_triggers =====
+parent | trig | is_disabled
+Action | tr_ActionMerger | False
+Allocation | tr_AllocMerger | False
+AllocationCandidate | tr_AllocCandMerger | False
+AS | tr_ASMerger | False
+Batch | CopyBatch | False
+Batch | tr_BatchMerger | False
+BatchChanges | CopyBatchChanges | False
+BatchChanges | tr_BatchChangesMerger | False
+BatchTags | tr_BatchTagsMerger | False
+BatchUserGroup | tr_BatchUserGroupMerger | False
+Category | tr_CategoryMerger | False
+CDVMessage | tr_CDVMessageMerger | False
+CDVTag | tr_CDVTagMerger | False
+CDVTagRange | tr_CDVTagRangeMerger | False
+CDVTagValue | tr_CDVTagValueMerger | False
+ChangedItem | tr_ChangedItemMerger | False
+Comment | tr_CommentMerger | False
+ConditionGate | tr_CondGateMerger | False
+Container | tr_ContainerMerger | False
+ContainerOnline | tr_ContainerOnlineMerger | False
+DataType | tr_DataTypeMerger | False
+DataTypeValue | tr_DataTypeValueMerger | False
+EsigCollectionAndTypeInfo | tr_EsigCltnMerger | False
+EsigDynData | tr_EsigDynDataMerger | False
+EsigFixData | tr_EsigFixDataMerger | False
+EsigSignature | tr_EsigSignatureMerger | False
+ExecutedSignature | tr_ExecutedEsigMerger | False
+ExtendedError | tr_ExtendedError | False
+ExtendedErrorState | tr_ExtendedErrorState | False
+Formula | tr_FormulaMerger | False
+FormulaCategory | tr_FormCatMerger | False
+Material | tr_MaterialMerger | False
+ModeOfOP | tr_ModeOfOPMerger | False
+Modification | tr_ModifMerger | False
+Order | tr_Order | False
+Order | trgInsertOrderDetailsOnOrder | False
+OrderCategory | tr_OrderCategory | False
+OrderCategory | trgInsertOrderDetailsOnOrderCategory | False
+PAInstance | tr_InstanceMerger | False
+ParameterDescription | tr_ParamDescMerger | False
+ParValue | tr_ParValueMerger | False
+ParValueOnline | CopyParValueOnline | False
+PCell | tr_PCellMerger | False
+PHTagInfos | tr_PHTagInfosMerger | False
+Procedure | tr_ProcedureMerger | False
+RecRef | tr_RecRefMerger | False
+ScaleFunc | tr_ScaleFuncMerger | False
+SubType | tr_SubTypeMerger | False
+TAG | tr_TAGMerger | False
+TermTrans | tr_TermTransMerger | False
+TermTransOnline | tr_TermTransOnlineMerger | False
+UARef | tr_UARefMerger | False
+UnitEqu | tr_UnitEquMerger | False
+
+===== 4.FAKIEH_SERVER1.trigger_defs -> 0 triggers written to _ro_vendor_triggers.txt =====
+
+===== 4.FAKIEH_SERVER2.capture_trigger_summary =====
+parent | trig | is_disabled | is_instead_of_trigger | exec_as | def_chars
+Batch | CopyBatch | False | False |  | 1690
+Batch | tr_BatchMerger | False | True |  | 2888
+BatchChanges | CopyBatchChanges | False | False |  | 3495
+BatchChanges | tr_BatchChangesMerger | False | True |  | 1829
+Order | tr_Order | False | True |  | 1001
+Order | trgInsertOrderDetailsOnOrder | False | False |  | 1102
+OrderCategory | tr_OrderCategory | False | True |  | 663
+OrderCategory | trgInsertOrderDetailsOnOrderCategory | False | False |  | 904
+ParValueOnline | CopyParValueOnline | False | False |  | 1901
+
+===== 4.FAKIEH_SERVER2.ALL_vendor_triggers =====
+parent | trig | is_disabled
+Action | tr_ActionMerger | False
+Allocation | tr_AllocMerger | False
+AllocationCandidate | tr_AllocCandMerger | False
+AS | tr_ASMerger | False
+Batch | CopyBatch | False
+Batch | tr_BatchMerger | False
+BatchChanges | CopyBatchChanges | False
+BatchChanges | tr_BatchChangesMerger | False
+BatchTags | tr_BatchTagsMerger | False
+BatchUserGroup | tr_BatchUserGroupMerger | False
+Category | tr_CategoryMerger | False
+CDVMessage | tr_CDVMessageMerger | False
+CDVTag | tr_CDVTagMerger | False
+CDVTagRange | tr_CDVTagRangeMerger | False
+CDVTagValue | tr_CDVTagValueMerger | False
+ChangedItem | tr_ChangedItemMerger | False
+Comment | tr_CommentMerger | False
+ConditionGate | tr_CondGateMerger | False
+Container | tr_ContainerMerger | False
+ContainerOnline | tr_ContainerOnlineMerger | False
+DataType | tr_DataTypeMerger | False
+DataTypeValue | tr_DataTypeValueMerger | False
+EsigCollectionAndTypeInfo | tr_EsigCltnMerger | False
+EsigDynData | tr_EsigDynDataMerger | False
+EsigFixData | tr_EsigFixDataMerger | False
+EsigSignature | tr_EsigSignatureMerger | False
+ExecutedSignature | tr_ExecutedEsigMerger | False
+ExtendedError | tr_ExtendedError | False
+ExtendedErrorState | tr_ExtendedErrorState | False
+Formula | tr_FormulaMerger | False
+FormulaCategory | tr_FormCatMerger | False
+Material | tr_MaterialMerger | False
+ModeOfOP | tr_ModeOfOPMerger | False
+Modification | tr_ModifMerger | False
+Order | tr_Order | False
+Order | trgInsertOrderDetailsOnOrder | False
+OrderCategory | tr_OrderCategory | False
+OrderCategory | trgInsertOrderDetailsOnOrderCategory | False
+PAInstance | tr_InstanceMerger | False
+ParameterDescription | tr_ParamDescMerger | False
+ParValue | tr_ParValueMerger | False
+ParValueOnline | CopyParValueOnline | False
+PCell | tr_PCellMerger | False
+PHTagInfos | tr_PHTagInfosMerger | False
+Procedure | tr_ProcedureMerger | False
+RecRef | tr_RecRefMerger | False
+ScaleFunc | tr_ScaleFuncMerger | False
+SubType | tr_SubTypeMerger | False
+TAG | tr_TAGMerger | False
+TermTrans | tr_TermTransMerger | False
+TermTransOnline | tr_TermTransOnlineMerger | False
+UARef | tr_UARefMerger | False
+UnitEqu | tr_UnitEquMerger | False
+
+===== 4.FAKIEH_SERVER2.trigger_defs -> 9 triggers written to _ro_vendor_triggers.txt =====
+
+===== 5.FAKIEH_SERVER1.BatchCopy.stats =====
+rows_ | min_btt | max_btt
+2642 | 2026-06-22 10:26:00.686 +00:00 | 2026-07-21 00:24:34.286 +00:00
+
+===== 5.FAKIEH_SERVER1.ParValueOnline_copy.stats =====
+rows_ | min_ts | max_ts
+8971888 | 2026-06-22 08:30:07.476 +00:00 | 2026-07-21 00:23:30.650 +00:00
+
+===== 5.FAKIEH_SERVER1.OrderDetails.rowcount =====
+rows_
+1
+
+===== 5.FAKIEH_SERVER1.BatchCopy.SourceServer_distinct =====
+ERROR: ('42S22', '[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'SourceServer\'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'SourceServer\'. (207); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred
+
+===== 5.FAKIEH_SERVER1.PVcopy.size =====
+ERROR: ('42000', '[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The user does not have permission to perform this action. (297) (SQLExecDirectW); [42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]VIEW DATABASE STATE permission denied in database \'ASMBatchReports\'. (262); [42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 5.FAKIEH_SERVER1.staging_indexes =====
+tbl | idx | is_unique | type_desc
+OrderDetails | PK__OrderDet__51096E28A2DEA132 | True | CLUSTERED
+
+===== 5.FAKIEH_SERVER1.staging_schema -> 112 cols appended to _ro_vendor_schema.csv =====
+
+===== 5.FAKIEH_SERVER1.agent_jobs =====
+ERROR: ('42000', '[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object \'sysjobs\', database \'msdb\', schema \'dbo\'. (229) (SQLExecDirectW); [42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 5.FAKIEH_SERVER1.agent_steps =====
+ERROR: ('42000', '[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object \'sysjobs\', database \'msdb\', schema \'dbo\'. (229) (SQLExecDirectW); [42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 5.FAKIEH_SERVER1.agent_schedules =====
+ERROR: ('42000', '[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The SELECT permission was denied on the object \'sysschedules\', database \'msdb\', schema \'dbo\'. (229) (SQLExecDirectW); [42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 5.FAKIEH_SERVER2.BatchCopy.stats =====
+rows_ | min_btt | max_btt
+414 | 2026-06-28 12:16:25.010 +00:00 | 2026-07-23 17:16:08.275 +00:00
+
+===== 5.FAKIEH_SERVER2.ParValueOnline_copy.stats =====
+rows_ | min_ts | max_ts
+1431378 | 2026-06-28 11:21:30.456 +00:00 | 2026-07-23 17:15:04.600 +00:00
+
+===== 5.FAKIEH_SERVER2.OrderDetails.rowcount =====
+rows_
+1
+
+===== 5.FAKIEH_SERVER2.BatchCopy.SourceServer_distinct =====
+ERROR: ('42S22', '[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'SourceServer\'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'SourceServer\'. (207); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER2" returned message "Deferred
+
+===== 5.FAKIEH_SERVER2.PVcopy.size =====
+rows_ | reserved_mb | used_mb
+1431378 | 389 | 389
+
+===== 5.FAKIEH_SERVER2.staging_indexes =====
+tbl | idx | is_unique | type_desc
+OrderDetails | PK_OrderDetails | True | CLUSTERED
+
+===== 5.FAKIEH_SERVER2.staging_schema -> 112 cols appended to _ro_vendor_schema.csv =====
+
+===== 5.FAKIEH_SERVER2.agent_jobs =====
+job | enabled
+syspolicy_purge_history | 1
+
+===== 5.FAKIEH_SERVER2.agent_steps =====
+job | step_id | step | subsystem | command
+syspolicy_purge_history | 1 | Verify that automation is enabled. | TSQL | IF (msdb.dbo.fn_syspolicy_is_automation_enabled() != 1)
+        BEGIN
+            RAISERROR(34022, 16, 1)
+        END
+syspolicy_purge_history | 2 | Purge history. | TSQL | EXEC msdb.dbo.sp_syspolicy_purge_history
+syspolicy_purge_history | 3 | Erase Phantom System Health Records. | PowerShell | if ('$(ESCAPE_SQUOTE(INST))' -eq 'MSSQLSERVER') {$a = '\DEFAULT'} ELSE {$a = ''};
+(Get-Item SQLSERVER:\SQLPolicy\$(ESCAPE_NONE(SRVR))$a).EraseSystemHealthPhantomRecords()
+
+===== 5.FAKIEH_SERVER2.agent_schedules =====
+job | sched | enabled | freq_type | mins
+syspolicy_purge_history | syspolicy_purge_history_schedule | 1 | 4 | 0
+
+===== 7.FAKIEH_SERVER1.VENDOR_Batch_max =====
+ERROR: ('42S22', '[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'ActStart\'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 7.FAKIEH_SERVER1.BatchCopy_max =====
+max_btt | max_actstart | rows_
+2026-07-21 00:24:34.286 +00:00 | 2026-07-21 00:04:12.573 +00:00 | 2642
+
+===== 7.FAKIEH_SERVER1.vendor_recent_5 =====
+ERROR: ('42S22', '[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name \'ActStart\'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Statement(s) could not be prepared. (8180); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]OLE DB provider "MSOLEDBSQL" for linked server "FAKIEH_SERVER1" returned message "Deferred prepare could not be completed.". (7412)')
+
+===== 8.linked_login_mapping =====
+name | uses_self_credential | local_principal_id | mapping_type
+FAKIEH_SERVER1 | False | 0 | fixed remote SQL login
+FAKIEH_SERVER2 | False | 0 | fixed remote SQL login
+OS1_SQL | False | 0 | fixed remote SQL login
+
+===== 8.FAKIEH_SERVER1.remote_is_sysadmin =====
+is_sysadmin | trunc_dummy
+0 | LinkUser
+
+===== 8.FAKIEH_SERVER2.remote_is_sysadmin =====
+is_sysadmin | trunc_dummy
+1 | fakieh_log
+
+===== 8.agent_service_account =====
+servicename | service_account | startup_type_desc | status_desc
+SQL Server (FAKIEH_REPORTING) | NT Service\MSSQL$FAKIEH_REPORTING | Automatic | Running
+SQL Server Agent (FAKIEH_REPORTING) | NT Service\SQLAgent$FAKIEH_REPORTING | Automatic | Running
+
+===== 8.job_owner_sysadmin =====
+job | owner_is_sysadmin
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1
+
+DONE FINAL SRC

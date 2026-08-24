@@ -463,7 +463,8 @@ export function Orders() {
   
   // Note: Pagination removed since we're getting live PLC data
 
-  const [broadcastStatus, setBroadcastStatus] = useState<'running' | 'stopped' | 'starting' | 'stopping'>('stopped');
+  // Read-only: broadcast is always-on on the backend (no Start/Stop for operators).
+  const [broadcastStatus, setBroadcastStatus] = useState<'running' | 'stopped'>('stopped');
 
 
   const fetchBinMaterials = useCallback(async () => {
@@ -560,56 +561,11 @@ export function Orders() {
     }
   }, [])
 
-  const startBroadcast = useCallback(async () => {
-    try {
-      setBroadcastStatus('starting')
-      const response = await axios.post(`${baseUrl}/websocket/start-broadcast`)
-      if (response.data.status === 'started') {
-        setBroadcastStatus('running')
-      } else {
-        setBroadcastStatus('stopped')
-        
-      }
-    } catch (error) {
-      setBroadcastStatus('stopped')
-      
-      if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.message || error.message
-        
-      }
-    }
-  }, [])
-
-  const stopBroadcast = useCallback(async () => {
-    try {
-      setBroadcastStatus('stopping')
-      const response = await axios.post(`${baseUrl}/websocket/stop-broadcast`)
-      if (response.data.status === 'stopped') {
-        setBroadcastStatus('stopped')
-      } else {
-        setBroadcastStatus('running')
-        
-      }
-    } catch (error) {
-      setBroadcastStatus('running')
-      
-      if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.message || error.message
-        
-      }
-    }
-  }, [])
-
   const checkBroadcastStatus = useCallback(async () => {
     try {
       const response = await axios.get(`${baseUrl}/websocket/status`)
-      if (response.data.broadcast_running === true) {
-        setBroadcastStatus('running')
-      } else {
-        setBroadcastStatus('stopped')
-      }
+      setBroadcastStatus(response.data.broadcast_running === true ? 'running' : 'stopped')
     } catch (error) {
-      // If status endpoint doesn't exist, assume stopped
       setBroadcastStatus('stopped')
     }
   }, [])
@@ -752,6 +708,7 @@ export function Orders() {
     const interval = setInterval(() => {
       fetchOrders()
       fetchQueue()
+      checkBroadcastStatus()
     }, 5000)
 
     // Cleanup interval on component unmount
@@ -1542,13 +1499,10 @@ export function Orders() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <div className={`w-3 h-3 rounded-full ${
-                broadcastStatus === 'running' ? 'bg-green-500' : 
-                broadcastStatus === 'starting' || broadcastStatus === 'stopping' ? 'bg-yellow-500' : 'bg-red-500'
+                broadcastStatus === 'running' ? 'bg-green-500' : 'bg-red-500'
               }`}></div>
               <span className="text-sm text-white light:text-gray-700">
-                PLC orders: {broadcastStatus === 'running' ? 'Running' : 
-                           broadcastStatus === 'starting' ? 'Starting...' :
-                           broadcastStatus === 'stopping' ? 'Stopping...' : 'Stopped'}
+                PLC orders: {broadcastStatus === 'running' ? 'Running' : 'Stopped'}
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -1577,17 +1531,6 @@ export function Orders() {
             >
               <RefreshCw className="h-3 w-3 mr-1" />
               Refresh
-            </Button>
-            <Button 
-              variant="outline"
-              size="sm" 
-              onClick={broadcastStatus === 'running' ? stopBroadcast : startBroadcast}
-              disabled={broadcastStatus === 'starting' || broadcastStatus === 'stopping'}
-              className={ORDER_BTN_OUTLINE}
-            >
-              {broadcastStatus === 'running' ? 'Stop Broadcast' : 
-               broadcastStatus === 'starting' ? 'Starting...' :
-               broadcastStatus === 'stopping' ? 'Stopping...' : 'Start Broadcast'}
             </Button>
           </div>
         </div>

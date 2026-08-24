@@ -10,6 +10,7 @@ from constants.material_codes import is_valid_material_code, resolve_material_na
 from models import db
 from models.truck import Driver, Truck
 from models.truck_weigh_order import OPEN_STATUSES, TruckWeighOrder
+from utils.baykon_scales import SCALES, get_scale, read_live_weight
 
 truck_entry_bp = Blueprint("truck_entry", __name__, url_prefix="/api/truck-entry")
 
@@ -74,6 +75,34 @@ def _open_order_for_truck(truck_id: int):
         .order_by(TruckWeighOrder.created_at.desc())
         .first()
     )
+
+
+@truck_entry_bp.route("/scales", methods=["GET"])
+def list_scales():
+    """List configured weighbridge scales (1=entry, 2=exit)."""
+    items = []
+    for sid, meta in SCALES.items():
+        items.append({
+            "scale": sid,
+            "name": meta["name"],
+            "role": meta["role"],
+            "ip": meta["ip"],
+            "mac": meta["mac"],
+        })
+    return jsonify({"scales": items}), 200
+
+
+@truck_entry_bp.route("/scales/<int:scale_id>/live", methods=["GET"])
+def scale_live(scale_id: int):
+    """
+    Live weight from Baykon indicator.
+    Scale 1 = entry (IN), Scale 2 = exit (OUT).
+    """
+    if get_scale(scale_id) is None:
+        return jsonify({"ok": False, "error": "scale must be 1 (entry) or 2 (exit)"}), 400
+    reading = read_live_weight(scale_id)
+    status = 200 if reading.get("ok") else 502
+    return jsonify(reading), status
 
 
 @truck_entry_bp.route("/orders", methods=["POST"])
@@ -250,6 +279,28 @@ def get_order(order_id: int):
     order = TruckWeighOrder.query.get(order_id)
     if not order:
         return jsonify({"error": "Order not found"}), 404
+    truck_map, driver_map = _enrich_truck_maps({order.truck_id})
+    return jsonify(_order_dict(order, truck_map, driver_map)), 200
+
+
+@truck_entry_bp.route("/orders/<int:order_id>", methods=["DELETE"])
+def delete_order(order_id: int):
+    """Cancel/remove an open weigh trip so the truck can be used again."""
+    order = TruckWeighOrder.query.get(order_id)
+    if not order:
+        return jsonify({"error": "Order not found"}), 404
+    if order.status not in OPEN_STATUSES:
+        return jsonify({
+            "error": f"Only open trips can be deleted (status is '{order.status}')",
+        }), 409
+
+    order.status = "cancelled"
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to delete order", "detail": str(e)}), 500
+
     truck_map, driver_map = _enrich_truck_maps({order.truck_id})
     return jsonify(_order_dict(order, truck_map, driver_map)), 200
 

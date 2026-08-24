@@ -1,0 +1,106 @@
+CONTRACT2 @ local 2026-07-23T21:38:31.641910 (READ-ONLY)
+
+===== A.all_programmable =====
+name | type_desc | create_date | modify_date
+RetrieveAndStoreAllBatchData | SQL_STORED_PROCEDURE | 2026-06-22 02:25:33 | 2026-07-10 14:00:55
+OS2_BatchCopy_Compat | VIEW | 2025-09-01 12:27:46 | 2025-09-01 13:49:31
+
+===== B.jobs =====
+job | enabled | modified
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 2026-06-22 02:26:41
+syspolicy_purge_history | 1 | 2026-07-15 12:26:33
+
+===== B.job_steps_FULL =====
+
+--- JOB: RetrieveAndStoreAllBatchData - Shadow (10 min) | step 1 'Run shadow pull' | subsystem=TSQL | db=ASMBatchReports ---
+EXEC dbo.RetrieveAndStoreAllBatchData @ShadowMode=1;
+
+--- JOB: syspolicy_purge_history | step 1 'Verify that automation is enabled.' | subsystem=TSQL | db=master ---
+EXECUTE AS LOGIN = '##MS_PolicyTsqlExecutionLogin##' WITH NO REVERT;
+        IF (msdb.dbo.fn_syspolicy_is_automation_enabled() != 1)
+        BEGIN
+            RAISERROR(34022, 16, 1)
+        END
+
+--- JOB: syspolicy_purge_history | step 2 'Purge history.' | subsystem=TSQL | db=master ---
+EXECUTE AS LOGIN = '##MS_PolicyTsqlExecutionLogin##' WITH NO REVERT;
+        EXEC msdb.dbo.sp_syspolicy_purge_history
+
+--- JOB: syspolicy_purge_history | step 3 'Erase Phantom System Health Records.' | subsystem=PowerShell | db=master ---
+if ('$(ESCAPE_SQUOTE(INST))' -eq 'MSSQLSERVER') {$a = '\DEFAULT'} ELSE {$a = ''};
+(Get-Item SQLSERVER:\SQLPolicy\$(ESCAPE_NONE(SRVR))$a).EraseSystemHealthPhantomRecords()
+
+===== B.schedules =====
+job | sched | enabled | freq_type | freq_subday_type | every_units | active_start_time
+RetrieveAndStoreAllBatchData - Shadow (10 min) | NFM_Shadow_Every_10_Minutes | 1 | 4 | 4 | 10 | 0
+syspolicy_purge_history | syspolicy_purge_history_schedule | 1 | 4 | 1 | 0 | 20000
+
+===== B.last20_outcomes =====
+job | step_id | run_date | rtime | run_status | msg
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 213000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 213001 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 212000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 212000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 211000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 211000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 210000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 210000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 205000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 205000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 204000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 204000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 203000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 203000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 202000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 202000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 201000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 201000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 0 | 20260723 | 200000 | 1 | The job succeeded.  The Job was invoked by Schedule 12 (NFM_Shadow_Every_10_Minutes).  The last step to run was step 1 (
+RetrieveAndStoreAllBatchData - Shadow (10 min) | 1 | 20260723 | 200000 | 1 | Executed as user: NT SERVICE\SQLAgent$FAKIEH_REPORTING. The step succeeded.
+
+===== C.golden_day_count =====
+rows_2026_07_22 | batches_2026_07_22
+2994 | 148
+
+===== C.rows_per_prod_day_last10 =====
+prod_day | rows_ | batches
+2026-07-23 | 1452 | 74
+2026-07-22 | 2994 | 148
+2026-07-21 | 2860 | 137
+2026-07-20 | 2838 | 135
+2026-07-19 | 3237 | 148
+2026-07-18 | 3205 | 146
+2026-07-17 | 2427 | 112
+2026-07-16 | 2475 | 114
+2026-07-15 | 2713 | 125
+2026-07-14 | 2917 | 134
+
+===== D.local_newest_per_server =====
+Source Server | batch_guid | rootguid | Batch Name | stored_ActStart | stored_ActEnd | stored_Xfer
+Server1 | 1A91DF30-EAA9-40B9-8CC2-E8BB8E851C26 | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | BROILER GROWER601 1 | 2026-07-21 00:04:12.573 | 2026-07-21 00:23:30.650 | 2026-07-21 00:24:34.287
+Server2 | EC606679-0BBA-4FFC-AF71-EE2BAD10549D | 9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705 | BROILER GROWER602 2 | 2026-07-23 16:35:26.347 | 2026-07-23 17:15:04.600 | 2026-07-23 17:16:08.277
+
+===== D.reps =====
+{'Server1': '9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705', 'Server2': '9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705'}
+
+===== D.source_BatchCopy Server1 via FAKIEH_SERVER1 (OGUID=9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705) =====
+src_ActStart | src_ActEnd | src_Xfer | src_Created
+
+===== D.source_BatchCopy_coltypes Server1 via FAKIEH_SERVER1 =====
+col | type
+Created | datetimeoffset
+ActStart | datetimeoffset
+ActEnd | datetimeoffset
+BatchTransferTime | datetimeoffset
+
+===== D.source_BatchCopy Server2 via FAKIEH_SERVER2 (OGUID=9EB5AAF9-4EC2-4BC1-B78F-A2C697BCE705) =====
+src_ActStart | src_ActEnd | src_Xfer | src_Created
+
+===== D.source_BatchCopy_coltypes Server2 via FAKIEH_SERVER2 =====
+col | type
+Created | datetimeoffset
+ActStart | datetimeoffset
+ActEnd | datetimeoffset
+BatchTransferTime | datetimeoffset
+
+DONE CONTRACT2

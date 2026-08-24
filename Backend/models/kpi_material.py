@@ -27,6 +27,7 @@ class KPIMaterial(db.Model):
     order_id = db.Column("OrderId", db.Integer)
     batch_name = db.Column("Batch Name", db.String(255))
     product_name = db.Column("Product Name", db.String(255))
+    product_code = db.Column("ProductCode", db.String(256))
     batch_act_start = db.Column("Batch Act Start", db.DateTime)
     batch_act_end = db.Column("Batch Act End", db.DateTime)
     batch_transfer_time = db.Column("Batch Transfer Time", db.DateTime)

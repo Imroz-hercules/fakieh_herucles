@@ -82,6 +82,40 @@ body, #root {
 :root.light .light\:text-orange-600 { color: #ea580c; }
 :root.light .light\:text-red-600 { color: #dc2626; }
 :root.light .light\:text-purple-600 { color: #9333ea; }
+:root.light .light\:text-green-700 { color: #15803d !important; }
+:root.light .light\:text-green-600 { color: #16a34a !important; }
+
+/* Weighbridge / truck-entry light accents */
+:root.light .light\:bg-cyan-50 { background-color: #ecfeff !important; }
+:root.light .light\:bg-cyan-100 { background-color: #cffafe !important; }
+:root.light .light\:bg-orange-50 { background-color: #fff7ed !important; }
+:root.light .light\:bg-orange-100 { background-color: #ffedd5 !important; }
+:root.light .light\:bg-green-100 { background-color: #dcfce7 !important; }
+:root.light .light\:bg-orange-600 { background-color: #ea580c !important; }
+:root.light .light\:hover\:bg-orange-700:hover { background-color: #c2410c !important; }
+:root.light .light\:border-cyan-200 { border-color: #a5f3fc !important; }
+:root.light .light\:border-cyan-300 { border-color: #67e8f9 !important; }
+:root.light .light\:border-orange-200 { border-color: #fed7aa !important; }
+:root.light .light\:border-orange-300 { border-color: #fdba74 !important; }
+:root.light .light\:border-green-300 { border-color: #86efac !important; }
+
+:root.light button[class*="bg-orange-600"],
+:root.light button.bg-orange-600 {
+  background-color: #ea580c !important;
+  color: #ffffff !important;
+  border-color: #ea580c !important;
+}
+:root.light button[class*="bg-orange-600"]:hover:not(:disabled),
+:root.light button.bg-orange-600:hover:not(:disabled) {
+  background-color: #c2410c !important;
+  border-color: #c2410c !important;
+}
+:root.light button[class*="bg-orange-600"]:disabled,
+:root.light button.bg-orange-600:disabled {
+  background-color: #fdba74 !important;
+  color: #ffffff !important;
+  opacity: 0.7;
+}
 
 /* Light theme cyan colors for buttons and accents */
 :root.light .light\:bg-cyan-600 { background-color: #0891b2 !important; }
