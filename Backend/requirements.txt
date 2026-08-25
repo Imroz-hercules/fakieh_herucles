@@ -15,8 +15,15 @@ resend
 
 # Hercules AI Assistant
 pandas
-numpy
-scikit-learn
+# The .joblib model artifacts in ai_assistant/ml/ are pickles: they can only be
+# loaded by the same scikit-learn (and major numpy) version that wrote them.
+# Leaving these unpinned let a newer scikit-learn get installed than the one the
+# models were trained with, and every /api/ai/ml/* predict call failed with
+# "Can't get attribute '_RemainderColsList' on sklearn.compose._column_transformer".
+# If you change these pins you MUST retrain and commit the models:
+#   cd Backend && python -m ai_assistant.ml.train && python -m ai_assistant.ml.train_severity
+numpy>=2,<3
+scikit-learn==1.9.0
 joblib
 requests
 google-genai

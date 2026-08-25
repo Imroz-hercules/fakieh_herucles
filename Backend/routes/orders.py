@@ -668,20 +668,21 @@ def add_bulk_order():
         ]
         validate_required_fields(data, required_fields)
 
+        # The request payload uses the PLC tag names; the model uses column names.
         order = BulkLineOrder(
-            BulkLine_Source_Silo=data['BulkLine_Source_Silo'],
-            BulkLine_DEST_1=data['BulkLine_DEST_1'],
-            BulkLine_DEST_2=data['BulkLine_DEST_2'],
-            BulkLine_CC25_Sel=data['BulkLine_CC25_Sel'],
-            BulkLine_Weight_Quantity=data['BulkLine_Weight_Quantity'],
-            BulkLine_Scale_Selection=data['BulkLine_Scale_Selection'],
-            ActiveBulk_Source_Silo=data['ActiveBulk_Source_Silo'],
-            ActiveBulk_DEST_1=data['ActiveBulk_DEST_1'],
-            ActiveBulk_DEST_2=data['ActiveBulk_DEST_2'],
-            ActiveBulk_CC25_Sel=data['ActiveBulk_CC25_Sel'],
-            ActiveBulk_weightQuantity=data['ActiveBulk_weightQuantity'],
-            ActiveBulk_ScaleSelect=data['ActiveBulk_ScaleSelect'],
-            BulkLine_Status=data['BulkLine_Status']
+            source_silo=data['BulkLine_Source_Silo'],
+            destination_silo1=data['BulkLine_DEST_1'],
+            destination_silo2=data['BulkLine_DEST_2'],
+            cc25_sel=data['BulkLine_CC25_Sel'],
+            declared_quantity_kg=data['BulkLine_Weight_Quantity'],
+            scale_sel=data['BulkLine_Scale_Selection'],
+            active_source_silo=data['ActiveBulk_Source_Silo'],
+            active_dest1=data['ActiveBulk_DEST_1'],
+            active_dest2=data['ActiveBulk_DEST_2'],
+            active_cc25_sel=data['ActiveBulk_CC25_Sel'],
+            active_qty_kg=data['ActiveBulk_weightQuantity'],
+            active_scale_sel=data['ActiveBulk_ScaleSelect'],
+            status_word=data['BulkLine_Status']
         )
 
         # Don't store in database - only store when status is 8 via handle_order_status
@@ -835,20 +836,18 @@ def add_pt_order():
         ]
         validate_required_fields(data, required_fields)
 
+        # The request payload uses the PLC tag names; the model uses column names.
+        # The ActivePit_* tags are still validated above (they are part of the PLC
+        # payload contract) but PTLineOrder has no active_* columns — the live
+        # active values are read back from the PLC, not stored on the order row.
         order = PTLineOrder(
-            PitLine_Pit_Number=data['PitLine_Pit_Number'],
-            PitLine_RawMaterialCode=data['PitLine_RawMaterialCode'],
-            PitLine_DEST_1=data['PitLine_DEST_1'],
-            PitLine_DEST_2=data['PitLine_DEST_2'],
-            PitLine_Weight_Quantity=data['PitLine_Weight_Quantity'],
-            PitLine_Scale_Selection=data['PitLine_Scale_Selection'],
-            ActivePit_Pit_Number=data['ActivePit_Pit_Number'],
-            ActivePit_RawMaterialCod=data['ActivePit_RawMaterialCod'],
-            ActivePit_DEST_1=data['ActivePit_DEST_1'],
-            ActivePit_DEST_2=data['ActivePit_DEST_2'],
-            ActivePit_Weight_Quant=data['ActivePit_Weight_Quant'],
-            ActivePit_Scale_Select=data['ActivePit_Scale_Select'],
-            PitLine_Status=data['PitLine_Status']
+            pit_no=data['PitLine_Pit_Number'],
+            raw_code=data['PitLine_RawMaterialCode'],
+            destination_silo1=data['PitLine_DEST_1'],
+            destination_silo2=data['PitLine_DEST_2'],
+            declared_quantity_kg=data['PitLine_Weight_Quantity'],
+            scale_sel=data['PitLine_Scale_Selection'],
+            status_word=data['PitLine_Status']
         )
 
         # Don't store in database - only store when status is 8 via handle_order_status
@@ -883,37 +882,31 @@ def seed_test_data():
 
         # Add sample bulk order
         bulk_order = BulkLineOrder(
-            BulkLine_Source_Silo="Silo A",
-            BulkLine_DEST_1="Destination 1",
-            BulkLine_DEST_2="Destination 2",
-            BulkLine_CC25_Sel="CC25-1",
-            BulkLine_Weight_Quantity=1000,
-            BulkLine_Scale_Selection="Scale 1",
-            ActiveBulk_Source_Silo="Silo B",
-            ActiveBulk_DEST_1="Active Dest 1",
-            ActiveBulk_DEST_2="Active Dest 2",
-            ActiveBulk_CC25_Sel="CC25-2",
-            ActiveBulk_weightQuantity=500,
-            ActiveBulk_ScaleSelect="Scale 2",
-            BulkLine_Status="Active"
+            source_silo="Silo A",
+            destination_silo1="Destination 1",
+            destination_silo2="Destination 2",
+            cc25_sel="CC25-1",
+            declared_quantity_kg=1000,
+            scale_sel="Scale 1",
+            active_source_silo="Silo B",
+            active_dest1="Active Dest 1",
+            active_dest2="Active Dest 2",
+            active_cc25_sel="CC25-2",
+            active_qty_kg=500,
+            active_scale_sel="Scale 2",
+            status_word="Active"
         )
         db.session.add(bulk_order)
 
         # Add sample PT order
         pt_order = PTLineOrder(
-            PitLine_Pit_Number="Pit 1",
-            PitLine_RawMaterialCode="RM001",
-            PitLine_DEST_1="PT Dest 1",
-            PitLine_DEST_2="PT Dest 2",
-            PitLine_Weight_Quantity=750,
-            PitLine_Scale_Selection="PT Scale 1",
-            ActivePit_Pit_Number="Pit 2",
-            ActivePit_RawMaterialCod="RM002",
-            ActivePit_DEST_1="Active PT Dest 1",
-            ActivePit_DEST_2="Active PT Dest 2",
-            ActivePit_Weight_Quant=300,
-            ActivePit_Scale_Select="PT Scale 2",
-            PitLine_Status="Active"
+            pit_no="Pit 1",
+            raw_code="RM001",
+            destination_silo1="PT Dest 1",
+            destination_silo2="PT Dest 2",
+            declared_quantity_kg=750,
+            scale_sel="PT Scale 1",
+            status_word="Active"
         )
         db.session.add(pt_order)
 

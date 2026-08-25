@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from flask import Blueprint, jsonify, current_app
 from models import db
-from routes.plc_routes import fetch_plant_orders_snapshot
+from routes.plc_routes import fetch_plant_orders_snapshot, DEMO_MODE, _snap7_loaded
 from routes.orders_sink import persist_orders
 from routes.silos_collect import collect_all_silos
 from routes.silos_sink import persist_silos
@@ -327,6 +327,14 @@ def ingestion_status():
 @ingestion_bp.route("/ingest-now", methods=["POST"])
 def ingest_now():
     """Manually trigger data ingestion once"""
+    # Fail fast instead of blocking on the snap7 TCP connect timeout when there is
+    # no physical PLC attached. Same DEMO_MODE convention used throughout plc_routes.py.
+    if DEMO_MODE or not _snap7_loaded:
+        return jsonify({
+            "status": "skipped",
+            "message": "Ingestion skipped: snap7 missing or DEMO_MODE=true (no PLC attached)"
+        }), 503
+
     try:
         with current_app.app_context():
             payload = fetch_plant_orders_snapshot()

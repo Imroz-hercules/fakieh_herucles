@@ -1,23 +1,31 @@
 import logging
+from logging.handlers import RotatingFileHandler
 import traceback
 from flask import jsonify, request
 from datetime import datetime
 
 # Configure logging
+# NOTE: routes/sqlserver_routes.py also calls logging.basicConfig(level=logging.INFO).
+# basicConfig() is a no-op once the root logger already has handlers, so whichever of
+# these two modules is imported first "wins". In the current app.py import order,
+# routes.orders (imported before routes.sqlserver_routes) pulls in this module first,
+# so this config wins naturally today -- but force=True is added below so this
+# rotating-file config always takes effect regardless of future import-order changes.
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('api_debug.log'),
+        RotatingFileHandler('api_debug.log', maxBytes=10_000_000, backupCount=3, encoding='utf-8'),
         logging.StreamHandler()
-    ]
+    ],
+    force=True
 )
 logger = logging.getLogger(__name__)
 
 class APIError(Exception):
     """Custom API Exception"""
     def __init__(self, message, status_code=500, error_code=None):
-        super().__init__()
+        super().__init__(message)
         self.message = message
         self.status_code = status_code
         self.error_code = error_code
@@ -36,7 +44,7 @@ def handle_api_error(error):
     """Handle API errors and return consistent error response"""
     error_info = {
         'error': True,
-        'message': str(error),
+        'message': getattr(error, 'message', None) or str(error) or 'Internal server error',
         'status_code': getattr(error, 'status_code', 500),
         'error_code': getattr(error, 'error_code', 'INTERNAL_ERROR'),
         'timestamp': datetime.utcnow().isoformat(),
@@ -73,7 +81,7 @@ def handle_validation_error(error):
     
     error_info = {
         'error': True,
-        'message': str(error),
+        'message': getattr(error, 'message', None) or str(error) or 'Validation error',
         'status_code': 400,
         'error_code': 'VALIDATION_ERROR',
         'timestamp': datetime.utcnow().isoformat(),
