@@ -85,6 +85,270 @@ body, #root {
 :root.light .light\:text-green-700 { color: #15803d !important; }
 :root.light .light\:text-green-600 { color: #16a34a !important; }
 
+/* Weighbridge Truck Entry operator console */
+.wb-console {
+  --wb-text: #eaf7ff;
+  --wb-text-sec: #8aa6b8;
+  --wb-text-muted: #557181;
+  --wb-border: #103143;
+  --wb-border-input: #164153;
+  --wb-stage: #020b14;
+  --wb-panel: #071a29;
+  --wb-panel-elevated: #0a2030;
+  --wb-input-bg: #071724;
+  --wb-table-head: #061522;
+  --wb-row-hover: rgba(0, 217, 255, 0.04);
+  --wb-row-active: rgba(0, 217, 255, 0.06);
+  --wb-cyan: #00d9ff;
+  --wb-cyan-bright: #5cebff;
+  --wb-weight-idle: #3d5665;
+  color: var(--wb-text);
+}
+
+:root.light .wb-console {
+  --wb-text: #0f172a;
+  --wb-text-sec: #475569;
+  --wb-text-muted: #64748b;
+  --wb-border: #e2e8f0;
+  --wb-border-input: #cbd5e1;
+  --wb-stage: #e8eef3;
+  --wb-panel: #ffffff;
+  --wb-panel-elevated: #ffffff;
+  --wb-input-bg: #f8fafc;
+  --wb-table-head: #f1f5f9;
+  --wb-row-hover: rgba(8, 145, 178, 0.06);
+  --wb-row-active: rgba(8, 145, 178, 0.1);
+  --wb-cyan: #0891b2;
+  --wb-cyan-bright: #0e7490;
+  --wb-weight-idle: #94a3b8;
+  color: var(--wb-text);
+}
+
+.wb-text {
+  color: var(--wb-text);
+}
+.wb-text-sec {
+  color: var(--wb-text-sec);
+}
+.wb-text-muted {
+  color: var(--wb-text-muted);
+}
+.wb-text-cyan {
+  color: var(--wb-cyan);
+}
+.wb-text-cyan-bright {
+  color: var(--wb-cyan-bright);
+}
+.wb-border {
+  border-color: var(--wb-border);
+}
+.wb-stage {
+  background: var(--wb-stage);
+}
+.wb-table-head {
+  background: var(--wb-table-head);
+}
+.wb-weight-live {
+  color: var(--wb-cyan-bright);
+}
+.wb-weight-idle {
+  color: var(--wb-weight-idle);
+}
+:root.light .wb-weight-live {
+  text-shadow: none;
+  filter: none;
+}
+
+.wb-panel {
+  background: var(--wb-panel);
+  border: 1px solid rgba(50, 130, 155, 0.2);
+  border-radius: 10px;
+}
+
+:root.light .wb-panel {
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.wb-panel-active {
+  border-color: rgba(0, 217, 255, 0.55);
+  box-shadow: 0 0 18px rgba(0, 217, 255, 0.12);
+}
+
+:root.light .wb-panel-active {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 1px rgba(8, 145, 178, 0.25), 0 4px 16px rgba(8, 145, 178, 0.1);
+}
+
+.wb-input {
+  background: var(--wb-input-bg) !important;
+  border: 1px solid var(--wb-border-input) !important;
+  color: var(--wb-text) !important;
+  border-radius: 8px !important;
+}
+
+.wb-input:focus,
+.wb-input:focus-visible {
+  border-color: var(--wb-cyan) !important;
+  box-shadow: 0 0 0 1px rgba(0, 217, 255, 0.35) !important;
+  outline: none !important;
+}
+
+:root.light .wb-input:focus,
+:root.light .wb-input:focus-visible {
+  box-shadow: 0 0 0 2px rgba(8, 145, 178, 0.2) !important;
+}
+
+.wb-input::placeholder {
+  color: var(--wb-text-muted) !important;
+}
+
+.wb-btn-primary {
+  background: #00bfd9 !important;
+  color: #001018 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 18px rgba(0, 217, 255, 0.2);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wb-btn-primary:hover:not(:disabled) {
+  background: #00d9ff !important;
+  box-shadow: 0 0 22px rgba(0, 217, 255, 0.35);
+}
+
+:root.light .wb-btn-primary {
+  background: #0891b2 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(8, 145, 178, 0.25);
+}
+
+:root.light .wb-btn-primary:hover:not(:disabled) {
+  background: #0e7490 !important;
+  box-shadow: 0 2px 8px rgba(8, 145, 178, 0.3);
+}
+
+.wb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid #0a7187;
+  background: rgba(0, 217, 255, 0.08);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--wb-text-sec);
+}
+
+.wb-chip strong {
+  color: var(--wb-cyan-bright);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+:root.light .wb-chip {
+  border-color: #a5f3fc;
+  background: #ecfeff;
+  color: #475569;
+}
+
+:root.light .wb-chip strong {
+  color: #0e7490;
+}
+
+.wb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.wb-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.wb-badge-ok {
+  color: #19d37e;
+  border-color: rgba(25, 211, 126, 0.4);
+  background: rgba(25, 211, 126, 0.08);
+}
+
+.wb-badge-cyan {
+  color: #5cebff;
+  border-color: rgba(0, 217, 255, 0.4);
+  background: rgba(0, 217, 255, 0.08);
+}
+
+.wb-badge-amber {
+  color: #ffb020;
+  border-color: rgba(255, 176, 32, 0.4);
+  background: rgba(255, 176, 32, 0.08);
+}
+
+:root.light .wb-badge-ok {
+  color: #15803d;
+  border-color: #86efac;
+  background: #dcfce7;
+}
+
+:root.light .wb-badge-cyan {
+  color: #0e7490;
+  border-color: #67e8f9;
+  background: #ecfeff;
+}
+
+:root.light .wb-badge-amber {
+  color: #c2410c;
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.wb-select-content {
+  background: var(--wb-panel-elevated) !important;
+  border: 1px solid var(--wb-border-input) !important;
+  color: var(--wb-text) !important;
+}
+
+.wb-kpi-icon-cyan {
+  border-color: rgba(0, 217, 255, 0.3);
+  background: rgba(0, 217, 255, 0.1);
+  color: #00d9ff;
+  box-shadow: 0 0 16px rgba(0, 217, 255, 0.12);
+}
+
+.wb-kpi-icon-amber {
+  border-color: rgba(255, 176, 32, 0.3);
+  background: rgba(255, 176, 32, 0.1);
+  color: #ffb020;
+  box-shadow: 0 0 16px rgba(255, 176, 32, 0.1);
+}
+
+:root.light .wb-kpi-icon-cyan {
+  border-color: #67e8f9;
+  background: #ecfeff;
+  color: #0e7490;
+  box-shadow: none;
+}
+
+:root.light .wb-kpi-icon-amber {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: #c2410c;
+  box-shadow: none;
+}
+
 /* Weighbridge / truck-entry light accents */
 :root.light .light\:bg-cyan-50 { background-color: #ecfeff !important; }
 :root.light .light\:bg-cyan-100 { background-color: #cffafe !important; }
