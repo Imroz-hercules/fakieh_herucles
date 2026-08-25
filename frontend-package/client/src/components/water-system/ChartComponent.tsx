@@ -62,7 +62,7 @@ const hercGlowPlugin: Plugin = {
 const hercArcGlowPlugin: Plugin = {
   id: 'hercArcGlow',
   beforeDatasetDraw(chart, args) {
-    if (chart.config.type !== 'doughnut') return
+    if ((chart.config as { type?: string }).type !== 'doughnut') return
     const meta = chart.getDatasetMeta(args.index)
     const ctx = chart.ctx
     ctx.save()
@@ -89,7 +89,7 @@ function makeCenterTextPlugin(label?: string, sub?: string, light = false): Plug
   return {
     id: 'hercCenterText',
     afterDraw(chart) {
-      if (chart.config.type !== 'doughnut' || !label) return
+      if ((chart.config as { type?: string }).type !== 'doughnut' || !label) return
       const { ctx, chartArea } = chart
       if (!chartArea) return
       const cx = (chartArea.left + chartArea.right) / 2

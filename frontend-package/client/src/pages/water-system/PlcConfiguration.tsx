@@ -358,7 +358,7 @@ export function PLCConfiguration({}: PlcConfigurationProps) {
       filtered = filtered.filter(addr => 
         addr.tagName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         addr.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        addr.materialCode.toLowerCase().includes(searchTerm.toLowerCase())
+        (addr.materialCode ?? '').toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 

@@ -2,7 +2,11 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-BUSINESS_TZ = ZoneInfo("Asia/Riyadh")
+# Single source of truth for the plant's business timezone. Use BUSINESS_TZ_NAME
+# (not a literal) anywhere a timezone string is needed — e.g. SQL `timezone(...)`
+# — so the boundary can never drift between modules.
+BUSINESS_TZ_NAME = "Asia/Riyadh"
+BUSINESS_TZ = ZoneInfo(BUSINESS_TZ_NAME)
 UTC = timezone.utc
 
 # AST = UTC+3; production day starts 07:00 AST = 04:00 UTC.

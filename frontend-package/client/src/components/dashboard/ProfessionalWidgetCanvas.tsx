@@ -180,7 +180,9 @@ function CanvasContent({
   gridSize: number
   snapToGrid: boolean
 }) {
-  const canvasRef = useRef<HTMLDivElement>(null)
+  // Mutable: the callback ref below assigns into it, so it must not be a
+  // read-only RefObject (useRef<T>(null) infers RefObject<T> with readonly current).
+  const canvasRef = useRef<HTMLDivElement | null>(null)
 
   const [, drop] = useDrop({
     accept: 'widget',

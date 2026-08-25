@@ -182,13 +182,13 @@ export default function TruckEntry() {
     });
   }, [openOrders]);
 
-  const refreshData = useCallback(async () => {
+  const refreshData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setErrorMsg(null);
     try {
       const [open, today] = await Promise.all([
-        fetchOpenOrders(),
-        fetchCompletedToday(),
+        fetchOpenOrders(signal),
+        fetchCompletedToday(undefined, signal),
       ]);
       setOpenOrders(open);
       setCompletedToday(today.rows ?? []);
@@ -197,9 +197,11 @@ export default function TruckEntry() {
         return open.find((o) => o.id === prev.id) ?? null;
       });
     } catch (err: unknown) {
+      // Navigating away aborts these fetches — that is not an error to show.
+      if ((err as { name?: string })?.name === "AbortError") return;
       setErrorMsg(err instanceof Error ? err.message : "Failed to load data");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
@@ -214,8 +216,12 @@ export default function TruckEntry() {
   }, []);
 
   useEffect(() => {
+    // Abort the initial /open + /today loads if the operator navigates away
+    // before they resolve (these can take seconds on a loaded backend).
+    const controller = new AbortController();
     fetchTrucks();
-    refreshData();
+    void refreshData(controller.signal);
+    return () => controller.abort();
   }, [fetchTrucks, refreshData]);
 
   // Drop selection if truck became busy (open trip)
@@ -603,12 +609,12 @@ export default function TruckEntry() {
               </div>
             </div>
 
-            <div className="relative flex-1 wb-stage min-h-[280px] flex items-center justify-center overflow-hidden">
+            <div className="relative flex-1 wb-stage min-h-[280px] flex items-center justify-center">
               {showTruckVisual ? (
                 <img
                   src={truck3}
                   alt="Truck on weighbridge"
-                  className="absolute inset-0 h-full w-full object-contain object-center scale-[1.35] origin-center"
+                  className="max-h-[320px] w-full object-contain object-center px-2 py-4"
                 />
               ) : (
                 <div className="text-center px-6 py-16 space-y-3">
@@ -625,7 +631,7 @@ export default function TruckEntry() {
               )}
 
               {activeScaleId && (
-                <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[10px] wb-text-sec z-10">
+                <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[10px] wb-text-sec">
                   {livePolling || liveReading?.ok ? (
                     <Wifi className="h-3 w-3 text-[#19D37E]" />
                   ) : (
@@ -832,7 +838,7 @@ export default function TruckEntry() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={refreshData}
+                onClick={() => { void refreshData() }}
                 disabled={loading}
                 className="h-7 gap-1 wb-text-sec hover:opacity-90"
               >

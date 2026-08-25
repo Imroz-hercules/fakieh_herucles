@@ -699,20 +699,41 @@ export default function FakiehDashboard() {
     }
   }
 
-  // Load data on component mount
+  // Load data on component mount.
+  //
+  // The KPI-tile counters (`fetchTotalOrders` alone is 8 parallel requests)
+  // used to fire in the same tick as the chart data, so ~13 XHR competed with
+  // the page's own JS/CSS/logo requests for the browser's connection slots and
+  // nothing painted until the slowest one landed. Charts load immediately; the
+  // counters are deferred until the browser is idle (after first paint).
   useEffect(() => {
     fetchBatchMaterials()
-    fetchTotalCount()
-    fetchTotalOrders()
-    fetchTotalTrucks()
     fetchHourlyBatchCount()
     fetchWeeklyBatchCount()
+
+    const idle: (cb: () => void) => number =
+      typeof window !== 'undefined' && 'requestIdleCallback' in window
+        ? (cb) => (window as any).requestIdleCallback(cb, { timeout: 2000 })
+        : (cb) => window.setTimeout(cb, 0)
+    const cancelIdle: (handle: number) => void =
+      typeof window !== 'undefined' && 'cancelIdleCallback' in window
+        ? (h) => (window as any).cancelIdleCallback(h)
+        : (h) => window.clearTimeout(h)
+
+    const idleHandle = idle(() => {
+      fetchTotalCount()
+      fetchTotalOrders()
+      fetchTotalTrucks()
+    })
 
     const interval = setInterval(() => {
       fetchHourlyBatchCount()
       fetchWeeklyBatchCount()
     }, 60000)
-    return () => clearInterval(interval)
+    return () => {
+      cancelIdle(idleHandle)
+      clearInterval(interval)
+    }
   }, [])
 
   // Fetch total orders count
