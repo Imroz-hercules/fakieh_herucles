@@ -106,8 +106,8 @@ export async function saveSecondWeight(orderId: number, weight: number): Promise
   return parseJson(res);
 }
 
-export async function fetchOpenOrders(): Promise<TruckWeighOrder[]> {
-  const res = await fetch(`${BASE}/orders/open`);
+export async function fetchOpenOrders(signal?: AbortSignal): Promise<TruckWeighOrder[]> {
+  const res = await fetch(`${BASE}/orders/open`, { signal });
   const data = await parseJson<{ orders: TruckWeighOrder[] }>(res);
   return data.orders ?? [];
 }
@@ -117,9 +117,12 @@ export interface CompletedTodayResult {
   rows: TruckWeighOrder[];
 }
 
-export async function fetchCompletedToday(date?: string): Promise<CompletedTodayResult> {
+export async function fetchCompletedToday(
+  date?: string,
+  signal?: AbortSignal
+): Promise<CompletedTodayResult> {
   const qs = date ? `?date=${encodeURIComponent(date)}` : "";
-  const res = await fetch(`${BASE}/orders/today${qs}`);
+  const res = await fetch(`${BASE}/orders/today${qs}`, { signal });
   const data = await parseJson<{ date?: string; rows: TruckWeighOrder[] }>(res);
   return { date: data.date ?? null, rows: data.rows ?? [] };
 }

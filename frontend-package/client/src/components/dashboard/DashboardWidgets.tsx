@@ -12,7 +12,7 @@ interface Widget {
     xAxisField?: string
     yAxisField?: string
     chartType?: 'line' | 'bar' | 'pie' | 'donut' | 'area' | 'scatter'
-    displayMode?: 'single' | 'multiple' | 'xy-chart' | 'trend'
+    displayMode?: 'single' | 'dual' | 'multiple' | 'xy-chart' | 'trend'
     thresholds?: Array<{
       value: number
       color: string

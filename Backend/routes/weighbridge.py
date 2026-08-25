@@ -75,7 +75,7 @@
 # # from models import db
 # # from models.weighbridge import WeighbridgeRecord
 # # from models.truck import Truck
-# # from models.orders import IntakeOrder, OutloadingOrder  # include whichever you have
+# # from models.orders import IntakeOrder, OutloadingOrder
 # # from models.rfid import RFIDTag  # if you maintain RFID tags table
 
 # # weighbridge_bp = Blueprint('weighbridge', __name__, url_prefix='/api/weighbridge')
@@ -672,11 +672,13 @@ from models import db
 from models.weighbridge import WeighbridgeRecord
 from models.truck import Truck                  # keep if you have a Truck model
 from models.orders import IntakeOrder, OutloadingOrder
+from utils.timezone import BUSINESS_TZ_NAME
 
 weighbridge_bp = Blueprint("weighbridge", __name__, url_prefix="/api/weighbridge")
 
 # ---------------- Config / constants ----------------
-TIMEZONE_NAME = "Asia/Kolkata"  # business-day boundary
+# business-day boundary — Saudi plant; was hardcoded "Asia/Kolkata".
+TIMEZONE_NAME = BUSINESS_TZ_NAME
 OPEN_STATUS_VALUES = {"Open", "Pending", "InProgress"}  # tweak to your statuses
 
 # Which columns hold RFID in your orders

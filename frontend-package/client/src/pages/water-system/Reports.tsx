@@ -1479,7 +1479,7 @@ export function Reports() {
       columns.join(',') + '\n' +
       data.map(row => 
         columns.map(col => 
-          row[col.toLowerCase().replace(/\s+/g, '_')] || ''
+          (row as Record<string, unknown>)[col.toLowerCase().replace(/\s+/g, '_')] ?? ''
         ).join(',')
       ).join('\n')
     

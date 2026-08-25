@@ -6,10 +6,12 @@ import requests
 from models import db
 from models.weights import WeightLog, RFIDLog
 from models.truck import Truck, Driver
+from utils.timezone import BUSINESS_TZ_NAME
 
 plant_bp = Blueprint("plant", __name__, url_prefix="/api")
 # Set your business timezone here
-TIMEZONE_NAME = "Asia/Kolkata"
+# Plant is in Saudi Arabia — sourced from utils.timezone (was "Asia/Kolkata").
+TIMEZONE_NAME = BUSINESS_TZ_NAME
 # PLC base URL - update this to your actual PLC endpoint
 PLC_BASE_URL = "http://localhost:5000"
 
@@ -32,7 +34,7 @@ def weights_today():
     Prefer GET /api/truck-entry/orders/today for completed truck weigh trips.
     Returns IN/OUT pairs (and NET) for a local day, enriched with truck plate & driver name.
     Query params:
-      - date=YYYY-MM-DD (optional; default = today in Asia/Kolkata)
+      - date=YYYY-MM-DD (optional; default = today in Asia/Riyadh)
     """
     date_str = request.args.get("date")
     local_ts = func.timezone(TIMEZONE_NAME, WeightLog.ts)

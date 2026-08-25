@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
+import { usePolling } from '../../hooks/usePolling'
 import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayout'
 import { ChartComponent } from '../../components/water-system/ChartComponent'
 import { Button } from '@/components/ui/button'
@@ -780,38 +781,31 @@ export function AiAssistant() {
   }, [])
 
   // Poll the live monitor (drives the feed, KPIs, charts, and drift/retrain popups).
-  useEffect(() => {
-    let alive = true
-    const poll = async () => {
-      try {
-        const { data } = await axios.get<LiveState>(`${AI}/live/state`)
-        if (!alive) return
-        setLive(data)
-        if (firstLoad.current) {
-          // Don't replay pre-existing notifications as popups on first open.
-          data.notifications.forEach((n) => seenNotif.current.add(n.id))
-          firstLoad.current = false
-        } else {
-          const fresh = data.notifications.filter((n) => !seenNotif.current.has(n.id))
-          if (fresh.length) {
-            fresh.forEach((n) => seenNotif.current.add(n.id))
-            setToasts((t) => [...fresh, ...t].slice(0, 4))
-            fresh.forEach((n) =>
-              setTimeout(() => setToasts((t) => t.filter((x) => x.id !== n.id)), 9000)
-            )
-          }
+  // Non-overlapping: a tick is skipped while the previous request is in flight,
+  // so a slow backend can no longer stack up ~50 requests/minute from this page.
+  usePolling(async (signal) => {
+    try {
+      const { data } = await axios.get<LiveState>(`${AI}/live/state`, { signal })
+      if (signal.aborted) return
+      setLive(data)
+      if (firstLoad.current) {
+        // Don't replay pre-existing notifications as popups on first open.
+        data.notifications.forEach((n) => seenNotif.current.add(n.id))
+        firstLoad.current = false
+      } else {
+        const fresh = data.notifications.filter((n) => !seenNotif.current.has(n.id))
+        if (fresh.length) {
+          fresh.forEach((n) => seenNotif.current.add(n.id))
+          setToasts((t) => [...fresh, ...t].slice(0, 4))
+          fresh.forEach((n) =>
+            setTimeout(() => setToasts((t) => t.filter((x) => x.id !== n.id)), 9000)
+          )
         }
-      } catch {
-        /* backend momentarily unreachable — keep last state */
       }
+    } catch {
+      /* backend momentarily unreachable — keep last state */
     }
-    poll()
-    const id = setInterval(poll, 1200)
-    return () => {
-      alive = false
-      clearInterval(id)
-    }
-  }, [])
+  }, 1500)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -915,7 +909,7 @@ export function AiAssistant() {
     for (const f of live.feed) {
       if (!seen.has(f.material_code)) seen.set(f.material_code, f.material_name)
     }
-    return [...seen.entries()].map(([code, name]) => ({ code, name }))
+    return Array.from(seen.entries()).map(([code, name]) => ({ code, name }))
   }, [live?.feed])
 
   const showAllFeedMaterials = feedMaterialPick.size === 0

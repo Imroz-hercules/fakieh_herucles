@@ -1,20 +1,23 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request
-from sqlalchemy import func
 
 from constants.material_codes import is_valid_material_code, resolve_material_name
 from models import db
 from models.truck import Driver, Truck
 from models.truck_weigh_order import OPEN_STATUSES, TruckWeighOrder
 from utils.baykon_scales import SCALES, get_scale, read_live_weight
+from utils.timezone import BUSINESS_TZ, BUSINESS_TZ_NAME
 
 truck_entry_bp = Blueprint("truck_entry", __name__, url_prefix="/api/truck-entry")
 
-TIMEZONE_NAME = "Asia/Kolkata"
+# The plant is in Saudi Arabia. This used to be hardcoded to "Asia/Kolkata",
+# which put the business-day boundary 2.5h off and made "today" wrong for
+# operators. Sourced from utils.timezone so it stays consistent app-wide.
+TIMEZONE_NAME = BUSINESS_TZ_NAME
 
 
 def _utcnow():
@@ -240,28 +243,30 @@ def list_open_orders():
 @truck_entry_bp.route("/orders/today", methods=["GET"])
 def list_completed_today():
     date_str = request.args.get("date")
-    # Business day is based on completion (OUT) time, not order creation time.
-    local_completed = func.timezone(TIMEZONE_NAME, TruckWeighOrder.second_ts)
 
+    # Business day is based on completion (OUT) time, not order creation time.
+    # We resolve the local day to a half-open [start, end) range of absolute
+    # timestamps and compare the bare column against it. The previous version
+    # wrapped the column (`date(timezone(tz, second_ts)) == day`), which makes
+    # the predicate non-sargable — Postgres cannot use an index on second_ts and
+    # has to compute the expression for every row.
     if date_str:
         day = _parse_date_yyyy_mm_dd(date_str)
         if not day:
             return jsonify({"error": "date must be YYYY-MM-DD"}), 400
-        day_filter = func.date(local_completed) == day
-        day_label = day.isoformat()
     else:
-        day_filter = func.date(local_completed) == func.date(
-            func.timezone(TIMEZONE_NAME, func.now())
-        )
-        day_label = db.session.query(
-            func.to_char(func.timezone(TIMEZONE_NAME, func.now()), "YYYY-MM-DD")
-        ).scalar()
+        day = datetime.now(BUSINESS_TZ).date()
+
+    day_label = day.isoformat()
+    start_local = datetime(day.year, day.month, day.day, tzinfo=BUSINESS_TZ)
+    end_local = start_local + timedelta(days=1)
 
     orders = (
         TruckWeighOrder.query.filter(
             TruckWeighOrder.status == "completed",
             TruckWeighOrder.second_ts.isnot(None),
-            day_filter,
+            TruckWeighOrder.second_ts >= start_local,
+            TruckWeighOrder.second_ts < end_local,
         )
         .order_by(TruckWeighOrder.second_ts.desc().nullslast(), TruckWeighOrder.id.desc())
         .all()

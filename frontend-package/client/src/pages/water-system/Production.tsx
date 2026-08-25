@@ -197,7 +197,16 @@ export function Production() {
                   </td>
                   <td className="p-4 flex gap-2">
                     <Button variant="ghost" size="sm" className="text-green-400 hover:bg-green-400/10"
-                      onClick={() => { setEditBatchId(batch.id); setFormData(batch); setShowForm(true); }}>
+                      onClick={() => {
+                        setEditBatchId(batch.id);
+                        // The form keeps numeric fields as strings (controlled inputs).
+                        setFormData({
+                          ...batch,
+                          targetQty: String(batch.targetQty ?? ''),
+                          actualQty: String(batch.actualQty ?? ''),
+                        });
+                        setShowForm(true);
+                      }}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="sm" className="text-red-400 hover:bg-red-400/10"

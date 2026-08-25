@@ -39,7 +39,7 @@ interface Widget {
     chartType?: 'line' | 'bar' | 'pie' | 'donut' | 'area' | 'scatter'
     refreshInterval?: number
     thresholds?: Array<{ value: number; color: string; label: string }>
-    displayMode?: 'single' | 'multiple' | 'xy-chart' | 'trend'
+    displayMode?: 'single' | 'dual' | 'multiple' | 'xy-chart' | 'trend'
     filters?: Record<string, any>
   }
   data?: any[]

@@ -434,7 +434,19 @@ export function Dashboard() {
   const [selectedChart, setSelectedChart] = useState<any>(null)
 
   // Define chart items with their data
-  const [chartItems, setChartItems] = useState([
+  // Explicit element type: without it the state type is inferred from the
+  // literal seed data, so charts added/edited later (which may carry a
+  // multi-select dataSource) do not fit the inferred shape.
+  interface ChartItem {
+    id: string
+    type: ChartFormData['type'] | string
+    title: string
+    color: string
+    dataSource: string | string[]
+    data: any
+  }
+
+  const [chartItems, setChartItems] = useState<ChartItem[]>([
     {
       id: 'production-summary',
       type: 'line',
@@ -953,14 +965,15 @@ export function Dashboard() {
                     </div>
 
                     <ChartComponent
+                      // ChartComponent only renders line | bar | doughnut; any
+                      // other configured type previously rendered a blank chart.
+                      // Map to the nearest supported type instead.
                       type={
-                        chart.type as
-                          | "line"
-                          | "bar"
-                          | "doughnut"
-                          | "pie"
-                          | "polarArea"
-                          | "radar"
+                        chart.type === "line" || chart.type === "bar" || chart.type === "doughnut"
+                          ? chart.type
+                          : chart.type === "pie" || chart.type === "polarArea"
+                            ? "doughnut"
+                            : "bar"
                       }
                       data={chart.data}
                       title={chart.title}

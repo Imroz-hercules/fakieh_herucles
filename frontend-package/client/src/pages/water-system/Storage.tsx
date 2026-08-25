@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useSilos } from "../../contexts/SiloContext";
+import { useSilos, useSilosPolling } from "../../contexts/SiloContext";
 
 // // ✅ Mock data
 // const mockSilos = [
@@ -89,8 +89,10 @@ export function Storage() {
     loading, 
     error, 
     lastUpdated, 
-    fetchSilos 
+    fetchSilos
   } = useSilos();
+  // Storage is a live silo view — opt in to polling here (not app-wide).
+  useSilosPolling(15000);
 
   const [filters, setFilters] = useState({
     binName: "",
@@ -218,8 +220,8 @@ export function Storage() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Button 
-              onClick={fetchSilos} 
-              variant="outline" 
+              onClick={() => { void fetchSilos() }}
+              variant="outline"
               className="text-sm border-slate-600 text-white light:border-gray-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-100"
               disabled={loading}
             >

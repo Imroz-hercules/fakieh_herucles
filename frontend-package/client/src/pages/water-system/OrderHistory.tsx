@@ -40,6 +40,13 @@ interface OrderData {
   rawCode?: string
   rfidSet?: string
   activDestSet?: string
+  // Resolved material names returned by the backend `to_dict()` for every
+  // order model (see Backend/models/orders.py) — optional because bulk/pit
+  // rows do not populate all of them.
+  sourceMaterialName?: string
+  rawMaterialName?: string
+  destinationSilo1MaterialName?: string
+  destinationSilo2MaterialName?: string
 }
 
 interface OrdersResponse {
@@ -132,7 +139,7 @@ export function OrderHistory() {
     }
   }
 
-  const formatDateTime = (dateString: string) => {
+  const formatDateTime = (dateString?: string | null) => {
     if (!dateString) return 'N/A'
     return format(new Date(dateString), 'MMM dd, yyyy h:mm:ss a')
   }

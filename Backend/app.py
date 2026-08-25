@@ -3,6 +3,7 @@ import os
 # Add the Backend directory to sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, jsonify, request
+from sqlalchemy import text
 from flask_cors import CORS
 from datetime import datetime, timezone
 from models import db
@@ -70,8 +71,8 @@ def health_check():
 @app.route('/api/test', methods=['GET'])
 def test_db():
     try:
-        # Test database connection
-        db.session.execute('SELECT 1')
+        # Test database connection (SQLAlchemy 2.0 requires text() for raw SQL)
+        db.session.execute(text('SELECT 1'))
         return jsonify({'status': 'Database connection successful'})
     except Exception as e:
         return jsonify({'error': f'Database connection failed: {str(e)}'}), 500
@@ -148,7 +149,20 @@ except Exception as _ai_err:
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Creates tables if they don't exist
+        # Only create tables on the default (PostgreSQL) bind. KPIMaterial is
+        # mapped to the read-only SQL Server reporting DB (__bind_key__ =
+        # "sqlserver"); including it here meant an unreachable reporting server
+        # aborted startup even for Postgres-only features.
+        try:
+            db.create_all(bind_key=None)
+        except Exception as _db_err:
+            import sys
+            print(
+                "FATAL: cannot initialize the application database "
+                f"({app.config.get('SQLALCHEMY_DATABASE_URI')}): {_db_err}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
         # Add distribution window columns on pre-existing installs
         try:

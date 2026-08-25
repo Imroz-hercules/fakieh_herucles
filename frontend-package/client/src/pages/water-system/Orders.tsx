@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination'
-import { useSilos } from '../../contexts/SiloContext'
+import { useSilos, useSilosPolling } from '../../contexts/SiloContext'
+import { usePolling } from '../../hooks/usePolling'
 import axios from 'axios'
 import { API_BASE_URL, PLC_BASE_URL } from '../../config/api'
 import { useToast } from '@/hooks/use-toast'
@@ -215,6 +216,8 @@ const getStatusIcon = (status: string) => {
 
 export function Orders() {
   const { getSilosForOrder, getAvailableSilos } = useSilos();
+  // Live silo locks/levels are needed here (destination pickers) — opt in.
+  useSilosPolling(15000);
   const { toast } = useToast();
   
   const materialCodes = MATERIAL_CODES;
@@ -489,9 +492,9 @@ export function Orders() {
     }
   }, [])
 
-  const fetchQueue = useCallback(async () => {
+  const fetchQueue = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await axios.get(`${plcBase}/orders/queue`)
+      const response = await axios.get(`${plcBase}/orders/queue`, { signal })
       const body = response.data
       setQueueItems(Array.isArray(body) ? body : body?.items ?? [])
     } catch (error) {
@@ -561,19 +564,20 @@ export function Orders() {
     }
   }, [])
 
-  const checkBroadcastStatus = useCallback(async () => {
+  const checkBroadcastStatus = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await axios.get(`${baseUrl}/websocket/status`)
+      const response = await axios.get(`${baseUrl}/websocket/status`, { signal })
       setBroadcastStatus(response.data.broadcast_running === true ? 'running' : 'stopped')
     } catch (error) {
+      if ((error as any)?.name === 'CanceledError') return
       setBroadcastStatus('stopped')
     }
   }, [])
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
     try {
       // Fetch data directly from PLC
-      const plcResponse = await axios.get(`${plcBase}/plant/orders`);
+      const plcResponse = await axios.get(`${plcBase}/plant/orders`, { signal });
       const plcData = plcResponse.data;
 
       // Mineral orders are now included in the PLC data
@@ -694,26 +698,24 @@ export function Orders() {
     }
   }, []) // Remove currentPage and itemsPerPage dependencies since we're getting live data
 
+  // One-shot reference data: loaded once on mount, never polled.
   useEffect(() => {
-    // Initial fetch
-    fetchOrders()
-    fetchQueue()
     fetchBinMaterials()
     fetchRfidConfigs()
     fetchTrucks()
     fetchClients()
-    checkBroadcastStatus()
-
-    // Set up real-time updates every 5 seconds for live PLC status + queue
-    const interval = setInterval(() => {
-      fetchOrders()
-      fetchQueue()
-      checkBroadcastStatus()
-    }, 5000)
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(interval)
   }, [])
+
+  // Live PLC status + queue. usePolling runs this immediately, then every 5s,
+  // but skips a tick while the previous one is still in flight — this is what
+  // stops the request pile-up that used to starve asset requests.
+  usePolling(async (signal) => {
+    await Promise.all([
+      fetchOrders(signal),
+      fetchQueue(signal),
+      checkBroadcastStatus(signal),
+    ])
+  }, 5000)
 
   // Handler for viewing an order
   const handleView = (order: any) => {
@@ -1525,7 +1527,7 @@ export function Orders() {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={fetchOrders}
+              onClick={() => { void fetchOrders() }}
               disabled={isLoading}
               className={ORDER_BTN_OUTLINE}
             >

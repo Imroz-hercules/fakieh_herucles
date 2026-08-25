@@ -22,6 +22,10 @@ _socketio = None
 _ws_silo_lock = threading.Lock()
 _ws_last_silo_persist = 0.0
 WS_CONNECT_SILO_PERSIST_MIN_SEC = float(os.getenv("WS_CONNECT_SILO_PERSIST_MIN_SEC", "20"))
+# How often the always-on broadcast loop re-reads + persists silo state. The loop
+# itself must stay fast (PLC_POLL_INTERVAL, ~0.5s) to catch the status-8 window,
+# but silos do not need that cadence — see broadcast_worker().
+BROADCAST_SILO_SYNC_MIN_SEC = float(os.getenv("BROADCAST_SILO_SYNC_MIN_SEC", "15"))
 
 
 def init_socketio(app):
@@ -123,22 +127,32 @@ def broadcast_worker(app_instance):
     
     print(f"[websocket] Started broadcasting PLC data every {poll_interval}s (FAST POLLING for status 8 capture)")
     
+    last_silo_sync = 0.0
+
     while _broadcast_running:
         try:
             # Get PLC data within application context (always, not just when clients are connected)
             with app_instance.app_context():
                 data = fetch_plant_orders_snapshot()
-                
+
                 # Don't persist orders data to database - only store when status is 8 via handle_order_status
                 # persist_orders(data)
-                
-                # Also collect and persist silo data
-                try:
-                    silo_rows = collect_all_silos()
-                    persist_silos(silo_rows)
-                except Exception as e:
-                    print(f"[websocket] Failed to persist silo data: {e}")
-            
+
+                # Silo material/HL/LOCK state changes on a human timescale, but this
+                # loop runs every ~0.5s to catch the short status-8 window. Re-reading
+                # DB1/DB2/DB3 (+DB5 quantities) from the PLC and re-writing every silo
+                # row on every tick was ~120 PLC round-trips and DB upsert batches per
+                # minute of pure waste, competing with the request path for the DB pool
+                # and the PLC's single connection. Throttle it to its own interval.
+                now = time.time()
+                if now - last_silo_sync >= BROADCAST_SILO_SYNC_MIN_SEC:
+                    last_silo_sync = now
+                    try:
+                        silo_rows = collect_all_silos()
+                        persist_silos(silo_rows)
+                    except Exception as e:
+                        print(f"[websocket] Failed to persist silo data: {e}")
+
             # Broadcast to all connected clients (only if there are clients)
             if _socketio and _connected_clients:
                 _socketio.emit('plc_data', {

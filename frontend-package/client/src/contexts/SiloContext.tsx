@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import axios from 'axios';
 import { PLC_BASE_URL } from '../config/api';
+import { usePolling } from '../hooks/usePolling';
 
 interface Silo {
   bin_name: string;
@@ -22,7 +23,7 @@ interface SiloContextType {
   loading: boolean;
   error: string | null;
   lastUpdated: string;
-  fetchSilos: () => Promise<void>;
+  fetchSilos: (signal?: AbortSignal) => Promise<void>;
   getSilosForOrder: (dbType: 'intake' | 'outloading' | 'storage') => Silo[];
   getAvailableSilos: () => Silo[];
 }
@@ -50,13 +51,19 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  const fetchSilos = async () => {
+  // Guards against overlapping /silos calls (the endpoint can take seconds when
+  // the PLC is slow; without this, callers stack requests and starve other XHR).
+  const inFlightRef = useRef(false);
+
+  const fetchSilos = async (signal?: AbortSignal) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       setLoading(true);
       setError(null);
-      
+
       // Fetch all silos from the unified endpoint
-      const response = await axios.get(`${PLC_BASE_URL}/silos`);
+      const response = await axios.get(`${PLC_BASE_URL}/silos`, { signal });
       const allSilosData = response.data;
       
       // Filter silos by database and add source information
@@ -116,9 +123,11 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
       setLastUpdated(new Date().toLocaleTimeString());
 
     } catch (err) {
-      
+      const name = (err as { name?: string })?.name;
+      if (name === 'CanceledError' || name === 'AbortError') return;
       setError("Failed to load silo data. Please check your connection.");
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -142,11 +151,13 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
     return allSilos.filter(silo => silo.material_code || silo.material_name);
   };
 
-  // Auto-fetch silos every 10 seconds
+  // NOTE: the provider deliberately does NOT poll. It used to refetch /silos
+  // every 10s for the whole app, so pages that never show silos (Truck Entry,
+  // Dashboard, Reports…) still paid for a slow PLC call on every tick.
+  // Pages that need live silo data opt in with `useSilosPolling()` below.
+  // A single fetch on mount keeps first render populated for consumers.
   useEffect(() => {
-    fetchSilos();
-    const interval = setInterval(fetchSilos, 10000);
-    return () => clearInterval(interval);
+    void fetchSilos();
   }, []);
 
   const value: SiloContextType = {
@@ -168,3 +179,15 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
     </SiloContext.Provider>
   );
 };
+
+/**
+ * Opt-in live silo polling. Call this ONLY from pages that display live silo
+ * state (Orders, Storage). Non-overlapping via usePolling + the provider's
+ * in-flight guard, so a slow /silos response can never stack up.
+ */
+export function useSilosPolling(intervalMs = 15000, enabled = true) {
+  const { fetchSilos } = useSilos();
+  usePolling(async (signal) => {
+    await fetchSilos(signal);
+  }, intervalMs, enabled);
+}
