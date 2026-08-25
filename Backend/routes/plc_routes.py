@@ -3,7 +3,7 @@
 import os, re, json, struct, time, threading, copy
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from models import db
 from models.rfid import RFIDConfig
 from models.weights import RFIDLog
@@ -218,18 +218,7 @@ def load_map_from_pg(db_no: int) -> Dict[str, Any]:
         rows = _pg_rows(sql)
     except Exception as e:
         print(f"[DB] load_map_from_pg error: {e}")
-        # Fallback to direct database connection
-        try:
-            import psycopg2
-            conn = psycopg2.connect('postgresql://postgres:Hercules@localhost:5432/Faikeh')
-            cur = conn.cursor()
-            cur.execute(sql)
-            rows = cur.fetchall()
-            conn.close()
-            print(f"[DB] load_map_from_pg fallback successful for DB{db_no}, got {len(rows)} rows")
-        except Exception as e2:
-            print(f"[DB] load_map_from_pg fallback error: {e2}")
-            return {"line_tags": [], "silo_meta": {}, "hl_map": {}, "max_byte": 0}
+        return {"line_tags": [], "silo_meta": {}, "hl_map": {}, "max_byte": 0}
 
     line_tags: List[Tuple[str, str, int, Optional[int]]] = []
     silo_meta: Dict[int, Dict[str, Tuple[int, int]]] = {}
@@ -2574,7 +2563,10 @@ def api_bin_materials():
     ])
 
 # ─────────────── Back-compat shortcuts (PLC direct) ───────────────
-@plc_bp.route("/health")
+# NOTE: "/health" is already registered above by plc_health() (live PLC health check).
+# This one serves the DB snapshot instead, so it is registered under "/db-health" to
+# avoid colliding with (and being shadowed by) the live PLC health endpoint.
+@plc_bp.route("/db-health")
 def health(): return db_health(DEFAULT_DB)
 
 @plc_bp.route("/lines")
@@ -2687,7 +2679,7 @@ def test_mineral_api():
 def debug_routes():
     """Debug endpoint to list all registered routes"""
     routes = []
-    for rule in plc_bp.url_map.iter_rules():
+    for rule in current_app.url_map.iter_rules():
         routes.append({
             "rule": str(rule.rule),
             "methods": list(rule.methods),

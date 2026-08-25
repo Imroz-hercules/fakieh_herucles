@@ -1,5 +1,6 @@
 import os
 from flask import Blueprint, request, jsonify
+from sqlalchemy.exc import IntegrityError
 from models import db
 from models.rfid import RFIDTag, RFIDConfig
 from models.truck import Truck
@@ -178,15 +179,29 @@ def get_available_rfids():
 @rfid_bp.route('/config', methods=['POST'])
 def add_config():
     try:
-        data = request.json
+        data = request.json or {}
+        rfid_number = data.get('rfidNumber')
+        if not rfid_number:
+            return jsonify({'error': 'rfidNumber is required'}), 400
+
+        # rfid_number is UNIQUE: a duplicate raises IntegrityError, which used to be
+        # swallowed by the generic handler below and returned as a 500 telling the
+        # operator to "try again" — advice that could never work. Report the real cause.
+        if RFIDConfig.query.filter_by(rfid_number=rfid_number).first():
+            return jsonify({'error': f'RFID {rfid_number} is already registered'}), 409
+
         cfg = RFIDConfig(
-            rfid_number=data['rfidNumber'],
+            rfid_number=rfid_number,
             rfid_used=data.get('rfidUsed', False),
             rfid_linked_to_order=data.get('rfidLinkedToOrder', None)
         )
         db.session.add(cfg)
         db.session.commit()
         return jsonify(cfg.to_dict()), 201
+    except IntegrityError:
+        # Lost the race between the check above and the commit.
+        db.session.rollback()
+        return jsonify({'error': f"RFID {data.get('rfidNumber')} is already registered"}), 409
     except Exception as e:
         db.session.rollback()
         print(f"Error adding RFID config: {e}")

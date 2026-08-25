@@ -15,6 +15,7 @@ breaks the app — that provider is simply skipped.
 
 from __future__ import annotations
 
+import concurrent.futures
 import os
 from typing import Any
 
@@ -55,6 +56,14 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
+# Hard wall-clock cap (seconds) on a single provider call. Without this, a
+# slow/hanging upstream (e.g. a "thinking" model variant, or a dead network
+# path) blocks the Flask worker indefinitely — see bug B4. Enforced two
+# ways: as a native per-request timeout passed to each SDK/HTTP call, and as
+# a backstop via ThreadPoolExecutor in generate() below, so even a call that
+# ignores its own timeout still returns control to the caller.
+AI_REQUEST_TIMEOUT_SEC = float(os.getenv("AI_REQUEST_TIMEOUT_SEC", "20"))
+
 # Comma-separated order, e.g. "gemini,deepseek,claude".
 PROVIDER_ORDER = [
     p.strip().lower()
@@ -93,7 +102,13 @@ def _call_gemini(system: str, prompt: str, temperature: float) -> tuple[str, dic
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=_gemini_key())
+    # HttpOptions.timeout is in MILLISECONDS (verified against the installed
+    # google-genai SDK — google/genai/types.py: "Timeout for the request in
+    # milliseconds."), hence the *1000 below.
+    client = genai.Client(
+        api_key=_gemini_key(),
+        http_options=types.HttpOptions(timeout=int(AI_REQUEST_TIMEOUT_SEC * 1000)),
+    )
 
     def _config(disable_thinking: bool):
         cfg = types.GenerateContentConfig(
@@ -128,7 +143,7 @@ def _call_gemini(system: str, prompt: str, temperature: float) -> tuple[str, dic
 def _call_claude(system: str, prompt: str, temperature: float) -> tuple[str, dict[str, Any]]:
     import anthropic
 
-    client = anthropic.Anthropic(api_key=_anthropic_key())
+    client = anthropic.Anthropic(api_key=_anthropic_key(), timeout=AI_REQUEST_TIMEOUT_SEC)
     resp = client.messages.create(
         model=ANTHROPIC_MODEL,
         max_tokens=1400,
@@ -169,7 +184,7 @@ def _call_deepseek(system: str, prompt: str, temperature: float) -> tuple[str, d
             "max_tokens": 1200,
             "stream": False,
         },
-        timeout=30,
+        timeout=AI_REQUEST_TIMEOUT_SEC,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -184,6 +199,14 @@ def _call_deepseek(system: str, prompt: str, temperature: float) -> tuple[str, d
         total_tokens=u.get("total_tokens"),
     )
     return text, usage
+
+
+# Shared pool used only to enforce AI_REQUEST_TIMEOUT_SEC as a hard backstop
+# (see generate() below). A stuck call cannot be killed outright in Python,
+# but future.result(timeout=...) still hands control back to the caller on
+# schedule, so a hung provider leaks one idle worker thread instead of
+# blocking the Flask request forever.
+_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="ai-provider")
 
 
 _HANDLERS = {
@@ -226,7 +249,8 @@ def generate(system: str, prompt: str, temperature: float = 0.25) -> dict:
         if not key_fn():
             continue
         try:
-            text, usage = call_fn(system, prompt, temperature)
+            future = _EXECUTOR.submit(call_fn, system, prompt, temperature)
+            text, usage = future.result(timeout=AI_REQUEST_TIMEOUT_SEC)
             return {
                 "text": text,
                 "provider": name,
@@ -235,6 +259,8 @@ def generate(system: str, prompt: str, temperature: float = 0.25) -> dict:
                 "errors": errors,
                 "usage": usage,
             }
+        except concurrent.futures.TimeoutError:
+            errors.append(f"{name}: timed out after {AI_REQUEST_TIMEOUT_SEC:.0f}s")
         except Exception as exc:  # try the next provider
             errors.append(f"{name}: {exc}")
 

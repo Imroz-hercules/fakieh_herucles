@@ -58,6 +58,108 @@ Once fixed, `start.sh` (the intended launcher) runs `python3 Backend/app.py` on 
 | B15 | Low | Ingestion | `Backend/routes/data_ingestion.py` (`ingest-now`) | blocks on PLC timeout when PLC absent |
 | B16 | Low | Dead code | `Backend/routes/local_batch_routes.py` | blueprint never registered in `app.py` |
 
+---
+
+## Resolution status (updated 2026-08-25)
+
+All findings have now been actioned. Two of them turned out **not to be defects** after
+closer investigation — they are recorded here rather than silently dropped.
+
+| # | Status | Where |
+|---|--------|-------|
+| B1 | Fixed | PR #1 (merged) — `db.create_all(bind_key=None)` guarded, fatal message + `sys.exit(1)` |
+| B2 | Fixed | this PR — PLC-tag kwargs mapped to real model columns |
+| B3 | Fixed | this PR — models retrained on the installed scikit-learn; version pinned; `is_ready()` now loads |
+| B4 | Fixed | this PR — hard request timeout + fast model alias; existing cached fallback now reachable |
+| B5 | **Not a defect** | see below |
+| B6 | Fixed | PR #1 (merged) — `db.session.execute(text('SELECT 1'))` |
+| B7 | Fixed | this PR — hardcoded DSN fallback removed |
+| B8 | Fixed | PR #1 (merged) — `npx tsc --noEmit` clean (39 → 0) |
+| B9 | Fixed | this PR — `super().__init__(message)` + defensive serialisers |
+| B10 | Fixed | PR #1 (merged) — boot no longer requires the SQL Server bind |
+| B11 | Fixed | this PR — `RotatingFileHandler`, level raised to WARNING, 7.15 GB log truncated |
+| B12 | Fixed | this PR — `PLC_BASE_URL` derives from `PORT`, overridable, request timeout added |
+| B13 | Fixed | this PR — `current_app.url_map.iter_rules()` |
+| B14 | Fixed | this PR — second `/health` re-registered as `/db-health` |
+| B15 | Fixed | this PR — DEMO_MODE fast-fail instead of blocking on the snap7 connect |
+| B16 | **Not a defect** | see below |
+| B17 | Fixed | this PR — new finding, see below |
+
+### B5 is not a defect — it was an artifact of the test database
+
+The report stated that `SELECT [sp_prot]` fails because the column "is not in the
+model/table". That conclusion was wrong, and acting on it would have **removed a real
+column from production queries**.
+
+`sp_prot` genuinely exists in the production `BatchMaterials` table: it is present in the
+`fakieh_sql.csv` export (column 17 of 17, with real values such as `203`, `202`) and it is
+queried by the `_ro_*.py` investigation scripts that were run against the live server.
+
+The 500 was environmental. The local `dbo.BatchMaterials_Shadow` table used for testing was
+created by the app's ORM from `models/kpi_material.py`, and that model simply does not declare
+every column of the real table — `sp_prot` among them. So the shadow table lacked a column the
+raw SQL correctly asks for.
+
+**Action taken:** no code change. The test table was corrected to match the real schema
+(`ALTER TABLE dbo.BatchMaterials_Shadow ADD [sp_prot] varchar(50) NULL`, then populated from
+the CSV), after which `GET /api/sqlserver/batch-materials` returns **200** with `sp_prot`
+present in the payload.
+
+*Related environment note:* the by-GUID variant (`sqlserver_routes.py:411`) uses `TRY_CONVERT`,
+which the local test database rejects because it was created at a compatibility level below 110.
+That is also a property of the scratch database, not of the code — `TRY_CONVERT` has existed
+since SQL Server 2012.
+
+### B16 is not a defect — the blueprint is unregistered on purpose
+
+`local_batch_routes.py` defines `/api/kpi`, `/api/kpi_calendar`, etc. Those exact paths are
+already served by `kpi_material_bp` and `kpi_calendar_bp`, which `app.py` registers with
+`url_prefix='/api'`. Registering it would collide with them.
+
+The module is intentionally registered **only** in `run_ai_demo.py`, and its own docstring
+already says so and names what supersedes it. **Action taken:** none.
+
+### B17 (new) — duplicate RFID registration returned 500
+
+Found while stress-testing the order queue, not part of the original sweep.
+
+`POST /api/rfid/config` with an already-registered tag returned **500** with
+`"Failed to add RFID configuration. Please try again."` — advice that can never succeed,
+because `rfid_config.rfid_number` is `unique=True` and the duplicate raises `IntegrityError`,
+which the bare `except Exception` turned into a 500.
+
+Fixed in `Backend/routes/rfid_routes.py`: a pre-check returns **409** with
+`"RFID <n> is already registered"`, a missing field returns **400**, and `IntegrityError` is
+caught separately to cover the race between the check and the commit.
+
+### Verification performed after the fixes
+
+Against the running app (IPv4 `127.0.0.1` — note that using `localhost` on Windows adds a
+~2 s IPv6-fallback penalty per request and will make every endpoint look slow):
+
+- **All 201 registered routes enumerated**; all 80 parameterless `GET /api` routes swept.
+  56 → `200`, 7 → `400` (all of them correct "date range is required" validations, each
+  confirmed `200` when called with parameters), remainder `200`. No `500`s.
+  `/api/rfid/stream` is excluded from sweeps: it is a Server-Sent Events endpoint and streams
+  by design.
+- **Previously-failing endpoints now pass:** `POST /api/orders/{bulk,pt}` → `201`,
+  `POST /api/orders/seed` → `200`, `/api/ai/ml/predict` + `/ml/severity/predict` +
+  `/ml/top-risks` → `200`, `/api/sqlserver/batch-materials` → `200`.
+- **Negative paths still reject correctly** (400, not 500), and `APIError` messages are no
+  longer blank: `"Missing required fields: BulkLine_DEST_1, ..."`.
+- **Order lifecycle:** enqueue → `201`; duplicate RFID → `409`; cancel → `200` and the row
+  leaves the queue; re-enqueue of the same tag → `201`, proving the RFID lock is released.
+- **Concurrency:** 300 requests over 12 threads across 10 endpoints — **300/300 `200`,
+  0 errors**, p50 79 ms, p95 167 ms, ~129 req/s.
+- **Frontend:** `npx tsc --noEmit` → **0 errors**; `npm run build` succeeds; initial JS chunk
+  **307.56 kB** (vs ~1,306 kB before the split), route-level code splitting intact, no
+  chunk-size or dynamic/static-import warnings.
+
+*Known remaining slow path (not a regression, not fixed):* `GET /api/plc/health` takes ~5 s
+when no PLC is attached, because it attempts a real connection and waits for the timeout. It is
+correct and fast against real hardware, and the frontend declares the constant but never calls
+it, so no user-facing screen is affected.
+
 > **Confirmed NOT bugs (environment / correct behavior)** — do not "fix" these:
 > `GET /api/plc/db/3/silos`, `/api/plc/db/5/silos-qty`, `/api/plc/lines`, `/api/plc/silos-plc`, `/api/plc/db/1/lines` → **503**, and `POST /api/plc/orders/create` → 500 ("Tag … not in mapping for DB4"): no physical PLC (`192.168.0.100`) and no `db{n}_map` tables in the test env. `GET /api/orders/{intake,bulk,pt,outloading}/<id>` → 404 and `/api/process/*`, `/api/wb-form/create` → 404: those orders only persist via the PLC status-8 lifecycle, which never fires without a PLC. `GET /api/reports/export/bogus` → 400 is correct validation.
 
