@@ -1,4 +1,5 @@
 # routes/plant_flow.py
+import os
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from sqlalchemy import desc, asc, func
@@ -12,8 +13,14 @@ plant_bp = Blueprint("plant", __name__, url_prefix="/api")
 # Set your business timezone here
 # Plant is in Saudi Arabia — sourced from utils.timezone (was "Asia/Kolkata").
 TIMEZONE_NAME = BUSINESS_TZ_NAME
-# PLC base URL - update this to your actual PLC endpoint
-PLC_BASE_URL = "http://localhost:5000"
+# PLC base URL - these are self-calls: the backend calls its own /api/plc/... routes
+# over HTTP instead of invoking them in-process. Default to the port this same
+# process is actually listening on (app.py reads PORT, defaulting to 5000) instead
+# of a hardcoded port, so this still works when the app runs on a different port
+# (e.g. the 5001 demo). Override with PLC_BASE_URL if the PLC gateway ever moves
+# to a genuinely separate host/process. TODO: replace these HTTP self-calls with
+# direct in-process function calls to remove this indirection entirely.
+PLC_BASE_URL = os.getenv("PLC_BASE_URL", f"http://127.0.0.1:{os.getenv('PORT', '5000')}")
 
 def _parse_date_yyyy_mm_dd(s: str):
     try:
@@ -284,7 +291,7 @@ def dispatch():
             }
             url = f"{PLC_BASE_URL}/api/plc/db/4/pit/write"
 
-        r = requests.post(url, json=body, timeout=8)
+        r = requests.post(url, json=body, timeout=10)
         # Bubble up the PLC response (422 if HL/LOCK, 409 if not Idle, etc.)
         return jsonify(r.json()), r.status_code
 

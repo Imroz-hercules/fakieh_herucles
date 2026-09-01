@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-07-15T07:46:12.550658+00:00",
+  "trained_at": "2026-08-25T11:14:18.459659+00:00",
   "model_type": "RandomForestClassifier (multi-class)",
   "target": "dosing severity band: on_target / watch / severe",
   "classes": [
@@ -22,48 +22,48 @@
   },
   "model_selection_note": "Two choices were tested via 5-fold CV rather than assumed: (1) plain multi-class RandomForestClassifier beat an ordinal regression-on-rank approach (macro-F1 0.549 vs 0.512); (2) merging the original minor+moderate classes into one 'watch' class beat the 4-class split (macro-F1 0.640 vs 0.549, accuracy 0.733 vs 0.688) because minor/moderate were not reliably separable and get the same operational response anyway.",
   "metrics": {
-    "accuracy": 0.752,
-    "macro_precision": 0.649,
-    "macro_recall": 0.701,
-    "macro_f1": 0.668,
-    "weighted_precision": 0.768,
-    "weighted_recall": 0.752,
-    "weighted_f1": 0.757,
+    "accuracy": 0.716,
+    "macro_precision": 0.62,
+    "macro_recall": 0.693,
+    "macro_f1": 0.645,
+    "weighted_precision": 0.752,
+    "weighted_recall": 0.716,
+    "weighted_f1": 0.727,
     "per_class": {
       "on_target": {
-        "precision": 0.885,
-        "recall": 0.826,
-        "f1_score": 0.854,
+        "precision": 0.889,
+        "recall": 0.766,
+        "f1_score": 0.823,
         "support": 167
       },
       "watch": {
-        "precision": 0.537,
+        "precision": 0.46,
         "recall": 0.527,
-        "f1_score": 0.532,
+        "f1_score": 0.492,
         "support": 55
       },
       "severe": {
-        "precision": 0.525,
-        "recall": 0.75,
-        "f1_score": 0.618,
+        "precision": 0.512,
+        "recall": 0.786,
+        "f1_score": 0.62,
         "support": 28
       }
     },
     "confusion_matrix": [
       [
-        138,
-        22,
-        7
+        128,
+        31,
+        8
       ],
       [
-        14,
+        13,
         29,
-        12
+        13
       ],
       [
-        4,
         3,
-        21
+        3,
+        22
       ]
     ],
     "confusion_matrix_labels": [
@@ -73,47 +73,47 @@
     ],
     "cross_validation": {
       "accuracy": {
-        "mean": 0.733,
+        "mean": 0.713,
         "std": 0.027,
         "folds": [
-          0.705,
-          0.715,
-          0.78,
-          0.745,
-          0.72
+          0.685,
+          0.7,
+          0.75,
+          0.74,
+          0.69
         ]
       },
       "f1_macro": {
-        "mean": 0.64,
-        "std": 0.042,
+        "mean": 0.633,
+        "std": 0.041,
         "folds": [
-          0.627,
-          0.596,
-          0.704,
-          0.67,
-          0.6
+          0.612,
+          0.603,
+          0.685,
+          0.679,
+          0.588
         ]
       },
       "precision_macro": {
-        "mean": 0.628,
-        "std": 0.035,
+        "mean": 0.617,
+        "std": 0.033,
         "folds": [
-          0.612,
-          0.6,
-          0.688,
-          0.648,
-          0.594
+          0.598,
+          0.604,
+          0.658,
+          0.653,
+          0.574
         ]
       },
       "recall_macro": {
-        "mean": 0.667,
-        "std": 0.057,
+        "mean": 0.679,
+        "std": 0.059,
         "folds": [
-          0.668,
-          0.602,
-          0.748,
-          0.709,
-          0.608
+          0.663,
+          0.622,
+          0.756,
+          0.741,
+          0.613
         ]
       }
     }
@@ -121,31 +121,31 @@
   "feature_importances": [
     {
       "feature": "setpoint",
-      "importance": 0.2707
+      "importance": 0.2783
     },
     {
       "feature": "log_setpoint",
-      "importance": 0.2613
+      "importance": 0.2663
     },
     {
       "feature": "material_code",
-      "importance": 0.2007
+      "importance": 0.1991
     },
     {
       "feature": "product_name",
-      "importance": 0.1281
+      "importance": 0.1258
     },
     {
       "feature": "quantity",
-      "importance": 0.0687
+      "importance": 0.063
     },
     {
       "feature": "is_micro",
-      "importance": 0.04
+      "importance": 0.0384
     },
     {
       "feature": "category",
-      "importance": 0.0306
+      "importance": 0.0293
     }
   ],
   "options": {

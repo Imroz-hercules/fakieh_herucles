@@ -9,6 +9,7 @@ Loads model.joblib once and answers:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from functools import lru_cache
 
@@ -30,9 +31,27 @@ FEATURE_LABELS = {
     "category": "Ingredient category",
 }
 
+logger = logging.getLogger(__name__)
+
 
 def is_ready() -> bool:
-    return os.path.exists(MODEL_PATH) and os.path.exists(META_PATH)
+    """True only if the model can actually be LOADED — not merely that the file exists.
+
+    A bare os.path.exists() check reported the model as ready even when joblib
+    could not unpickle it (e.g. artifacts trained on a different scikit-learn
+    version), so /api/ai/health advertised the model as healthy while every
+    predict call returned 500. Attempting the load is the only honest check.
+    _model()/_meta() are lru_cached, so this costs nothing after the first call.
+    """
+    if not (os.path.exists(MODEL_PATH) and os.path.exists(META_PATH)):
+        return False
+    try:
+        _model()
+        _meta()
+        return True
+    except Exception as exc:  # unpickling / version-mismatch / corrupt file
+        logger.warning("Dosing-quality model present but not loadable: %s", exc)
+        return False
 
 
 @lru_cache(maxsize=1)

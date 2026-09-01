@@ -8,6 +8,7 @@ Loads model_severity.joblib once and answers:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from functools import lru_cache
 
@@ -29,8 +30,24 @@ FEATURE_LABELS = {
 }
 
 
+logger = logging.getLogger(__name__)
+
+
 def is_ready() -> bool:
-    return os.path.exists(MODEL_PATH) and os.path.exists(META_PATH)
+    """True only if the model can actually be LOADED — not merely that the file exists.
+
+    See predictor.is_ready(): a bare existence check let /api/ai/health report the
+    model as ready while every predict call failed to unpickle it.
+    """
+    if not (os.path.exists(MODEL_PATH) and os.path.exists(META_PATH)):
+        return False
+    try:
+        _model()
+        _meta()
+        return True
+    except Exception as exc:  # unpickling / version-mismatch / corrupt file
+        logger.warning("Severity model present but not loadable: %s", exc)
+        return False
 
 
 @lru_cache(maxsize=1)
