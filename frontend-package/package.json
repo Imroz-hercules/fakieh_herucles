@@ -4,8 +4,10 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "predev": "node scripts/preflight.mjs",
     "dev": "vite",
     "start-frontend": "vite",
+    "prebuild": "node scripts/preflight.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "check": "tsc",
