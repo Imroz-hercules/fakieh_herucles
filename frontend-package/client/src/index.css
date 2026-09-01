@@ -354,6 +354,11 @@ body, #root {
 :root.light .light\:bg-cyan-100 { background-color: #cffafe !important; }
 :root.light .light\:bg-orange-50 { background-color: #fff7ed !important; }
 :root.light .light\:bg-orange-100 { background-color: #ffedd5 !important; }
+/* Alarm severities must not share a background. "High" (amber) and "Locked" /
+   "Not live" (red) both fell back to orange-100 in light mode, because no
+   red-100 existed in this hand-written set — leaving two different severities
+   separated only by text hue. */
+:root.light .light\:bg-red-100 { background-color: #fee2e2 !important; }
 :root.light .light\:bg-green-100 { background-color: #dcfce7 !important; }
 :root.light .light\:bg-orange-600 { background-color: #ea580c !important; }
 :root.light .light\:hover\:bg-orange-700:hover { background-color: #c2410c !important; }

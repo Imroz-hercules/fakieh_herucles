@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { NavLayoutProvider } from "@/contexts/NavLayoutContext";
 import { SiloProvider } from "@/contexts/SiloContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Water System Pages — lazy so a first visit only downloads the route it needs
 // instead of every screen's chunk (Orders alone is ~2.6k lines).
@@ -61,6 +62,8 @@ const Distribution = lazy(() =>
 );
 const Management = lazy(() => import("./pages/water-system/Management"));
 const AiAssistant = lazy(() => import("./pages/water-system/AiAssistant"));
+// three.js only reaches the browser when this route is opened.
+const Plant3D = lazy(() => import("./pages/water-system/Plant3D"));
 
 function PageFallback() {
   return (
@@ -95,6 +98,7 @@ function Router() {
       <Route path="/fakieh/fakieh-dashboard" component={FakiehDashboard} />
       <Route path="/fakieh/material" component={Material} />
       <Route path="/fakieh/storage" component={Storage} />
+      <Route path="/fakieh/plant-3d" component={Plant3D} />
       <Route path="/fakieh/production" component={Production} />
       <Route path="/fakieh/orders">
         <Redirect to="/fakieh/live_orders" />
@@ -137,6 +141,33 @@ function Router() {
   );
 }
 
+/**
+ * The routed tree, bounded.
+ *
+ * Named routes rather than one blanket name: the fallback tells the operator
+ * WHICH screen failed, and "Plant 3D" is a more useful thing to read than
+ * "the application". Anything unlisted falls back to a neutral description
+ * rather than a wrong one.
+ */
+const ROUTE_NAMES: Array<[string, string]> = [
+  ['/fakieh/plant-3d', 'Plant 3D'],
+  ['/fakieh/storage', 'Storage'],
+  ['/fakieh/live_orders', 'Orders'],
+  ['/fakieh/order-history', 'Order history'],
+  ['/fakieh/weighbridge', 'Weighbridge'],
+  ['/fakieh/production', 'Production'],
+];
+
+function RoutedErrorBoundary() {
+  const [location] = useLocation();
+  const name = ROUTE_NAMES.find(([path]) => location.startsWith(path))?.[1] ?? 'This screen';
+  return (
+    <ErrorBoundary name={name} resetKey={location}>
+      <Router />
+    </ErrorBoundary>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -146,7 +177,17 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <Suspense fallback={<PageFallback />}>
-                <Router />
+                {/*
+                 * Inside the Suspense, so a chunk that fails to download is
+                 * caught here too rather than leaving the fallback spinning
+                 * for ever — these routes are all lazy.
+                 *
+                 * Keyed on the path, so navigating away from a crashed screen
+                 * and back actually retries it. Without that the boundary
+                 * latches on first error and every later route renders the
+                 * same dead panel, which looks like the crash spreading.
+                 */}
+                <RoutedErrorBoundary />
               </Suspense>
             </TooltipProvider>
           </SiloProvider>

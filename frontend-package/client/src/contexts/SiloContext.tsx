@@ -55,6 +55,25 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
   // the PLC is slow; without this, callers stack requests and starve other XHR).
   const inFlightRef = useRef(false);
 
+/**
+ * Bin number from a bin name, for rows where the PLC did not send `siloNo`.
+ *
+ * `silo.binName.replace(...)` was called directly at three sites, and none of
+ * them survived a `binName` that was null or a number — both of which this API
+ * sends, since it is the same feed whose `materialCode` arrives as a number
+ * despite being typed `string | null`. A throw there was caught by the
+ * surrounding try/catch and turned into "Failed to load silo data", so ONE
+ * malformed row discarded the whole plant's readings rather than losing its own
+ * bin number. Contained, but at completely the wrong granularity.
+ *
+ * Returns 0 for anything unparseable, which is what the `|| 0` at each call
+ * site already meant.
+ */
+function siloNoFromName(binName: unknown): number {
+  const n = Number.parseInt(String(binName ?? '').replace('Silo ', ''), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
   const fetchSilos = async (signal?: AbortSignal) => {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
@@ -79,7 +98,7 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
           updated_at: silo.updatedAt,
           dbSource: 'DB1', 
           dbType: 'Intake',
-          silo_no: silo.siloNo || parseInt(silo.binName.replace('Silo ', '')) || 0
+          silo_no: silo.siloNo || siloNoFromName(silo.binName)
         }));
       
       const db2SilosWithSource = allSilosData
@@ -94,7 +113,7 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
           updated_at: silo.updatedAt,
           dbSource: 'DB2', 
           dbType: 'Outloading',
-          silo_no: silo.siloNo || parseInt(silo.binName.replace('Silo ', '')) || 0
+          silo_no: silo.siloNo || siloNoFromName(silo.binName)
         }));
       
       const db3SilosWithSource = allSilosData
@@ -109,7 +128,7 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
           updated_at: silo.updatedAt,
           dbSource: 'DB3', 
           dbType: 'Mineral',
-          silo_no: silo.siloNo || parseInt(silo.binName.replace('Silo ', '')) || 0
+          silo_no: silo.siloNo || siloNoFromName(silo.binName)
         }));
 
       setDb1Silos(db1SilosWithSource);

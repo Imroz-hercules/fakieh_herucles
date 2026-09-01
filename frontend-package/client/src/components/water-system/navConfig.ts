@@ -14,6 +14,7 @@ import {
   Send,
   Users,
   Sparkles,
+  Boxes,
 } from 'lucide-react'
 
 export interface SidebarNavItem {
@@ -137,6 +138,12 @@ export const sidebarNavEntries: SidebarNavEntry[] = [
     description: 'Storage Management',
   },
   {
+    path: '/fakieh/plant-3d',
+    icon: Boxes,
+    label: 'Plant 3D',
+    description: '3D view of the plant and silos',
+  },
+  {
     id: 'orders',
     label: 'Orders',
     description: 'Live orders and order history',
@@ -210,6 +217,12 @@ export const topNavItems: TopNavItem[] = [
     path: '/fakieh/storage',
     label: 'Storage',
     icon: Database,
+  },
+  {
+    kind: 'link',
+    path: '/fakieh/plant-3d',
+    label: 'Plant 3D',
+    icon: Boxes,
   },
   {
     kind: 'group',
