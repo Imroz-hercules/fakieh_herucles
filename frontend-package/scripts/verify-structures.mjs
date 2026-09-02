@@ -30,6 +30,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SRC = join(ROOT, 'client', 'src', 'lib', 'plant3d');
@@ -113,11 +114,13 @@ async function main() {
   let structures;
   let site;
   let silos;
+  let dressing;
   try {
-    await bundle(dir, ['structures.tsx', 'site.ts', 'ground.tsx', 'silos.ts']);
+    await bundle(dir, ['structures.tsx', 'site.ts', 'ground.tsx', 'silos.ts', 'siteDressing.tsx']);
     structures = await import(pathToFileURL(join(dir, 'structures.js')).href);
     site = await import(pathToFileURL(join(dir, 'site.js')).href);
     silos = await import(pathToFileURL(join(dir, 'silos.js')).href);
+    dressing = await import(pathToFileURL(join(dir, 'siteDressing.js')).href);
   } catch (err) {
     console.error('COULD NOT RUN — the modules failed to build or import.');
     console.error(err && err.stack ? err.stack : err);
@@ -368,6 +371,170 @@ async function main() {
     }
     console.log(`      total: ${total}`);
     return total > 25 ? `${total} draw calls exceeds the 25 budget` : null;
+  });
+
+  /* ---- outside-world dressing (siteDressing.tsx) ------------------------- */
+
+  /*
+   * Every category, called through its PURE builder with the real,
+   * unfiltered site.ts data (the zone-reach filter in `<SiteDressing>` only
+   * ever REMOVES instances, so checking the full set is the strict superset
+   * of what any zone view can draw). `worldBox`/`worldCorners` already
+   * handle rotation correctly (see the header comment on this script), so a
+   * turned truck or a diagonal gallery member is checked at its true footprint,
+   * not an inflated axis-aligned guess.
+   */
+  const fenceRect = {
+    minX: SITE.wall.x - SITE.wall.length / 2,
+    maxX: SITE.wall.x + SITE.wall.length / 2,
+    minZ: SITE.wall.z - SITE.wall.width / 2,
+    maxZ: SITE.wall.z + SITE.wall.width / 2,
+  };
+  const marginRect = {
+    minX: -(SITE.ground.length / 2 + 120),
+    maxX: SITE.ground.length / 2 + 120,
+    minZ: -(SITE.ground.width / 2 + 120),
+    maxZ: SITE.ground.width / 2 + 120,
+  };
+  const buildingRects = BUILDINGS.map((b) => ({
+    id: b.id,
+    minX: b.x - b.length / 2,
+    maxX: b.x + b.length / 2,
+    minZ: b.z - b.width / 2,
+    maxZ: b.z + b.width / 2,
+  }));
+
+  function boxFullyOutsideRect(box, rect) {
+    return box.max.x < rect.minX || box.min.x > rect.maxX || box.max.z < rect.minZ || box.min.z > rect.maxZ;
+  }
+  function boxFullyInsideRect(box, rect) {
+    return box.min.x >= rect.minX && box.max.x <= rect.maxX && box.min.z >= rect.minZ && box.max.z <= rect.maxZ;
+  }
+
+  function dressingCategories() {
+    const trees = dressing.buildTreeInstances();
+    const vehicles = dressing.buildVehicleInstances();
+    return [
+      ['neighbour-wall', dressing.buildNeighbourWallInstances()],
+      ['neighbour-roof', dressing.buildNeighbourRoofInstances()],
+      ['street-slab', dressing.buildStreetSlabInstances()],
+      ['street-kerb', dressing.buildStreetKerbInstances()],
+      ['tree-canopy', trees.canopy],
+      ['tree-trunk', trees.trunk],
+      ['truck-cab', vehicles.truckCab],
+      ['truck-trailer', vehicles.truckTrailer],
+      ['car', vehicles.car],
+      ['tank', dressing.buildTankInstances()],
+      ['container', dressing.buildContainerInstances()],
+      ['stockpile', dressing.buildStockpileInstances()],
+    ];
+  }
+
+  check('every dressing item sits outside the perimeter fence rectangle', () => {
+    const bad = [];
+    for (const [name, specs] of dressingCategories()) {
+      if (!specs.length) {
+        bad.push(`${name}: builder returned no instances at all — the empty-loop trap`);
+        continue;
+      }
+      for (const spec of specs) {
+        const box = worldBox(spec);
+        if (!boxFullyOutsideRect(box, fenceRect)) {
+          bad.push(
+            `${name}: instance x[${box.min.x.toFixed(1)},${box.max.x.toFixed(1)}] z[${box.min.z.toFixed(1)},${box.max.z.toFixed(1)}] is not fully outside the fence rectangle x[${fenceRect.minX},${fenceRect.maxX}] z[${fenceRect.minZ},${fenceRect.maxZ}]`,
+          );
+        }
+      }
+    }
+    return bad.length ? bad.slice(0, 8).join('; ') : null;
+  });
+
+  check('every dressing item sits outside every BUILDINGS footprint', () => {
+    const bad = [];
+    for (const [name, specs] of dressingCategories()) {
+      for (const spec of specs) {
+        const box = worldBox(spec);
+        for (const rect of buildingRects) {
+          if (!boxFullyOutsideRect(box, rect)) {
+            bad.push(`${name}: instance overlaps building "${rect.id}"`);
+          }
+        }
+      }
+    }
+    return bad.length ? bad.slice(0, 8).join('; ') : null;
+  });
+
+  check('every dressing item sits inside the ground plane + 120m margin', () => {
+    const bad = [];
+    for (const [name, specs] of dressingCategories()) {
+      for (const spec of specs) {
+        const box = worldBox(spec);
+        if (!boxFullyInsideRect(box, marginRect)) {
+          bad.push(
+            `${name}: instance x[${box.min.x.toFixed(1)},${box.max.x.toFixed(1)}] z[${box.min.z.toFixed(1)},${box.max.z.toFixed(1)}] exceeds the ground+margin rect x[${marginRect.minX},${marginRect.maxX}] z[${marginRect.minZ},${marginRect.maxZ}]`,
+          );
+        }
+      }
+    }
+    return bad.length ? bad.slice(0, 8).join('; ') : null;
+  });
+
+  /* ---- dressing draw-call and triangle budget ----------------------------- */
+
+  check('site-dressing draw calls <= 12 and triangle estimate <= 60000', () => {
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const roofShape = new THREE.Shape();
+    roofShape.moveTo(-0.5, 0);
+    roofShape.lineTo(0.5, 0);
+    roofShape.lineTo(0, 1);
+    roofShape.closePath();
+    const roofGeo = new THREE.ExtrudeGeometry(roofShape, { depth: 1, bevelEnabled: false });
+    const planeA = new THREE.PlaneGeometry(1, 1);
+    const planeB = new THREE.PlaneGeometry(1, 1);
+    const canopyGeo = mergeGeometries([planeA, planeB], false) ?? planeA;
+    const tankGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 20);
+    const stockpileGeo = new THREE.ConeGeometry(0.5, 1, 20);
+
+    const tris = (geo) => (geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3);
+
+    const rows = [
+      ['neighbour-wall', boxGeo, dressing.buildNeighbourWallInstances().length],
+      ['neighbour-roof', roofGeo, dressing.buildNeighbourRoofInstances().length],
+      ['street-slab', boxGeo, dressing.buildStreetSlabInstances().length],
+      ['street-kerb', boxGeo, dressing.buildStreetKerbInstances().length],
+      ['tree-canopy', canopyGeo, dressing.buildTreeInstances().canopy.length],
+      ['tree-trunk', boxGeo, dressing.buildTreeInstances().trunk.length],
+      ['truck-cab', boxGeo, dressing.buildVehicleInstances().truckCab.length],
+      ['truck-trailer', boxGeo, dressing.buildVehicleInstances().truckTrailer.length],
+      ['car', boxGeo, dressing.buildVehicleInstances().car.length],
+      ['tank', tankGeo, dressing.buildTankInstances().length],
+      ['container', boxGeo, dressing.buildContainerInstances().length],
+      ['stockpile', stockpileGeo, dressing.buildStockpileInstances().length],
+    ];
+
+    console.log('      site-dressing draw-call / triangle table:');
+    let totalTris = 0;
+    for (const [name, geo, count] of rows) {
+      const t = tris(geo) * count;
+      totalTris += t;
+      console.log(`        ${name.padEnd(16)} ${String(count).padStart(4)} instances  x  ${tris(geo)} tris  =  ${t}`);
+    }
+    const drawCalls = rows.filter((r) => r[2] > 0).length;
+    console.log(`      draw calls (non-empty categories): ${drawCalls}`);
+    console.log(`      total triangles: ${totalTris}`);
+
+    boxGeo.dispose();
+    roofGeo.dispose();
+    planeA.dispose();
+    planeB.dispose();
+    canopyGeo.dispose();
+    tankGeo.dispose();
+    stockpileGeo.dispose();
+
+    const problems = [];
+    if (drawCalls > 12) problems.push(`${drawCalls} draw calls exceeds the 12 budget`);
+    if (totalTris > 60000) problems.push(`${totalTris} triangles exceeds the 60000 budget`);
+    return problems.length ? problems.join('; ') : null;
   });
 
   await rm(dir, { recursive: true, force: true });

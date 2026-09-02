@@ -1143,6 +1143,12 @@ async function checkTailwind() {
   const files = [
     'client/src/components/water-system/plant3d/PlantHud.tsx',
     'client/src/components/water-system/plant3d/SiloList.tsx',
+    'client/src/components/water-system/plant3d/Breadcrumb.tsx',
+    'client/src/components/water-system/plant3d/Hint.tsx',
+    'client/src/components/water-system/plant3d/StatusModeSwitch.tsx',
+    'client/src/components/water-system/plant3d/KpiStrip.tsx',
+    'client/src/components/water-system/plant3d/ControlBar.tsx',
+    'client/src/components/water-system/plant3d/DataChip.tsx',
     'client/src/pages/water-system/Plant3D.tsx',
     'client/src/lib/plant3d/siloMesh.tsx',
   ];
@@ -1268,6 +1274,12 @@ async function checkLightClasses() {
   const files = [
     'client/src/components/water-system/plant3d/PlantHud.tsx',
     'client/src/components/water-system/plant3d/SiloList.tsx',
+    'client/src/components/water-system/plant3d/Breadcrumb.tsx',
+    'client/src/components/water-system/plant3d/Hint.tsx',
+    'client/src/components/water-system/plant3d/StatusModeSwitch.tsx',
+    'client/src/components/water-system/plant3d/KpiStrip.tsx',
+    'client/src/components/water-system/plant3d/ControlBar.tsx',
+    'client/src/components/water-system/plant3d/DataChip.tsx',
     'client/src/pages/water-system/Plant3D.tsx',
     'client/src/lib/plant3d/siloMesh.tsx',
   ];
@@ -1543,6 +1555,12 @@ async function checkMaterialCodeCoercion() {
     join('pages', 'water-system', 'Plant3D.tsx'),
     join('components', 'water-system', 'plant3d', 'PlantHud.tsx'),
     join('components', 'water-system', 'plant3d', 'SiloList.tsx'),
+    join('components', 'water-system', 'plant3d', 'Breadcrumb.tsx'),
+    join('components', 'water-system', 'plant3d', 'Hint.tsx'),
+    join('components', 'water-system', 'plant3d', 'StatusModeSwitch.tsx'),
+    join('components', 'water-system', 'plant3d', 'KpiStrip.tsx'),
+    join('components', 'water-system', 'plant3d', 'ControlBar.tsx'),
+    join('components', 'water-system', 'plant3d', 'DataChip.tsx'),
     join('lib', 'plant3d', 'siloData.ts'),
     join('lib', 'plant3d', 'siloMesh.tsx'),
     join('lib', 'plant3d', 'materials.ts'),

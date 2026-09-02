@@ -58,7 +58,7 @@ const FILL_EDGE = '#f8fafc';
  * there is no second, family-specific accent colour. Cyan (`ACCENT`) is the
  * only accent this app has.
  */
-const STRUCTURE_COLOR = '#3b4249';
+const STRUCTURE_COLOR = '#5a636c'; /* was #3b4249; lightened 2026-09-02 after the laptop showed the 800 bank's legs and hoppers reading as a black mass at site range */
 /** Fill-status ramp (DESIGN.md "Fill-status mode"). Mutually exclusive with vMat. */
 const STATUS_LOW = '#c9a86a';
 const STATUS_MID = '#7f95a8';

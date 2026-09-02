@@ -78,6 +78,9 @@ import {
   type SiloReading,
 } from '@/lib/plant3d/siloData';
 import type { Zone, ZoneId } from '@/lib/plant3d/site';
+import { StatusModeSwitch, type ColorMode } from './StatusModeSwitch';
+
+export type { ColorMode };
 
 export type TimeOfDay = 'day' | 'dusk' | 'night';
 export type Quality = 'auto' | 'high' | 'low';
@@ -94,6 +97,33 @@ export const CARD =
 export const CARD_PRIMARY =
   'rounded-md border border-slate-700 bg-slate-950/95 shadow-md backdrop-blur-md ' +
   'light:border-gray-300 light:bg-white/95 light:shadow-md';
+
+/**
+ * The floating silo-number pill drawn over the canvas (`Plant3D.tsx`'s
+ * `SiloNumberProjector` overlay). Exported so that file — which owns the
+ * per-label positioning (`absolute -translate-x-1/2 -translate-y-1/2`,
+ * `style={{ left, top }}`) — can compose its own placement classes with a
+ * single shared visual definition instead of a hand-typed string that can
+ * drift from this one.
+ *
+ * Dark theme is unchanged from before this pass: a slate-950/85 pill with
+ * cyan-200 text. Light theme is not simply the dark pill's classes with
+ * `light:` sprinkled on — it used to carry `light:text-cyan-700`, cyan text
+ * on every one of up to 70 labels, which is the one thing PRODUCT.md's rule
+ * 4 rules out ("one accent colour, only for selection"). Light theme now
+ * gets what a label reads best as: a white pill, a hairline border, a 1px
+ * shadow, dark neutral text — a paper tag, not a selection state.
+ *
+ * The element this class is applied to is always a `<span>` (see
+ * `Plant3D.tsx`), never a `<button>`, so the `:root.light
+ * button[class*="light:bg-"]` cancellation rule that forces every OTHER
+ * `light:` class in this app onto an inner span does not apply here — this
+ * one can carry its `light:` classes directly.
+ */
+export const siloNumberPillClass =
+  'whitespace-nowrap rounded border border-transparent bg-slate-950/85 px-1 py-px font-mono text-[10px] ' +
+  'font-semibold leading-none text-cyan-200 ring-1 ring-cyan-400/30 ' +
+  'light:border-gray-200 light:bg-white light:text-gray-900 light:shadow-sm';
 
 /**
  * A control embedded in the page header strip rather than floating over the
@@ -177,6 +207,48 @@ const HEADER_DIVIDER = 'mx-0.5 h-5 w-px shrink-0 bg-white/15';
  */
 const TOTAL_BINS = SILOS.filter((s) => s.group.monitored).length;
 
+/**
+ * "301–322", "101–115 · 201–203 · 501–505" — the silo numbers standing under
+ * each zone's label in `ZoneSwitch`, so an operator who knows a bin by number
+ * can tell which tab it lives under before pressing anything.
+ *
+ * Computed over EVERY placed bin in the zone, monitored or not — unlike the
+ * count badge beside it (`counts`, computed by the caller from `monitored`
+ * bins only), the range is a statement about POSITION, not about whether the
+ * plant reports on a bin. Leaving the 500 series out of the Yard's range
+ * would be wrong in exactly the way leaving it off the drawing would be: it
+ * is there, at 501-505, whether or not this view can show a level for it.
+ *
+ * Runs are contiguous silo numbers, not one run per `SiloGroupSpec` — the
+ * dosing zone's 401-408 and 901-930 are five groups (400, 900a, 900b, 900c)
+ * that happen to number continuously within two bands, and a reader does not
+ * care how many masks the layout code used to place them.
+ */
+function contiguousRanges(nums: number[]): string {
+  const sorted = [...nums].sort((a, b) => a - b);
+  const runs: [number, number][] = [];
+  for (const n of sorted) {
+    const last = runs[runs.length - 1];
+    if (last && n === last[1] + 1) last[1] = n;
+    else runs.push([n, n]);
+  }
+  return runs.map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`)).join(' · ');
+}
+
+const ZONE_SILO_RANGES: Partial<Record<ZoneId, string>> = (() => {
+  const byZone = new Map<ZoneId, number[]>();
+  for (const s of SILOS) {
+    const list = byZone.get(s.group.zone);
+    if (list) list.push(s.siloNo);
+    else byZone.set(s.group.zone, [s.siloNo]);
+  }
+  const out: Partial<Record<ZoneId, string>> = {};
+  byZone.forEach((nums, zone) => {
+    out[zone] = contiguousRanges(nums);
+  });
+  return out;
+})();
+
 /* ------------------------------------------------------------------ */
 /* Controls                                                            */
 /* ------------------------------------------------------------------ */
@@ -253,7 +325,10 @@ function Pill({
   );
 }
 
-const DIVIDER = 'mx-1 h-5 w-px bg-slate-700 light:bg-gray-200';
+/** A hairline vertical rule between cells in a themed card row — `StatusBar`'s
+    own, now also `KpiStrip`'s and `ControlBar`'s, exported rather than
+    re-typed so the three cards agree on exactly one rule weight. */
+export const DIVIDER = 'mx-1 h-5 w-px bg-slate-700 light:bg-gray-200';
 
 /**
  * Whole site · Yard · Raw · Dosing · Buffer · Finished, as a segmented
@@ -275,6 +350,7 @@ export function ZoneSwitch({
   counts,
   onSelect,
   compact,
+  narrow,
 }: {
   zones: Zone[];
   zone: ZoneId | 'all';
@@ -293,6 +369,16 @@ export function ZoneSwitch({
    * or how long their names happen to be.
    */
   compact?: boolean;
+  /**
+   * Hides the silo-range line under each zone's label. A separate signal
+   * from `compact` (which swaps long labels for short ones at <1400px of
+   * header room): the range costs a second line rather than width, so it
+   * follows the page's own <1100px "no room for a second column" threshold
+   * (`Plant3D.tsx`'s `narrow`) instead of the header's word-length one — the
+   * two thresholds answer different questions and happen to share neither
+   * a name nor a value today.
+   */
+  narrow?: boolean;
 }) {
   return (
     <div
@@ -306,24 +392,37 @@ export function ZoneSwitch({
       >
         {compact ? 'All' : 'Whole site'}
       </HeaderPill>
-      {zones.map((z) => (
-        <HeaderPill
-          key={z.id}
-          active={zone === z.id}
-          onClick={() => onSelect(z.id)}
-          title={z.description}
-        >
-          {compact ? z.short : z.label}
-          <span
-            className={cn(
-              'rounded-full px-1 font-mono text-[10px]',
-              zone === z.id ? 'bg-slate-950/25 text-slate-900' : 'bg-white/10 text-slate-400',
-            )}
-          >
-            {counts[z.id] ?? 0}
-          </span>
-        </HeaderPill>
-      ))}
+      {zones.map((z) => {
+        const range = ZONE_SILO_RANGES[z.id];
+        const active = zone === z.id;
+        return (
+          <HeaderPill key={z.id} active={active} onClick={() => onSelect(z.id)} title={z.description}>
+            <span className="flex flex-col items-start gap-0 leading-none">
+              <span className="flex items-center gap-1.5 text-[11px]">
+                {compact ? z.short : z.label}
+                <span
+                  className={cn(
+                    'rounded-full px-1 font-mono text-[10px] leading-none',
+                    active ? 'bg-slate-950/25 text-slate-900' : 'bg-white/10 text-slate-400',
+                  )}
+                >
+                  {counts[z.id] ?? 0}
+                </span>
+              </span>
+              {!narrow && range && (
+                <span
+                  className={cn(
+                    'whitespace-nowrap text-[10px] font-normal leading-none',
+                    active ? 'text-slate-900/70' : 'text-slate-500',
+                  )}
+                >
+                  {range}
+                </span>
+              )}
+            </span>
+          </HeaderPill>
+        );
+      })}
     </div>
   );
 }
@@ -698,9 +797,19 @@ export function Chip({
       type="button"
       onClick={onClick}
       title={title}
-      className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+      /*
+       * `touch-target-44`, not a bare pixel size: DESIGN.md asks for >=32px
+       * everywhere and >=44px under a coarse pointer, and this same Chip
+       * renders the KPI strip's alarm counts (workstream F item 8, "alarm
+       * chips 28px tall with 44px coarse targets") as well as the detail
+       * panel's badges. The 28px default below already clears the 24px WCAG
+       * floor with room; the media query is what reaches 44px on the tablet
+       * without inflating this on the laptop/desktop pointer it is mostly
+       * seen on.
+       */
+      className="touch-target-44 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
     >
-      <span className={cn(CHIP_BASE, CHIP_TONES[tone], 'min-h-[24px] cursor-pointer hover:brightness-125')}>
+      <span className={cn(CHIP_BASE, CHIP_TONES[tone], 'min-h-[28px] cursor-pointer hover:brightness-125')}>
         {children}
         {/* Hover is not an affordance on a plant-floor touch panel, and it is
             invisible in a screenshot. One glyph says "this leads somewhere"
@@ -926,6 +1035,62 @@ export function StatusBar({
 }
 
 /* ------------------------------------------------------------------ */
+/* Status colour mode                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The fill-status palette, DESIGN.md's "Fill-status mode" row, restated here
+ * (rather than imported) because the shader's own copy in `siloShader.ts`
+ * is a private module constant — this and that file both cite the same
+ * source of truth rather than one importing the other across the shader/HUD
+ * boundary. Kept mutually exclusive with material colour, same as the
+ * shader's `uColorMode`: a bin is drawn by what it holds, or by how full it
+ * is, never a blend of both — PRODUCT.md rule 3.
+ */
+export const STATUS_COLORS = {
+  low: '#c9a86a',
+  normal: '#7f95a8',
+  high: '#e0a030',
+  alarm: '#ef4444',
+} as const;
+
+export type StatusCategory = keyof typeof STATUS_COLORS;
+
+/** Below this fraction of rated capacity, fill-status mode reads "low". */
+export const STATUS_LOW_THRESHOLD = 0.1;
+/** Above this fraction, fill-status mode reads "high". */
+export const STATUS_HIGH_THRESHOLD = 0.9;
+
+/**
+ * Which of the four status colours a bin draws in fill-status mode, or
+ * `null` for "no data" (the hatched swatch) — a bin with no level to show
+ * (400 series, unmonitored, no reading yet) is not zero, it is unknown, and
+ * colouring it as "low" would be a claim about a quantity nobody measured.
+ *
+ * An alarm overrides the fraction entirely: a bin sitting at 40% with its
+ * high-level or lock sensor active is drawn as an alarm, not as "normal",
+ * because the alarm is the more urgent fact about it.
+ */
+export function statusCategoryFor(fraction: number | null, alarmed: boolean): StatusCategory | null {
+  if (alarmed) return 'alarm';
+  if (fraction === null) return null;
+  if (fraction < STATUS_LOW_THRESHOLD) return 'low';
+  if (fraction > STATUS_HIGH_THRESHOLD) return 'high';
+  return 'normal';
+}
+
+/**
+ * The 45-degree hatch used for "no data to draw" — the fill bar's empty
+ * track when a bin has no level, the list row's swatch for the same case,
+ * and the status-mode legend's own "no data" entry. Pulled out once so the
+ * three places drawing "unknown" agree on what that looks like, rather than
+ * three separately hand-typed gradients that could drift apart one edit at
+ * a time.
+ */
+export const HATCH_PATTERN =
+  'repeating-linear-gradient(45deg, rgba(148,163,184,0.35) 0, rgba(148,163,184,0.35) 2px, transparent 2px, transparent 4px)';
+
+/* ------------------------------------------------------------------ */
 /* Material key                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -943,6 +1108,7 @@ const PROVENANCE = [
   'The outside yard is schematic. The 100 and 200 series are drawn as cylinders on instruction; in reality they are flat and cellular storage.',
   'Five bins are drawn but not counted. The 500 series is in service — it runs soya oil — but nothing upstream reports on it, so it appears in the yard and is left out of every count on this screen, all of which are over the 131 bins the plant does report. It is drawn rather than hidden because it is there; it is uncounted rather than shown empty because an empty bar would be a claim about it that nobody has made.',
   'Ladders, stairs, vents, kerbs, trusses and conveyors are typical feed-mill furniture drawn for legibility, not surveyed plant facts.',
+  `Fill-status colours (the "Fill" switch at the left of this dock): below ${Math.round(STATUS_LOW_THRESHOLD * 100)}% of rated capacity reads low, above ${Math.round(STATUS_HIGH_THRESHOLD * 100)}% reads high, everything between reads normal. A high-level or lock alarm always draws as alarm regardless of the fraction. A bin with no level to show — the 400 series, the unmonitored tanks, a bin with no reading yet — draws hatched rather than as any of the four, because "unknown" and "low" are different facts.`,
 ].join('\n\n');
 
 /**
@@ -971,8 +1137,18 @@ export const LegendDock = forwardRef<
     materials: { code: string; name: string; color: string; count: number }[];
     highlighted: string | null;
     onHighlight: (code: string | null) => void;
+    /**
+     * Fill-status mode (plan workstream F item 1). Optional so a caller
+     * mid-wiring this in still compiles: defaults to 'material', today's
+     * only behaviour.
+     */
+    colorMode?: ColorMode;
+    onColorMode?: (mode: ColorMode) => void;
   }
->(function LegendDock({ materials, highlighted, onHighlight }, ref) {
+>(function LegendDock(
+  { materials, highlighted, onHighlight, colorMode = 'material', onColorMode },
+  ref,
+) {
   const [open, setOpen] = useState(false);
   const [popover, setPopover] = useState<{ left: number; bottom: number } | null>(null);
   const infoRef = useRef<HTMLButtonElement>(null);
@@ -1001,7 +1177,14 @@ export const LegendDock = forwardRef<
     setOpen((o) => !o);
   };
 
-  if (materials.length === 0) return null;
+  /*
+   * Material mode with nothing tagged still hides the dock, as before this
+   * pass — an empty scrolling strip was never worth the 32px band. Status
+   * mode never depends on `materials` (the four status swatches are fixed),
+   * so it always has something to show, and the mode switch itself has to
+   * survive into that state or there would be no way back to material mode.
+   */
+  if (colorMode === 'material' && materials.length === 0 && !onColorMode) return null;
 
   return (
     <div
@@ -1022,55 +1205,105 @@ export const LegendDock = forwardRef<
         'absolute inset-x-0 bottom-0 z-20 flex h-8 items-center gap-1 rounded-none border-x-0 border-b-0 px-2 shadow-none',
       )}
     >
-      {/*
-        The legend is also the filter. "Where is my maize?" is the question an
-        operator actually arrives with, and pressing the swatch answers it by
-        quietening every bin that holds something else. Deliberately dimming
-        the rest rather than accenting the matches: the accent colour means
-        "selected" and nothing else on this screen.
+      {onColorMode && (
+        <>
+          <StatusModeSwitch colorMode={colorMode} onColorMode={onColorMode} />
+          <span className={DIVIDER} />
+        </>
+      )}
 
-        Horizontally scrollable rather than wrapping or truncating — the dock
-        has a fixed 32px height, so a second row is not an option, and full
-        names are the point (DESIGN.md: "no truncation — the dock is as wide
-        as the canvas").
-      */}
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {materials.map((mat) => {
-          const on = highlighted === mat.code;
-          return (
-            <button
-              key={mat.code}
-              type="button"
-              onClick={() => onHighlight(on ? null : mat.code)}
-              aria-pressed={on}
-              title={
-                on
-                  ? `Showing only ${mat.name} — press again to show everything`
-                  : `${mat.name} — ${mat.count} bin${mat.count === 1 ? '' : 's'}. Press to pick it out.`
-              }
-              className="touch-target-44 shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-            >
-              <span
-                className={cn(
-                  'inline-flex min-h-[24px] items-center gap-1.5 whitespace-nowrap rounded px-1.5 py-0.5 text-xs transition-colors',
+      {colorMode === 'material' ? (
+        /*
+          The legend is also the filter. "Where is my maize?" is the question
+          an operator actually arrives with, and pressing the swatch answers
+          it by quietening every bin that holds something else. Deliberately
+          dimming the rest rather than accenting the matches: the accent
+          colour means "selected" and nothing else on this screen.
+
+          Horizontally scrollable rather than wrapping or truncating — the
+          dock has a fixed 32px height, so a second row is not an option, and
+          full names are the point (DESIGN.md: "no truncation — the dock is
+          as wide as the canvas").
+        */
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {materials.map((mat) => {
+            const on = highlighted === mat.code;
+            return (
+              <button
+                key={mat.code}
+                type="button"
+                onClick={() => onHighlight(on ? null : mat.code)}
+                aria-pressed={on}
+                title={
                   on
-                    ? 'bg-slate-700/70 text-white light:bg-gray-200 light:text-gray-900'
-                    : 'text-slate-300 hover:bg-slate-800/70 light:text-gray-700 light:hover:bg-gray-100',
-                )}
+                    ? `Showing only ${mat.name} — press again to show everything`
+                    : `${mat.name} — ${mat.count} bin${mat.count === 1 ? '' : 's'}. Press to pick it out.`
+                }
+                className="touch-target-44 shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
               >
                 <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-black/20"
-                  style={{ backgroundColor: mat.color }}
-                />
-                <span>{mat.name}</span>
-                <span className="font-mono text-[10px] text-slate-500 light:text-gray-500">
-                  {mat.count}
+                  className={cn(
+                    'inline-flex min-h-[24px] items-center gap-1.5 whitespace-nowrap rounded px-1.5 py-0.5 text-xs transition-colors',
+                    on
+                      ? 'bg-slate-700/70 text-white light:bg-gray-200 light:text-gray-900'
+                      : 'text-slate-300 hover:bg-slate-800/70 light:text-gray-700 light:hover:bg-gray-100',
+                  )}
+                >
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-black/20"
+                    style={{ backgroundColor: mat.color }}
+                  />
+                  <span>{mat.name}</span>
+                  <span className="font-mono text-[10px] text-slate-500 light:text-gray-500">
+                    {mat.count}
+                  </span>
                 </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        /*
+         * Status mode: material filtering is disabled (PRODUCT.md rule 3 —
+         * a bin is coloured by material or by fill, never both, so a
+         * material filter has nothing to act on here), and every entry is
+         * informational rather than a button. Fixed set, so — unlike the
+         * material row — nothing to scroll past on a normal viewport; still
+         * wrapped in the scroller for the tablet's narrower dock.
+         */
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto" data-status-legend>
+          {(
+            [
+              ['low', 'Low', `Below ${Math.round(STATUS_LOW_THRESHOLD * 100)}% of rated capacity`],
+              ['normal', 'Normal', 'Between the low and high thresholds'],
+              ['high', 'High', `Above ${Math.round(STATUS_HIGH_THRESHOLD * 100)}% of rated capacity`],
+              ['alarm', 'Alarm', 'High-level or lock alarm active, regardless of fill'],
+            ] as [StatusCategory, string, string][]
+          ).map(([key, label, detail]) => (
+            <span
+              key={key}
+              title={detail}
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-1 py-0.5 text-xs text-slate-300 light:text-gray-700"
+            >
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-black/20"
+                style={{ backgroundColor: STATUS_COLORS[key] }}
+              />
+              <span>{label}</span>
+            </span>
+          ))}
+          <span
+            title="No level to show — the 400 series, an unmonitored tank, or a bin with no reading yet"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-1 py-0.5 text-xs text-slate-400 light:text-gray-500"
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-black/20"
+              style={{ backgroundImage: HATCH_PATTERN }}
+            />
+            <span>No data</span>
+          </span>
+        </div>
+      )}
 
       <span className={DIVIDER} />
 
@@ -1081,13 +1314,17 @@ export const LegendDock = forwardRef<
         actually reports a material code for are coloured, and the rest are
         deliberately left as neutral vessels because inventing a colour for
         contents nobody has reported is the one thing this view must not do.
+        Material-mode-only: the ratio is about material tagging, which status
+        mode's colours do not depend on.
       */}
-      <span
-        title={`${tagged} of ${TOTAL_BINS} bins report a material code. The rest are drawn as neutral vessels rather than being given a colour the plant has not reported.`}
-        className="shrink-0 px-1 font-mono text-[10px] text-slate-500 light:text-gray-500"
-      >
-        {tagged}/{TOTAL_BINS}
-      </span>
+      {colorMode === 'material' && (
+        <span
+          title={`${tagged} of ${TOTAL_BINS} bins report a material code. The rest are drawn as neutral vessels rather than being given a colour the plant has not reported.`}
+          className="shrink-0 px-1 font-mono text-[10px] text-slate-500 light:text-gray-500"
+        >
+          {tagged}/{TOTAL_BINS}
+        </span>
+      )}
 
       <button
         ref={infoRef}
@@ -1226,7 +1463,7 @@ function Fact({ label, value, hint }: { label: string; value: React.ReactNode; h
       <dt className="text-[10px] uppercase tracking-wide text-slate-500 light:text-gray-500">
         {label}
       </dt>
-      <dd className="truncate text-xs text-slate-200 light:text-gray-800" title={hint}>
+      <dd className="truncate text-xs tabular-nums text-slate-200 light:text-gray-800" title={hint}>
         {value}
       </dd>
     </div>
@@ -1320,14 +1557,24 @@ export function SiloDetailPanel({
       <div className={cn('flex gap-3 px-3 py-3', embedded && 'px-0 pt-0')}>
         <MiniSilo fill={level.fill} color={color} hopper={d.hopper > 0} />
         <div className="min-w-0 flex-1">
+          {/*
+            22px per DESIGN.md's type scale (11/12/13/15/22) — was `text-2xl`
+            (24px), a size the scale does not contain. `tabular-nums` here is
+            not decorative: this is the one number on the whole HUD an
+            operator reads at a distance, and a proportional 5 next to a
+            proportional 1 shifts the decimal point sideways as the value
+            ticks.
+          */}
           {level.fill === null ? (
-            <p className="font-mono text-2xl leading-none text-slate-600 light:text-gray-500">***</p>
+            <p className="font-mono text-[22px] leading-none tabular-nums text-slate-600 light:text-gray-500">
+              ***
+            </p>
           ) : (
             <>
-              <p className="font-mono text-2xl leading-none text-white light:text-gray-900">
+              <p className="font-mono text-[22px] leading-none tabular-nums text-white light:text-gray-900">
                 {formatPercent(level.fraction)}
               </p>
-              <p className="mt-1 text-[11px] text-slate-400 light:text-gray-600">
+              <p className="mt-1 text-[11px] tabular-nums text-slate-400 light:text-gray-600">
                 {formatKg(level.quantityKg)} of {formatCapacity(group.capacityKg)}
               </p>
             </>
@@ -1360,6 +1607,21 @@ export function SiloDetailPanel({
               </Chip>
             )}
           </div>
+
+          {/*
+            The chip's own title carries this on hover, which a tap-only
+            tablet never triggers — a plan correction (4.F.6: "untagged/
+            unmonitored explained in one line each") for exactly that. Only
+            these two reasons get a line: 'no-reading' is not a property of
+            the bin, it is this poll cycle having nothing yet, and saying so
+            in the same weight as "this bin has no quantity address at all"
+            would flatten two very different facts into one look.
+          */}
+          {(level.reason === 'no-tag' || level.reason === 'not-monitored') && noLevel && (
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500 light:text-gray-500">
+              {noLevel.detail}
+            </p>
+          )}
 
           {level.reason === 'no-tag' && level.quantityKg ? (
             <p

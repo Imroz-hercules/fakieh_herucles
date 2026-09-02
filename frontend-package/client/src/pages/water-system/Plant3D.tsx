@@ -24,24 +24,14 @@ import {
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   OrbitControls,
-  Sky,
   AdaptiveDpr,
+  BakeShadows,
   Html,
-  Edges,
   Environment,
   Lightformer,
   PerformanceMonitor,
 } from '@react-three/drei';
 import * as THREE from 'three';
-import {
-  EffectComposer,
-  N8AO,
-  Bloom,
-  Vignette,
-  SMAA,
-  ToneMapping,
-} from '@react-three/postprocessing';
-import { ToneMappingMode } from 'postprocessing';
 import { Link } from 'wouter';
 import { motion, useReducedMotion } from 'framer-motion';
 import { PanelRight } from 'lucide-react';
@@ -49,11 +39,8 @@ import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayo
 import {
   BUILDINGS,
   GALLERIES,
-  LIGHT_MASTS,
-  SITE,
   SITE_VIEW,
   ZONES,
-  type SiteBuilding,
   type ZoneId,
 } from '../../lib/plant3d/site';
 import {
@@ -65,6 +52,7 @@ import {
   ZONE_ANCHORS,
   assertSiloModel,
   formatCapacity,
+  platformInZone,
   type Bounds,
   type Platform,
   type SiloPlacement,
@@ -80,16 +68,37 @@ import {
   useSiloReadings,
 } from '../../lib/plant3d/siloData';
 import { SiloGroupMesh, type SiloVisual } from '../../lib/plant3d/siloMesh';
-import { ACCENT } from '../../lib/plant3d/siloShader';
+import { setColorMode, setSolidShells } from '../../lib/plant3d/siloShader';
+import { SiloSelectionProxy } from '../../lib/plant3d/siloSelection';
 import { SiteGround } from '../../lib/plant3d/ground';
+import {
+  Buildings,
+  Platforms,
+  Perimeter,
+  RoadKerbs,
+  Galleries,
+  LightMasts,
+  galleryTouchesZone,
+  ZONE_FOOTPRINT,
+} from '../../lib/plant3d/structures';
+import { SiteDressing } from '../../lib/plant3d/siteDressing';
+import { SkyDome } from '../../lib/plant3d/SkyDome';
+import { PostFx, type PostTier } from '../../lib/plant3d/PostFx';
 import {
   DiagnosticsBar,
   LookBar,
   LegendDock,
   ZoneSwitch,
+  siloNumberPillClass,
   type Quality,
 } from '../../components/water-system/plant3d/PlantHud';
 import { SiloList } from '../../components/water-system/plant3d/SiloList';
+import { KpiStrip } from '../../components/water-system/plant3d/KpiStrip';
+import { Hint } from '../../components/water-system/plant3d/Hint';
+import { ControlBar, type ViewMode, type LabelMode } from '../../components/water-system/plant3d/ControlBar';
+import { DataChip, NUMBER_CHIP_W, DATA_CHIP_W, type ChipStatus } from '../../components/water-system/plant3d/DataChip';
+import { statusCategoryFor } from '../../components/water-system/plant3d/PlantHud';
+import { cn } from '@/lib/utils';
 import { LOOKS, lightformersFor, type Look, type TimeOfDay } from '../../lib/plant3d/look';
 
 /* ------------------------------------------------------------------ */
@@ -97,277 +106,16 @@ import { LOOKS, lightformersFor, type Look, type TimeOfDay } from '../../lib/pla
 /* ------------------------------------------------------------------ */
 
 /*
- * Building shells, cool and neutral.
- * 
- * These were warm sand (#cfc6b4 and friends), which put four large warm-grey
- * masses either side of the silo banks and left the whole frame in one hue.
- * The world is deliberately desaturated so that material colour is the only
- * chroma on screen; the buildings are context and belong in the neutral band.
+ * ------------------------------------------------------------------
+ * Structures — moved to `plant3d/structures.tsx` (workstream 4.E).
+ * ------------------------------------------------------------------
+ * `Building`+`PitchedRoof`, `PlatformMesh`, `LightMasts`, `Galleries` and
+ * `PerimeterWall` used to live here. They are now `Buildings`, `Platforms`,
+ * `LightMasts`, `Galleries` and `Perimeter` (plus the new `RoadKerbs`),
+ * imported above — same public shape (`galleryTouchesZone`/`ZONE_FOOTPRINT`
+ * are re-exported from that module too, so the framing memo below reads the
+ * one copy instead of a second, drifting one). See `Scene` for the swap.
  */
-const SHELL_COLOR: Record<SiteBuilding['kind'], string> = {
-  store: '#b8bdc2',
-  process: '#adb3b9',
-  office: '#a8b2bb',
-  shed: '#b2b7bb',
-};
-
-/* ------------------------------------------------------------------ */
-/* Structures                                                          */
-/* ------------------------------------------------------------------ */
-
-/** A pitched roof as an extruded triangle. roofRise = 0 renders nothing. */
-function PitchedRoof({ b, color }: { b: SiteBuilding; color: string }) {
-  const geometry = useMemo(() => {
-    const rise = b.roofRise ?? 0;
-    if (rise <= 0) return null;
-    const shape = new THREE.Shape();
-    shape.moveTo(-b.width / 2, 0);
-    shape.lineTo(b.width / 2, 0);
-    shape.lineTo(0, rise);
-    shape.closePath();
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: b.length, bevelEnabled: false });
-    /* extrude runs along +Z; stand it up and centre it on the building */
-    geo.rotateY(Math.PI / 2);
-    geo.translate(-b.length / 2, 0, 0);
-    geo.computeVertexNormals();
-    return geo;
-  }, [b.width, b.length, b.roofRise]);
-
-  /* r3f only auto-disposes objects declared as nested JSX children. A geometry
-     passed as a `geometry={...}` prop is a plain property set, so nothing frees
-     it, and the see-through toggle remounts every roof. */
-  useEffect(() => () => geometry?.dispose(), [geometry]);
-
-  if (!geometry) return null;
-  return (
-    <mesh geometry={geometry} position={[b.x, b.height, b.z]} castShadow receiveShadow>
-      <meshStandardMaterial color={color} roughness={0.85} metalness={0.05} />
-    </mesh>
-  );
-}
-
-/*
- * A ghosted building is a CAGE, not a frosted box.
- *
- * It used to draw both sides of the box at 14% opacity in a pale warm grey, and
- * the result was a plastic display case: the NEAR wall veiled every bin behind
- * it, the far wall veiled the ground, and four of them in a row made the whole
- * site look like a model kit under glass. Two 14% surfaces between the eye and
- * a silo compound to 26% of the image being building — on the one element the
- * view exists to show.
- *
- * Rendering only the BACK faces fixes it outright. The near wall stops existing,
- * so nothing at all stands between the camera and the bins; the far wall and the
- * underside of the roof still describe the volume, and the silhouette edges
- * still say where the building is. Same trick an x-ray view uses, and it costs
- * nothing — it is one flag.
- */
-const GHOST_FILL = '#63707f';
-/*
- * Dim, because drei Edges ignores `side`.
- *
- * The fill is BackSide so the near wall does not exist — but `Edges` builds a
- * separate LineSegments2 from EdgesGeometry over the whole box and draws all
- * twelve edges, front ones included. So every ghosted building still rendered
- * as a complete bright cage. #8fa1b5 is 62% luminance, brighter than the ground
- * and close to the sky, so it read as a lit outline over everything; #4a5666 is
- * 34% and at a third opacity it recedes into the mid greys and merely says
- * where the shed is.
- */
-const GHOST_EDGE = '#4a5666';
-
-function Building({ b, ghosted }: { b: SiteBuilding; ghosted: boolean }) {
-  const color = SHELL_COLOR[b.kind];
-  return (
-    <group>
-      <mesh position={[b.x, b.height / 2, b.z]} castShadow={!ghosted} receiveShadow>
-        <boxGeometry args={[b.length, b.height, b.width]} />
-        <meshStandardMaterial
-          color={ghosted ? GHOST_FILL : color}
-          roughness={0.9}
-          metalness={0.04}
-          transparent={ghosted}
-          opacity={ghosted ? 0.1 : 1}
-          depthWrite={!ghosted}
-          side={ghosted ? THREE.BackSide : THREE.FrontSide}
-        />
-        {/* With the fill this quiet, the edges are what say "building". Cool and
-            dim on purpose: these are context, not the subject, and at full
-            brightness they read as debug wireframe and pull the eye off the
-            silos. */}
-        {ghosted && <Edges threshold={15} color={GHOST_EDGE} transparent opacity={0.35} />}
-      </mesh>
-      {!ghosted && <PitchedRoof b={b} color={color} />}
-    </group>
-  );
-}
-
-/** A mezzanine slab with corner columns, so the elevated bins do not float. */
-function PlatformMesh({ p }: { p: Platform }) {
-  const cols: [number, number][] = [
-    [p.x - p.length / 2 + 1, p.z - p.width / 2 + 1],
-    [p.x + p.length / 2 - 1, p.z - p.width / 2 + 1],
-    [p.x - p.length / 2 + 1, p.z + p.width / 2 - 1],
-    [p.x + p.length / 2 - 1, p.z + p.width / 2 - 1],
-    [p.x, p.z - p.width / 2 + 1],
-    [p.x, p.z + p.width / 2 - 1],
-  ];
-  return (
-    <group>
-      <mesh position={[p.x, p.y - 0.2, p.z]} castShadow receiveShadow>
-        <boxGeometry args={[p.length, 0.4, p.width]} />
-        <meshStandardMaterial color="#9aa2aa" roughness={0.85} metalness={0.15} />
-      </mesh>
-      {cols.map(([cx, cz], i) => (
-        <mesh key={i} position={[cx, (p.y - 0.4) / 2, cz]} castShadow receiveShadow>
-          <boxGeometry args={[0.45, p.y - 0.4, 0.45]} />
-          <meshStandardMaterial color="#868e96" roughness={0.85} metalness={0.2} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-/**
- * Lighting masts: a column, a head, and a point light.
- *
- * No shadow maps on these — eight shadow-casting point lights would cost six
- * cube renders each and buy nothing, because the sun already grounds everything
- * with a shadow. The emissive head is what actually reads as a lamp.
- */
-function LightMasts({
-  strength,
-  color,
-  lowPower,
-}: {
-  strength: number;
-  color: string;
-  lowPower: boolean;
-}) {
-  if (strength <= 0) return null;
-  /* Every point light adds per-fragment cost across the whole scene. On a
-     machine already falling back to the cheap path, half of them is plenty to
-     keep the plant readable at night. */
-  const masts = lowPower ? LIGHT_MASTS.filter((_, i) => i % 2 === 0) : LIGHT_MASTS;
-  return (
-    <group>
-      {masts.map((m, i) => (
-        <group key={i} position={[m.x, 0, m.z]}>
-          <mesh position={[0, m.height / 2, 0]} castShadow>
-            <cylinderGeometry args={[0.28, 0.42, m.height, 6]} />
-            <meshStandardMaterial color="#3f4855" roughness={0.8} metalness={0.4} />
-          </mesh>
-          {/*
-            A fixture, not a floating bulb.
-
-            This was a bare emissive sphere, unlit from every direction and then
-            bloomed — a glowing marble on a stick. A real yard light is a dark
-            housing with a lamp under it, and the housing is what makes it read
-            as equipment: it gives the head a silhouette against the sky and it
-            stops the glow radiating upward out of a fitting that has a lid.
-            Two extra primitives per mast, on eight masts, half of them dropped
-            on the cheap path.
-          */}
-          <mesh position={[0, m.height + 0.75, 0]} castShadow>
-            <cylinderGeometry args={[1.5, 1.05, 0.5, 8]} />
-            <meshStandardMaterial color="#2c333d" roughness={0.7} metalness={0.5} />
-          </mesh>
-          <mesh position={[0, m.height + 0.42, 0]}>
-            <cylinderGeometry args={[0.95, 0.95, 0.16, 8]} />
-            <meshBasicMaterial color={color} toneMapped={false} />
-          </mesh>
-          <pointLight
-            position={[0, m.height, 0]}
-            color={color}
-            intensity={5200 * strength}
-            distance={165}
-            decay={2}
-          />
-        </group>
-      ))}
-    </group>
-  );
-}
-
-/**
- * A conveyor gallery: a deck on legs, running between two points.
- *
- * Zone-filtered like the buildings are — this used to render all four
- * galleries regardless of which zone was framed, so a raised truss running
- * to a bank of silos that were hidden for this view hung in the frame
- * connected to nothing, outside the box the camera fit to. `galleryTouchesZone`
- * shows one whenever either of its two ends is near the active zone, since a
- * connector genuinely belongs to both the zone it leaves and the one it
- * feeds — never fewer galleries than actually touch this zone, but also
- * never one whose other end is nowhere in view.
- */
-function Galleries({ color, zone }: { color: string; zone: ZoneId | 'all' }) {
-  const shown = zone === 'all' ? GALLERIES : GALLERIES.filter((g) => galleryTouchesZone(g, zone));
-  return (
-    <group>
-      {shown.map((g) => {
-        const dx = g.to[0] - g.from[0];
-        const dz = g.to[1] - g.from[1];
-        const len = Math.hypot(dx, dz);
-        const mx = (g.from[0] + g.to[0]) / 2;
-        const mz = (g.from[1] + g.to[1]) / 2;
-        const angle = Math.atan2(dz, dx);
-        const legs = Math.max(2, Math.round(len / 14));
-        /* Stable across the zone filter changing which subset renders —
-           an index would silently rekey (and re-mount) every remaining
-           gallery whenever one ahead of it drops out of the view. */
-        const key = `${g.from.join(',')}->${g.to.join(',')}`;
-        return (
-          <group key={key} position={[mx, 0, mz]} rotation={[0, -angle, 0]}>
-            <mesh position={[0, g.y + g.width / 2, 0]} castShadow receiveShadow>
-              <boxGeometry args={[len, g.width, g.width]} />
-              <meshStandardMaterial
-                color={color}
-                roughness={0.75}
-                metalness={0.35}
-                opacity={g.observed ? 1 : 0.75}
-                transparent={!g.observed}
-              />
-            </mesh>
-            {Array.from({ length: legs }, (_, k) => {
-              const t = legs === 1 ? 0 : k / (legs - 1) - 0.5;
-              return (
-                <mesh key={k} position={[t * len * 0.92, g.y / 2, 0]} castShadow>
-                  <boxGeometry args={[0.45, g.y, 0.45]} />
-                  <meshStandardMaterial color={color} roughness={0.85} metalness={0.3} />
-                </mesh>
-              );
-            })}
-          </group>
-        );
-      })}
-    </group>
-  );
-}
-
-/** The compound wall, as four thin slabs. Cheap, and it gives the site an edge. */
-function PerimeterWall({ color }: { color: string }) {
-  const w = SITE.wall;
-  const hx = w.length / 2;
-  const hz = w.width / 2;
-  const runs: [number, number, number, number][] = [
-    [w.x, w.z - hz, w.length, w.thickness],
-    [w.x, w.z + hz, w.length, w.thickness],
-    [w.x - hx, w.z, w.thickness, w.width],
-    [w.x + hx, w.z, w.thickness, w.width],
-  ];
-  return (
-    <group>
-      {runs.map(([x, z, lx, lz], i) => (
-        <mesh key={i} position={[x, w.height / 2, z]} castShadow receiveShadow>
-          <boxGeometry args={[lx, w.height, lz]} />
-          <meshStandardMaterial color={color} roughness={0.95} metalness={0.02} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
 
 /** One silo number, already placed in screen space. */
 export interface SiloNumberLabel {
@@ -429,6 +177,7 @@ function SiloNumberProjector({
   onLayout,
   insetTop,
   insetBottom,
+  wide = false,
 }: {
   placements: SiloPlacement[];
   onLayout: (labels: SiloNumberLabel[]) => void;
@@ -436,6 +185,8 @@ function SiloNumberProjector({
      same numbers the camera fit uses. A label is not allowed into them. */
   insetTop: number;
   insetBottom: number;
+  /** true when the overlay draws the wide data chip (number, %, tonnes) */
+  wide?: boolean;
 }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const size = useThree((s) => s.size);
@@ -448,7 +199,7 @@ function SiloNumberProjector({
     const key =
       `${camera.position.toArray().map((n) => n.toFixed(2)).join()}|`
       + `${camera.quaternion.toArray().map((n) => n.toFixed(3)).join()}|`
-      + `${size.width}x${size.height}|${placements.length}`;
+      + `${size.width}x${size.height}|${placements.length}|${wide ? 'w' : 'n'}`;
     if (key === lastKey.current) return;
     lastKey.current = key;
 
@@ -479,7 +230,9 @@ function SiloNumberProjector({
         x,
         y,
         dist,
-        w: 11 + 7 * String(p.siloNo).length,
+        /* The overlap rejection must measure the chip that is drawn: the
+           data chip is roughly three times the width of the number pill. */
+        w: wide ? DATA_CHIP_W(String(p.siloNo).length) : NUMBER_CHIP_W(String(p.siloNo).length),
       });
     }
 
@@ -547,26 +300,16 @@ function SiloNumberProjector({
   return null;
 }
 
-/** Ring on the floor and a marker above, so a selected bin is findable in a bank. */
-function SelectionMarker({ p }: { p: SiloPlacement }) {
-  /* The drawn size, not the physical one. The indoor bins are drawn compressed
-     up to ~3x, so a ring sized off `dims` sits inside a micro hopper instead of
-     around it, and the beam starts below its own roof. */
-  const r = (p.dims.diameter * p.drawScale) / 2;
-  const beam = Math.max(3, p.dims.total * p.drawScale * 0.4);
-  return (
-    <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[p.x, p.floor + 0.06, p.z]}>
-        <ringGeometry args={[r * 1.25, r * 1.7, 44]} />
-        <meshBasicMaterial color={ACCENT} transparent opacity={1} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[p.x, p.topY + beam / 2 + r * 0.4, p.z]}>
-        <cylinderGeometry args={[Math.max(0.05, r * 0.09), Math.max(0.05, r * 0.09), beam, 8]} />
-        <meshBasicMaterial color={ACCENT} transparent opacity={0.7} depthWrite={false} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
+/*
+ * `SelectionMarker` (a floor ring + a vertical beam) is gone — replaced by
+ * `SiloSelectionProxy` (`siloSelection.tsx`), a real proxy mesh over the
+ * selected bin's own drawn silhouette with a cyan fresnel-glow material
+ * (`makeSelectionMaterial()` in `siloShader.ts`). DESIGN.md's own silo
+ * grammar section says why: "Not a post-process outline: the pinned
+ * `Outline` selects whole `Object3D`s, so on an InstancedMesh it would
+ * outline the entire group... No floor ring, no beam." See `Scene` below for
+ * where it is rendered.
+ */
 
 /** What the cursor is over, said mostly in colour and length rather than words. */
 export interface HoverInfo {
@@ -779,6 +522,20 @@ interface OrbitLike {
   removeEventListener: (type: string, fn: () => void) => void;
 }
 
+/** Applies a zoom request from the control bar: dolly the camera toward the
+ *  orbit target by a factor (0.85 in, 1.18 out), clamped by the controls. */
+function ZoomDriver({ req }: { req: { n: number; f: number } }) {
+  const controls = useThree((s) => s.controls) as unknown as OrbitLike | null;
+  const camera = useThree((s) => s.camera);
+  useEffect(() => {
+    if (!controls || req.n === 0) return;
+    const t = controls.target;
+    camera.position.sub(t).multiplyScalar(req.f).add(t);
+    controls.update();
+  }, [req, controls, camera]);
+  return null;
+}
+
 function CameraRig({
   bounds,
   dir,
@@ -873,6 +630,156 @@ function CameraRig({
   return null;
 }
 
+/**
+ * Keeps the sun's shadow camera tight to whatever is actually on screen
+ * (plan §4.D.4).
+ *
+ * The old shadow frustum was a fixed 440 m square (`-220..220` on both
+ * axes) covering the entire site regardless of which zone was framed, so a
+ * 2048 map spent most of its texels on ground nobody was looking at: soft
+ * blobs at zone range, nothing at all resolvable at bin range. This instead
+ * projects the current framing's own box — the same `Bounds[]` `CameraRig`
+ * fits the camera to — into the light's own view space every time it
+ * changes, and sets `left`/`right`/`top`/`bottom` to that projected extent
+ * plus a flat 10 m margin.
+ *
+ * On-demand, not per-frame: `<BakeShadows>` (in `Scene`) sets
+ * `gl.shadowMap.autoUpdate = false`, so a shadow map that is not explicitly
+ * asked to update stays exactly as it last rendered. This component is the
+ * thing doing the asking — `gl.shadowMap.needsUpdate = true` on a framing
+ * change (this effect), on a look change or a data change (the second
+ * effect, keyed on `look` and the `visuals` array identity — a fresh array
+ * every render of the parent's `visuals` memo, so its IDENTITY changing is
+ * exactly "the data actually changed"), and while the camera is moving (a
+ * `controls` `'change'` listener, the third effect) — never on a frame where
+ * nothing that could invalidate the shadow actually happened.
+ */
+function ShadowFollow({
+  lightRef,
+  framing,
+  look,
+  visuals,
+}: {
+  lightRef: React.RefObject<THREE.DirectionalLight>;
+  framing: { bounds: Bounds[]; dir: [number, number, number] };
+  look: Look;
+  visuals: SiloVisual[][];
+}) {
+  const gl = useThree((s) => s.gl);
+  const controls = useThree((s) => s.controls) as unknown as OrbitLike | null;
+
+  /* The frustum itself — recomputed only when the framing (the box the
+     camera is fit to) actually changes. */
+  useEffect(() => {
+    const light = lightRef.current;
+    if (!light) return;
+    const { bounds } = framing;
+    if (!bounds.length) return;
+
+    const min: [number, number, number] = [Infinity, Infinity, Infinity];
+    const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+    for (const b of bounds) {
+      for (let i = 0; i < 3; i += 1) {
+        min[i] = Math.min(min[i], b.min[i]);
+        max[i] = Math.max(max[i], b.max[i]);
+      }
+    }
+    if (!Number.isFinite(min[0])) return;
+
+    /* The light's own view axes: forward is target-minus-position (light
+       shines FROM its position TOWARD its target, which three's own
+       DirectionalLight defaults to the origin — never reparented here), and
+       a right/up pair built the same way `fitToBounds` builds the camera's
+       own right/up from `dir`, so the frustum's left/right/top/bottom follow
+       the same convention as everything else in this file that projects a
+       box into a view. */
+    const forward = new THREE.Vector3()
+      .subVectors(light.target.position, light.position)
+      .normalize();
+    const worldUp = Math.abs(forward.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : UP;
+    const right = new THREE.Vector3().crossVectors(forward, worldUp).normalize();
+    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+
+    let l = Infinity;
+    let r = -Infinity;
+    let t = -Infinity;
+    let btm = Infinity;
+    let near = Infinity;
+    let far = -Infinity;
+    const corner = new THREE.Vector3();
+    for (let i = 0; i < 8; i += 1) {
+      corner.set(i & 1 ? max[0] : min[0], i & 2 ? max[1] : min[1], i & 4 ? max[2] : min[2]);
+      const x = corner.dot(right);
+      const y = corner.dot(up);
+      const z = corner.dot(forward);
+      l = Math.min(l, x);
+      r = Math.max(r, x);
+      btm = Math.min(btm, y);
+      t = Math.max(t, y);
+      near = Math.min(near, z);
+      far = Math.max(far, z);
+    }
+
+    const MARGIN = 10;
+    const cam = light.shadow.camera;
+    cam.left = l - MARGIN;
+    cam.right = r + MARGIN;
+    cam.top = t + MARGIN;
+    cam.bottom = btm - MARGIN;
+    /* `near`/`far` are along the light's OWN forward axis, measured from the
+       light's own position (three's shadow camera near/far are distances
+       from the camera, not the scene's world coordinates) — the light sits
+       far outside the framed box on purpose (`look.sunPosition` is hundreds
+       of metres out), so this keeps a fixed generous range rather than
+       re-deriving it from `near`/`far` above, which are relative to the
+       BOX's own centre, not the light's position. */
+    cam.near = 1;
+    cam.far = 700;
+    cam.updateProjectionMatrix();
+    light.shadow.needsUpdate = true;
+    gl.shadowMap.needsUpdate = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [framing, lightRef, gl]);
+
+  /* Data or look changed: the shadow-casting geometry (or what it should
+     look like) did too, even if the framing box did not. */
+  useEffect(() => {
+    gl.shadowMap.needsUpdate = true;
+  }, [look, visuals, gl]);
+
+  /* The camera is moving: nothing about the SHADOW changed, but with
+     `autoUpdate` off a static shadow map would visibly lag a full orbit
+     behind — so keep it live while `OrbitControls` reports motion. */
+  useEffect(() => {
+    if (!controls) return undefined;
+    const onChange = () => {
+      gl.shadowMap.needsUpdate = true;
+    };
+    controls.addEventListener('change', onChange);
+    return () => controls.removeEventListener('change', onChange);
+  }, [controls, gl]);
+
+  return null;
+}
+
+/**
+ * Applies the current look's `exposure` to the renderer, reactively.
+ *
+ * `onCreated` (the `<Canvas>` prop, below) only runs once per canvas mount —
+ * fine for the tone-mapping MODE (fixed for the page's lifetime) but wrong
+ * for exposure, which changes every time the operator switches day/dusk/
+ * night. The ToneMapping EFFECT in postprocessing 6.39 has no `exposure`
+ * prop at all (Codex audit, plan §6a) — exposure genuinely lives only on the
+ * renderer, so this is the one place it can be kept in sync with `look`.
+ */
+function ExposureDrive({ exposure }: { exposure: number }) {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.toneMappingExposure = exposure;
+  }, [gl, exposure]);
+  return null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Instrumentation — measure, do not assume                            */
 /* ------------------------------------------------------------------ */
@@ -950,10 +857,11 @@ function StatsProbe({ target }: { target: React.RefObject<HTMLSpanElement> }) {
  */
 const SiteEnvironment = memo(function SiteEnvironment({ look }: { look: Look }) {
   return (
-    <Environment resolution={128} frames={1} environmentIntensity={look.envIntensity}>
-      {/* Sky dome, sun, ground bounce and a cool back rim — as data, in
-          `look.ts`, so the whole rig for a time of day lives in one place next
-          to the fog and the sun that have to agree with it. */}
+    <Environment resolution={256} frames={1} environmentIntensity={look.envIntensity}>
+      {/* Six formers — sky dome, sun, ground bounce, two rim fills, one large
+          soft overhead — as data, in `look.ts` (plan §4.D.3), so the whole
+          rig for a time of day lives in one place next to the fog and the
+          sun that have to agree with it. */}
       {lightformersFor(look).map((lf) => (
         <Lightformer
           key={lf.key}
@@ -984,51 +892,13 @@ const BUCKETS: GroupBucket[] = SILO_GROUPS.map((spec) => ({
   placements: SILOS.filter((s) => s.group.id === spec.id),
 }));
 
-/**
- * Each zone's own silo footprint in X/Z, computed once. Used only to decide
- * which conveyor galleries are relevant to a zone view — see `Galleries`
- * below — never to fit the camera; the camera fits to `siloFitBoxes` (and,
- * for a visible gallery, that gallery's own box) directly.
+/*
+ * `ZONE_FOOTPRINT` and `galleryTouchesZone` used to be defined here. They now
+ * live in `structures.tsx` (imported above) — that module needed them for its
+ * own `<Galleries>` component and this file needed the exact same rule for
+ * the framing memo below, so duplicating them would have risked the two
+ * drifting apart the next time either was tuned.
  */
-const ZONE_FOOTPRINT: Record<ZoneId, { minX: number; maxX: number; minZ: number; maxZ: number }> =
-  (() => {
-    const out = {} as Record<ZoneId, { minX: number; maxX: number; minZ: number; maxZ: number }>;
-    for (const z of ZONES) {
-      const ps = SILOS.filter((s) => s.group.zone === z.id);
-      out[z.id] = {
-        minX: Math.min(...ps.map((p) => p.x)),
-        maxX: Math.max(...ps.map((p) => p.x)),
-        minZ: Math.min(...ps.map((p) => p.z)),
-        maxZ: Math.max(...ps.map((p) => p.z)),
-      };
-    }
-    return out;
-  })();
-
-/**
- * Slack around a zone's own silo footprint before a gallery endpoint counts
- * as touching it. Gallery endpoints are traced from imagery to within a few
- * metres (site.ts), and a conveyor plausibly lands anywhere along a group's
- * own edge, not dead centre on a silo — so this is generous on purpose.
- */
-const GALLERY_ZONE_MARGIN = 12;
-
-/**
- * A gallery is a CONNECTOR between two areas, not a resident of one zone —
- * `Gallery` (site.ts) carries no `zone` field, deliberately: a conveyor from
- * the outdoor bank to the mill is meaningful in both the yard view and the
- * raw-material view it feeds. So it counts as relevant to a zone when EITHER
- * end falls near that zone's own silo footprint.
- */
-function galleryTouchesZone(g: (typeof GALLERIES)[number], zoneId: ZoneId): boolean {
-  const fp = ZONE_FOOTPRINT[zoneId];
-  const near = (x: number, z: number) =>
-    x >= fp.minX - GALLERY_ZONE_MARGIN &&
-    x <= fp.maxX + GALLERY_ZONE_MARGIN &&
-    z >= fp.minZ - GALLERY_ZONE_MARGIN &&
-    z <= fp.maxZ + GALLERY_ZONE_MARGIN;
-  return near(g.from[0], g.from[1]) || near(g.to[0], g.to[1]);
-}
 
 /**
  * A visible gallery's own drawn world-space box — but only the DECK, from
@@ -1149,7 +1019,9 @@ function Scene({
   insetTop,
   insetBottom,
   showNumbers,
+  labelWide,
   onNumberLayout,
+  timeOfDay,
 }: {
   look: Look;
   ghosted: boolean;
@@ -1165,13 +1037,28 @@ function Scene({
   labelFor: (no: number) => HoverInfo;
   zoneTonnes: Record<string, number | null>;
   showNumbers: boolean;
+  labelWide: boolean;
   onNumberLayout: (labels: SiloNumberLabel[]) => void;
   framing: { bounds: Bounds[]; dir: [number, number, number] };
   insetTop: number;
   insetBottom: number;
+  timeOfDay: TimeOfDay;
 }) {
   const selectedPlacement = selected !== null ? SILO_BY_NO.get(selected) : undefined;
   const hoveredPlacement = hovered !== null ? SILO_BY_NO.get(hovered) : undefined;
+
+  /* Same rule the old `Building` used, now computed once here so it can be
+     handed to `<SiteGround ghostedIds>` (which draws the floor-plan dot grid
+     inside each ghosted footprint) as well as to `<Buildings>` below —
+     `structures.tsx`'s own `<Buildings>` recomputes the identical set
+     internally for its own render decision, but the ground shader is not
+     that component's to reach into, so this file needs its own copy of the
+     RULE (not a duplicate of the geometry) to pass across the boundary. */
+  const ghostedBuildingIds = BUILDINGS.filter(
+    (b) => !!b.zone && (ghosted || (zone !== 'all' && b.zone === zone)),
+  ).map((b) => b.id);
+
+  const shadowLightRef = useRef<THREE.DirectionalLight>(null);
 
   return (
     <>
@@ -1184,35 +1071,67 @@ function Scene({
           hard — left as they were, everything washed out to a flat pale grey. */}
       <hemisphereLight args={[look.skyColor, look.groundColor, look.ambient * 0.7]} />
       <directionalLight
+        ref={shadowLightRef}
         position={look.sunPosition}
         intensity={look.sunIntensity}
         color={look.sunColor}
         castShadow={!lowPower}
         shadow-mapSize={lowPower ? [512, 512] : [2048, 2048]}
+        /*
+         * Starting frustum only — `ShadowFollow` below overwrites
+         * left/right/top/bottom every time `framing` changes to the
+         * currently-visible zone's own box (plan §4.D.4), so a 2048 map is
+         * spent on the part of the site actually on screen instead of a
+         * fixed 440 m square that makes every shadow at zone range a soft
+         * blob. This starting box is only what paints before the first
+         * `ShadowFollow` effect runs.
+         */
         shadow-camera-left={-220}
         shadow-camera-right={220}
         shadow-camera-top={220}
         shadow-camera-bottom={-220}
-        shadow-camera-far={560}
-        shadow-bias={-0.0004}
-        shadow-normalBias={0.05}
+        shadow-camera-near={1}
+        shadow-camera-far={700}
+        /* Re-tuned against acne on the new legs/rings/rails the geometry
+           workstream added — the old -0.0004/0.05 pair, tuned against the
+           plain lathe silos, produced visible striping on the thin structure
+           members once the shadow camera tightened to zone range. */
+        shadow-bias={-0.0006}
+        shadow-normalBias={0.12}
       />
 
-      {/*
-        Sky distance must sit INSIDE the camera's far plane.
-        drei's default is 45000 and this camera's far is 2400, so the sky sphere
-        was being clipped away entirely — every "sky" in this scene until now was
-        the flat background colour showing through, which is exactly why no
-        amount of turbidity or rayleigh tuning changed anything.
-      */}
-      <Sky
-        distance={1800}
-        sunPosition={look.skySunPosition ?? look.sunPosition}
-        turbidity={look.skyTurbidity}
-        rayleigh={look.skyRayleigh}
+      {/* The sky — a hand-authored gradient dome, not `drei Sky` (plan
+          §4.D.2; see `SkyDome.tsx`'s own header for why). Drawn first
+          (`renderOrder={-1}` on the mesh itself). */}
+      <SkyDome look={look} timeOfDay={timeOfDay} />
+
+      {!lowPower && (
+        <ShadowFollow lightRef={shadowLightRef} framing={framing} look={look} visuals={visuals} />
+      )}
+      {/* Shadows render only when something actually needs them to update —
+          the camera moving, the look changing, or the data changing — rather
+          than every frame (plan §4.D.4). */}
+      {!lowPower && <BakeShadows />}
+
+      <SiteGround
+        ground={look.ground}
+        yard={look.yard}
+        road={look.road}
+        fog={look.fog}
+        ghostedIds={ghostedBuildingIds}
       />
 
-      <SiteGround ground={look.ground} yard={look.yard} road={look.road} fog={look.fog} />
+      {/* Road kerbs are flat-ish ground furniture — drawn OUTSIDE the
+          vertical-exaggeration group below, same as the ground itself. */}
+      <RoadKerbs color={look.ground} />
+
+      {/* The neighbouring-property/yard dressing (neighbour buildings, trees,
+          trucks, cars, tanks, containers, stockpiles) — real-world scale like
+          the ground, so it stays outside the exaggeration group too. 12 draw
+          calls / ~3.4k tris (verify:structures), every mesh named
+          `dressing:*` with no `userData.silo`, so the picture-check mask
+          ignores it. */}
+      <SiteDressing zone={zone} lowPower={lowPower} />
 
       {/*
         The 10 m survey grid that used to be drawn here is gone.
@@ -1232,61 +1151,26 @@ function Scene({
         but keeping them out makes the intent obvious.
       */}
       <group scale={[1, VERTICAL_EXAGGERATION, 1]}>
-      <PerimeterWall color={look.yard} />
+      <Perimeter color={look.yard} />
       <Galleries color="#8d949c" zone={zone} />
       <LightMasts strength={look.mast} color={look.mastColor} lowPower={lowPower} />
 
       {/*
-        In see-through mode, a building with no bins in it is not shown at all.
-
-        The offices are the only shell with no `zone`. Ghosting them put an empty
-        glass box in the yard advertising contents it does not have; drawing them
-        solid instead made them the one opaque object in an otherwise transparent
-        scene, and being nearest the camera they became the brightest thing in
-        the frame — still the first place the eye lands, still not a silo.
-
-        See-through mode is the "show me the bins" mode. A shell with nothing in
-        it has no part in that, and it comes back the moment the buildings are
-        made solid again.
+        In see-through mode, a building with no bins in it is not shown at all
+        — `<Buildings>` (structures.tsx) applies the exact rule documented on
+        `ghostedBuildingIds` above: the offices (no `zone`) never ghost, since
+        nothing is ever drawn inside them.
       */}
-      {BUILDINGS.filter(
-        (b) => (zone === 'all' || !b.zone || b.zone === zone) && !(ghosted && !b.zone),
-      ).map((b) => (
-        <Building
-          key={b.id}
-          b={b}
-          /* Picking a zone is a request to look inside it, so its shell always
-             goes see-through regardless of the global toggle. */
-          /*
-           * Only ghost a building that has something to reveal.
-           *
-           * Ghosting is a promise: it says "there is something inside worth
-           * seeing". The offices are the one shell with no `zone`, so no bin is
-           * ever drawn inside them — and they were being ghosted anyway, which
-           * put a large, empty, bright-edged glass box in the yard. Worse, it
-           * sits at z = 84 while the silo banks sit around z = -4 to -16, so
-           * perspective made the smallest building on the site the LARGEST
-           * object in the default frame. The first thing the eye landed on was
-           * a container advertising contents it did not have, and it read as a
-           * debug bounding box left behind.
-           */
-          ghosted={!!b.zone && (ghosted || (zone !== 'all' && b.zone === zone))}
-        />
-      ))}
+      <Buildings zone={zone} ghosted={ghosted} />
 
       {/*
-        Zone-filtered like the buildings are — this used to render every
-        mezzanine regardless of which zone was framed, so viewing the raw
-        material zone also drew the dosing floor and the buffer floor sitting
-        off camera. Harmless clutter for a distant platform, but the same gap
-        as the galleries had: a platform's own fitted-in view never accounted
-        for a DIFFERENT zone's slab appearing in it, and — see
-        `platformFitBox` — the zone whose own platform this is fits it in on
-        purpose, so its silos never end up dwarfed by their own deck.
+        Zone- AND building-aware, like the silo groups — `<Platforms>`
+        (structures.tsx) uses `platformInZone`, so the mineral dosing floor
+        (which serves the dosing zone but stands in mill-a, the raw building)
+        is drawn in both the Raw Material and Minerals & Micro views, not
+        only the one whose `zone` field it carries.
       */}
-      {PLATFORMS.filter((p) => zone === 'all' || p.zone === zone).map((p) => (
-        <PlatformMesh key={p.id} p={p} />
-      ))}
+      <Platforms zone={zone} />
 
       {/* Only the bins actually on screen are candidates — a hidden zone's
           silos would otherwise be projected and take up label slots that the
@@ -1297,6 +1181,7 @@ function Scene({
           onLayout={onNumberLayout}
           insetTop={insetTop}
           insetBottom={insetBottom}
+          wide={labelWide}
         />
       )}
 
@@ -1321,7 +1206,7 @@ function Scene({
 
       {selectedPlacement && (
         <>
-          <SelectionMarker p={selectedPlacement} />
+          <SiloSelectionProxy placement={selectedPlacement} />
           {/* A ring on the floor is invisible in a packed bank seen from above.
               The number is what actually says "this one". */}
           <Html
@@ -1442,103 +1327,24 @@ function Scene({
         insetBottom={insetBottom}
       />
       <StatsProbe target={statsRef} />
+      <ExposureDrive exposure={look.exposure} />
       <AdaptiveDpr pixelated />
     </>
   );
 }
 
-/**
- * The post pass, deliberately its own memoised component.
- *
- * Inline effect children inside `Scene` are recreated on every render of it —
- * which means on every hover, every selection and every data refresh. r3f's
- * postprocessing drops the old EffectPass objects without disposing them, and
- * N8AO has no cleanup at all, so VRAM climbs while someone simply moves the
- * mouse. Same story for the environment cubemap below: new children identity
- * makes drei re-bake all six faces.
- *
- * Memoising on the two booleans that actually matter fixes both.
+/*
+ * `PostFx` (the post-processing chain: N8AO, tone mapping, AA, and — in the
+ * pre-rebuild version — Bloom and Vignette) used to be defined here. It now
+ * lives in its own file, `plant3d/PostFx.tsx` (imported above), per plan
+ * §4.D.6: "move PostFx out of Plant3D.tsx". The chain itself changed too —
+ * see that file's own header for the new N8AO tuning, the LUT grade and the
+ * distance-driven TiltShift, and for why Bloom and Vignette are both gone
+ * (Vignette: dropped per DESIGN.md's target picture, §3.1; Bloom: nothing in
+ * this scene is HDR-bright enough to justify its sixteen-pass mipmap
+ * pyramid — the masts are unlit emissive quads, not a light source this
+ * chain blooms).
  */
-/**
- * How much of the post chain is running. 0 is everything, 3 is the least.
- *
- * It used to be a boolean, and dropping it took the WHOLE chain with it —
- * including the tone mapping. That made the fallback a strict regression rather
- * than a simplification: the machine says it is struggling, and the answer it
- * gets is the same picture with every highlight clipped flat to white. The
- * degrade has to shed the expensive passes and keep the cheap, load-bearing one.
- *
- * Cost per tier, counted from the pass structure rather than guessed:
- *   Bloom's mipmap pyramid  16 draws  (8 levels down, 7 up, plus the extract)
- *   N8AO at half resolution  6 draws  (downsample, AO, 2 denoise, composite, copy)
- *   SMAA                     3 draws
- *   ToneMapping + Vignette   1 draw   — they merge into one pass and never go.
- */
-type PostTier = 0 | 1 | 2 | 3;
-
-const PostFx = memo(function PostFx({ tier }: { tier: PostTier }) {
-  /*
-   * Built as a filtered array rather than as `{cond && <Effect/>}` children.
-   *
-   * EffectComposer types its children as elements and walks them to merge
-   * compatible effects into a single pass, so a literal `false` in that list is
-   * both a type error and something it would have to reason about.
-   */
-  const passes = [
-    /* Ambient occlusion is what this scene was missing most after the
-       environment map: 136 vessels standing on a flat plane had no contact with
-       it and no shading in the gaps between them. Second to go. */
-    tier < 2 ? (
-      <N8AO key="ao" aoRadius={6} intensity={2.2} distanceFalloff={1.2} halfRes color="#1d222b" />
-    ) : null,
-    /* First to go, because it is by far the most expensive thing here — the
-       mipmap pyramid alone is sixteen passes. `levels` defaults to 8; five is
-       still smooth and saves six draw calls on every frame, at every tier. */
-    tier < 1 ? (
-      <Bloom
-        key="bloom"
-        intensity={0.55}
-        luminanceThreshold={0.82}
-        luminanceSmoothing={0.25}
-        mipmapBlur
-        levels={5}
-      />
-    ) : null,
-    /*
-     * Tone mapping MUST be in the chain rather than on the renderer, and must
-     * never be dropped at any tier.
-     *
-     * EffectComposer sets `gl.toneMapping = NoToneMapping` when it takes over,
-     * because tone mapping has to happen after the effects and not before them.
-     * Without this effect the scene renders with no tone mapping at all and
-     * every value above 1.0 clips flat to white — which is exactly what
-     * happened once already: the sky, the ground and the silos all went pale
-     * together and no amount of tuning the sun, the fog or the sky scattering
-     * moved them, because the clipping was downstream of all of it.
-     *
-     * It and the vignette merge into one pass, so keeping them costs a single
-     * draw call, which is why the degrade sheds Bloom and AO before either.
-     *
-     * One thing this is NOT: an audit claimed the old all-or-nothing fallback
-     * clipped everything white because it took the tone mapping with it. It
-     * does not — @react-three/postprocessing saves gl.toneMapping on mount and
-     * RESTORES it on unmount (EffectComposer.js:117-122), so with no composer
-     * the renderer applies its own ACES from `onCreated`. The reason to tier is
-     * smaller and duller: dropping AO, bloom and antialiasing in one step is a
-     * bigger jump than the machine usually needs, and bloom alone is sixteen of
-     * the chain's twenty-six passes.
-     */
-    <ToneMapping key="tone" mode={ToneMappingMode.ACES_FILMIC} />,
-    <Vignette key="vignette" offset={0.32} darkness={0.42} />,
-    tier < 3 ? <SMAA key="smaa" /> : null,
-  ].filter(Boolean) as JSX.Element[];
-
-  return (
-    <EffectComposer multisampling={0} enableNormalPass={false}>
-      {passes}
-    </EffectComposer>
-  );
-});
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -1611,7 +1417,24 @@ export default function Plant3D() {
    * the honest default for something you turn to when you need it; the search
    * box remains the way to find one specific bin without covering the rest.
    */
-  const [showNumbers, setShowNumbers] = useState(false);
+  /*
+   * Labels cycle Off -> Numbers -> Data (2026-09-02, from the competitor
+   * mockup's information design). The header's "Show silo numbers" pill keeps
+   * its boolean contract by mapping onto the first two states.
+   */
+  const [labelMode, setLabelMode] = useState<LabelMode>('off');
+  const showNumbers = labelMode !== 'off';
+  const setShowNumbers = useCallback((v: boolean) => setLabelMode(v ? 'numbers' : 'off'), []);
+  /* 2D plan: the same scene framed from straight above. A perspective camera
+     at fit distance looking down is visually near-orthographic and costs
+     nothing new; rotation is locked in this mode so it stays a plan. */
+  const [viewMode, setViewMode] = useState<ViewMode>('3d');
+  /* Bumped by Reset view / Fit all: a new framing object re-arms the camera
+     rig even when the zone has not changed. */
+  const [fitNonce, setFitNonce] = useState(0);
+  /* Zoom in/out requests from the control bar, applied by ZoomDriver inside
+     the Canvas (the page has no camera handle of its own). */
+  const [zoomReq, setZoomReq] = useState<{ n: number; f: number }>({ n: 0, f: 1 });
   const [numberLayout, setNumberLayout] = useState<SiloNumberLabel[]>([]);
   /*
    * Opens on the outside yard, not on the whole site.
@@ -1658,6 +1481,58 @@ export default function Plant3D() {
   /** a material picked out of the plant from the legend */
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [contextLost, setContextLost] = useState(false);
+  /*
+   * Colour mode: material (default) or fill-status — DESIGN.md's "Fill-status
+   * mode" and the shader's `uColorMode` uniform (`setColorMode` in
+   * `siloShader.ts`). Plan §4.D.1.e: expose this to the legend dock via props
+   * ONLY IF the dock already has a prop for it. `PlantHud.tsx`'s `LegendDock`
+   * does not (checked: no `colorMode`/`onColorMode`/`ColorMode` anywhere in
+   * that file) — that HUD control is Phase 4's job, and `PlantHud.tsx` is not
+   * this workstream's to edit. So for now this state exists, drives the
+   * shader, and is reachable for testing only via the DEV hooks below.
+   *
+   * TODO(Phase 4, HUD worker): once `LegendDock` grows a `colorMode`/
+   * `onColorMode` prop, wire `colorMode`/`setColorMode` (this state, not the
+   * shader function of the same name — rename one or the other when that
+   * lands) through to it here, the same way `highlighted`/`onHighlight`
+   * already are.
+   */
+  const [colorMode, setColorModeState] = useState<0 | 1>(0);
+  /* The see-through toggle (`ghosted`) is the BUILDINGS; `uSolidShells` is a
+     different axis (opaque vessel walls vs acrylic shells) with no HUD
+     control at all yet — same TODO as colour mode, same DEV-hook stopgap. */
+  const [solidShells, setSolidShellsState] = useState(false);
+
+  /* Pushes both toggles into the shared shader uniforms every time either
+     changes — `setColorMode`/`setSolidShells` (siloShader.ts) write a module-
+     level uniform OBJECT every material already shares, so this is the one
+     place either has to be called, not once per `SiloGroupMesh`. */
+  useEffect(() => {
+    setColorMode(colorMode);
+  }, [colorMode]);
+  useEffect(() => {
+    setSolidShells(solidShells);
+  }, [solidShells]);
+
+  /* DEV-only console hooks, same spirit as `__plant3d`/`__plant3dFraming`
+     below: until the legend dock grows real controls for these (see the TODO
+     above), this is how they get tested at all —
+     `window.__plant3dSetColorMode(1)` / `window.__plant3dSetSolidShells(true)`
+     from the browser console or a headless script. Stripped from production
+     builds. */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    const w = window as unknown as {
+      __plant3dSetColorMode?: (mode: 0 | 1) => void;
+      __plant3dSetSolidShells?: (on: boolean) => void;
+    };
+    w.__plant3dSetColorMode = (mode: 0 | 1) => setColorModeState(mode);
+    w.__plant3dSetSolidShells = (on: boolean) => setSolidShellsState(on);
+    return () => {
+      delete w.__plant3dSetColorMode;
+      delete w.__plant3dSetSolidShells;
+    };
+  }, []);
   /*
    * Ambient occlusion, bloom and antialiasing are the passes most likely to sink
    * a weak integrated GPU, and "is this machine fast enough" is not something
@@ -1977,6 +1852,13 @@ export default function Plant3D() {
               const code = String(r?.materialCode ?? '').trim();
               return code !== '' && code !== OUT_OF_SERVICE ? 1 : 0;
             })(),
+            /* Alarm plumbing (plan §4.D.1.c / 4.C.7): so the roof beacon
+               (`siloBeacons.tsx`, driven by `SiloGroupMesh`'s own `aState`
+               write) actually lights. `SiloVisual.hl`/`lock` default to 0 if
+               omitted — this is the caller finally threading the real state
+               through rather than leaving them dark. */
+            hl: r?.hlActive ? 1 : 0,
+            lock: r?.lockActive ? 1 : 0,
           };
         }),
       ),
@@ -2012,13 +1894,17 @@ export default function Plant3D() {
     const galleryBoxes = (z ? GALLERIES.filter((g) => galleryTouchesZone(g, z.id)) : GALLERIES).map(
       (g) => galleryFitBox(g, zoneFp),
     );
-    /* Same requirement as the galleries, and Platform already carries its
-       own `zone` — no nearest-cluster guess needed. An elevated zone's own
-       deck is drawn (see the PLATFORMS filter above) and has to be inside
-       the fitted box, or the slab reads as bigger than the bins standing on
-       it with nothing tying the two together. */
-    const platformBoxes = (z ? PLATFORMS.filter((p) => p.zone === z.id) : PLATFORMS).map((p) =>
-      platformFitBox(p),
+    /* Same requirement as the galleries — and, like `groupInZone`, a
+       platform belongs to the fit not only when its OWN `zone` matches but
+       also when it stands in the building this zone occupies:
+       `platformInZone` (silos.ts) is the one rule `<Platforms>`
+       (structures.tsx) also uses, so the mineral dosing floor is fitted in
+       for BOTH the Raw Material view (it stands in mill-a) and the Minerals
+       & Micro view (it serves that zone) — before this it was `p.zone ===
+       z.id` only, which left the mineral floor undrawn-but-unfitted in Raw,
+       the one place its own 400-series bins are visible standing on it. */
+    const platformBoxes = (z ? PLATFORMS.filter((p) => platformInZone(p, z.id, BUILDINGS)) : PLATFORMS).map(
+      (p) => platformFitBox(p),
     );
     const zoneFraming = z
       ? {
@@ -2030,9 +1916,9 @@ export default function Plant3D() {
             ...galleryBoxes,
             ...platformBoxes,
           ],
-          dir: z.dir,
+          dir: viewMode === '2d' ? [0.02, 1, 0.02] as [number, number, number] : z.dir,
         }
-      : { bounds: [...siloFitBoxes(SILOS), ...galleryBoxes, ...platformBoxes], dir: SITE_VIEW.dir };
+      : { bounds: [...siloFitBoxes(SILOS), ...galleryBoxes, ...platformBoxes], dir: viewMode === '2d' ? [0.02, 1, 0.02] as [number, number, number] : SITE_VIEW.dir };
 
     const p = focused !== null ? SILO_BY_NO.get(focused) : undefined;
     if (!p) return zoneFraming;
@@ -2052,7 +1938,8 @@ export default function Plant3D() {
       ],
       dir: zoneFraming.dir,
     };
-  }, [zone, focused]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zone, focused, viewMode, fitNonce]);
 
   const summary = useMemo(() => {
     let withStock = 0;
@@ -2203,8 +2090,8 @@ export default function Plant3D() {
       style={expanded || stageHeight === null ? undefined : { height: stageHeight }}
       className={
         expanded
-          ? 'fixed inset-0 z-50 overflow-hidden bg-slate-950'
-          : 'relative h-full min-h-[260px] w-full overflow-hidden bg-slate-950'
+          ? 'fixed inset-0 z-50 flex flex-col overflow-hidden bg-slate-950'
+          : 'relative flex h-full min-h-[260px] w-full flex-col overflow-hidden bg-slate-950'
       }
     >
       {/*
@@ -2223,13 +2110,30 @@ export default function Plant3D() {
         the-viewport requirement means the list has to leave the grid
         entirely there, which is what the overlay drawer below is for.
       */}
+      {/* The KPI strip: bins, capacity, stored, utilisation, alarms, freshness —
+          across the full width above canvas and list (borrowed from the
+          competitor mockup's information design, 2026-09-02). Hidden in full
+          screen, where the canvas must equal the viewport. */}
+      {!expanded && (
+        <KpiStrip
+          summary={summary}
+          plantWroteAt={readings.plantWroteAt}
+          fetchedAt={readings.fetchedAt}
+          loading={readings.isLoading}
+          error={readings.error}
+          onRefresh={readings.refetch}
+          onGoTo={goToAlarm}
+          compact={narrow}
+        />
+      )}
       <div
         className="relative min-h-0 min-w-0 overflow-hidden"
         style={{
           display: 'grid',
           gridTemplateColumns:
             narrow || expanded ? '1fr' : 'minmax(0, 1fr) clamp(280px, 28%, 360px)',
-          height: '100%',
+          flex: '1 1 0%',
+          minHeight: 0,
           width: '100%',
         }}
       >
@@ -2263,7 +2167,16 @@ export default function Plant3D() {
         onCreated={(state) => {
           const { gl } = state;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 0.92;
+          /* Overwritten every render by `ExposureDrive` (in `Scene`) once the
+             current look's own `exposure` is known — this is only the value
+             painted for the one frame before that effect runs. */
+          gl.toneMappingExposure = 1.0;
+          /* Plan §4.D.4: "2048 map, PCFSoftShadowMap (set in onCreated)".
+             r3f's `shadows` boolean prop only flips `shadowMap.enabled` —
+             the TYPE still defaults to three's own `PCFShadowMap`, which is
+             visibly harder-edged than the soft contact this scene wants
+             from the tightened, framing-following shadow camera. */
+          gl.shadowMap.type = THREE.PCFSoftShadowMap;
 
           /* Dev-only handle so the scene can be measured from the console rather
              than reasoned about. Stripped from production builds. */
@@ -2344,7 +2257,9 @@ export default function Plant3D() {
             insetTop={insets.top}
             insetBottom={insets.bottom}
             showNumbers={showNumbers}
+            labelWide={labelMode === 'data'}
             onNumberLayout={setNumberLayout}
+            timeOfDay={timeOfDay}
           />
         </Suspense>
 
@@ -2357,8 +2272,10 @@ export default function Plant3D() {
           maxPolarAngle={Math.PI / 2.06}
           minDistance={6}
           maxDistance={560}
+          enableRotate={viewMode !== '2d'}
           makeDefault
         />
+        <ZoomDriver req={zoomReq} />
       </Canvas>
 
       {/*
@@ -2369,22 +2286,31 @@ export default function Plant3D() {
       */}
       {showNumbers && (
         <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
-          {numberLayout.map((l) => (
-            <span
-              key={l.siloNo}
-              /* One ring value for both themes. The light-mode pseudo-variant
-                 is hand-written in index.css and defines no ring rules at all,
-                 so a light-mode ring class compiles to nothing; `ring-cyan-400/30`
-                 is a hairline that reads against the dark card fill and the
-                 pale one alike. The class check caught the first attempt — and
-                 then caught this comment naming the class, which is worth
-                 knowing: that scanner reads comments too. */
-              className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-slate-950/85 px-1 py-px font-mono text-[10px] font-semibold leading-none text-cyan-200 ring-1 ring-cyan-400/30 light:bg-white/90 light:text-cyan-700"
-              style={{ left: `${l.x}px`, top: `${l.y}px` }}
-            >
-              {l.siloNo}
-            </span>
-          ))}
+          {numberLayout.map((l) => {
+            const placement = SILO_BY_NO.get(l.siloNo);
+            if (!placement) return null;
+            const reading = readings.byNo.get(l.siloNo);
+            const level = siloLevel(placement, reading);
+            const alarmed = Boolean(reading?.hlActive || reading?.lockActive);
+            const status: ChipStatus = reading?.lockActive
+              ? 'locked'
+              : (statusCategoryFor(level.fraction, alarmed) ?? 'no-data');
+            return (
+              <span
+                key={l.siloNo}
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${l.x}px`, top: `${l.y}px` }}
+              >
+                <DataChip
+                  siloNo={l.siloNo}
+                  percent={level.fraction}
+                  tonnes={level.quantityKg === null ? null : level.quantityKg / 1000}
+                  status={status}
+                  mode={labelMode === 'data' ? 'data' : 'number'}
+                />
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -2422,7 +2348,35 @@ export default function Plant3D() {
         materials={materials}
         highlighted={highlighted}
         onHighlight={setHighlighted}
+        colorMode={colorMode === 1 ? 'status' : 'material'}
+        onColorMode={(m) => {
+          setColorModeState(m === 'status' ? 1 : 0);
+          /* The material filter buttons disappear in status mode; a filter
+             left active would keep dimming bins with no control to undo it. */
+          if (m === 'status') setHighlighted(null);
+        }}
       />
+      <Hint />
+      {/* Bottom-left control cluster, above the legend dock (h-8): 3D/2D,
+          X-ray (the acrylic shells), Reset, Fit all, Labels, zoom. */}
+      <div className="pointer-events-none absolute left-2 z-20" style={{ bottom: 32 + 8 }}>
+        <div className="pointer-events-auto">
+          <ControlBar
+            viewMode={viewMode}
+            onViewMode={setViewMode}
+            xray={!solidShells}
+            onXray={(v) => setSolidShellsState(!v)}
+            onReset={() => setFitNonce((n) => n + 1)}
+            onFit={() => {
+              goToZone('all');
+              setFitNonce((n) => n + 1);
+            }}
+            labels={labelMode}
+            onLabels={setLabelMode}
+            onZoom={(dir) => setZoomReq((r) => ({ n: r.n + 1, f: dir === 'in' ? 0.85 : 1.18 }))}
+          />
+        </div>
+      </div>
 
       {/*
         Full screen's own floating top bar.
@@ -2502,6 +2456,7 @@ export default function Plant3D() {
         >
           <SiloList
             placements={visibleSilos}
+            colorMode={colorMode === 1 ? 'status' : 'material'}
             readings={readings}
             summary={summary}
             selected={selected}
@@ -2539,6 +2494,7 @@ export default function Plant3D() {
         >
           <SiloList
             placements={visibleSilos}
+            colorMode={colorMode === 1 ? 'status' : 'material'}
             readings={readings}
             summary={summary}
             selected={selected}
@@ -2573,7 +2529,7 @@ export default function Plant3D() {
         <motion.div
           ref={sheetRef}
           data-plant3d-sheet
-          className="absolute inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden border-t border-slate-800 bg-slate-950/95 shadow-[0_-4px_16px_rgba(0,0,0,0.25)] backdrop-blur-md light:border-gray-200 light:bg-white/95"
+          className="absolute inset-x-0 bottom-8 z-30 flex flex-col overflow-hidden border-t border-slate-800 bg-slate-950/95 shadow-[0_-4px_16px_rgba(0,0,0,0.25)] backdrop-blur-md light:border-gray-200 light:bg-white/95"
           initial={false}
           animate={{ height: sheetOpen ? '45%' : SHEET_PEEK }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
@@ -2597,6 +2553,7 @@ export default function Plant3D() {
           <div className="min-h-0 flex-1 overflow-hidden">
             <SiloList
               placements={visibleSilos}
+              colorMode={colorMode === 1 ? 'status' : 'material'}
               readings={readings}
               summary={summary}
               selected={selected}

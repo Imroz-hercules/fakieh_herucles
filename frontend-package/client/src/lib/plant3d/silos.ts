@@ -618,13 +618,17 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
        bin at 1.5 m drew 5.4:1; 2.0 m is a real small hopper bin's shape. The
        2.4 m pitch opens with the same draw scale, so the pair on the sides
        stays clear. */
-    diameter: 2.4,
+    /* 2.7 m (2026-09-02, second widening on the client's "bigger, the ones
+       you can"): the most the 3-2-3 block can take at cz 8 while staying
+       1.6 m clear of the 300 battery's back row; drawn volume still equals
+       the 5 t capacity, so the bin is shorter for being wider. */
+    diameter: 2.7,
     hopperRatio: 0.7,
     elevation: 0.6,
     floor: 10,
     mask: ['XXX', 'X X', 'XXX'],
-    pitchX: 2.8,
-    pitchZ: 2.8,
+    pitchX: 2.9,
+    pitchZ: 2.9,
     cx: -15,
     cz: 8,
     arrangement: 'Square, three-two-three, the pair on the sides',
@@ -717,13 +721,19 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     shell: 'galvanised',
     /* 1.5 -> 2.0 m (2026-09-02, client's proportions decision), same reasoning
        as the 400 series; the 5 x 6 m pitch has room to spare. */
-    diameter: 2.6,
+    /* 2.7 m, z pitch 7 (2026-09-02, second widening). 3.2 m was tried and the
+       capacity check refused it: a 5 t bin's 60-degree hopper alone holds
+       9.7 m3 at that width against a 6.7 m3 label. 2.7 m is the widest a 5 t
+       bin can be drawn while its volume still equals its capacity. 0.9 m
+       clear of the
+       press house's west wall, 1.2 m clear of its north wall. */
+    diameter: 2.7,
     hopperRatio: 0.7,
     elevation: 0.6,
     floor: 8,
     mask: ['XX', 'XX'],
     pitchX: 5,
-    pitchZ: 6,
+    pitchZ: 7,
     cx: 66.5,
     cz: -9,
     arrangement: 'Two pairs: 601-602 and 603-604',
@@ -744,7 +754,9 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     /* 3 -> 3.5 m (2026-09-02, client's proportions decision): the 50 t buffer
        silo drew 6:1 tall; 3.5 m brings it under 5:1 at the new stretch. It
        stands alone, so nothing binds. */
-    diameter: 4.0,
+    /* 4.5 m (2026-09-02, second widening): 0.8 m clear of the press house's
+       east wall, which is what pins the finished store's west wall. */
+    diameter: 4.5,
     hopperRatio: 0.7,
     elevation: 0.6,
     floor: 8,

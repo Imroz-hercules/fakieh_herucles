@@ -27,15 +27,20 @@
  * selected `siloNo` (e.g. `SILO_BY_NO.get(selected)`).
  */
 import { useEffect, useMemo } from 'react';
-import * as THREE from 'three';
 import type { SiloPlacement } from './silos';
 import { buildBaseGeometry } from './siloGeometry';
+import { makeSelectionMaterial } from './siloShader';
 
-/** The one accent colour this app uses for selection — see siloShader.ts's
-    own ACCENT constant, kept as a literal here since importing a value
-    from siloShader.ts would pull its whole module (and this proxy renders
-    even before that module has finished compiling on a hot edit). */
-const ACCENT = '#22d3ee';
+/*
+ * Phase 2 workstream D swap: the flat placeholder `MeshBasicMaterial` this
+ * file shipped with (a plain 35%-alpha cyan tint) is replaced by
+ * `makeSelectionMaterial()` (`siloShader.ts`) — the real cyan fresnel-glow
+ * material the shader worker built for exactly this proxy: a rim that firms
+ * up at grazing angles and almost vanishes face-on, so the selected bin reads
+ * as a glow around its own silhouette rather than a flat tinted cylinder.
+ * Same `ACCENT` constant either way (siloShader.ts's own `export const
+ * ACCENT`), so this file no longer needs its own literal copy of it.
+ */
 
 export function SiloSelectionProxy({ placement }: { placement: SiloPlacement }) {
   /* One geometry per (group, capacity-derived dims) pair — memoized on the
@@ -47,17 +52,7 @@ export function SiloSelectionProxy({ placement }: { placement: SiloPlacement }) 
     [placement.group.id],
   );
 
-  const material = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        color: new THREE.Color(ACCENT),
-        transparent: true,
-        opacity: 0.35,
-        depthWrite: false,
-        side: THREE.FrontSide,
-      }),
-    [],
-  );
+  const material = useMemo(() => makeSelectionMaterial(), []);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);

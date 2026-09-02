@@ -1638,6 +1638,52 @@ main {
   }
 }
 
+/*
+ * Plant 3D HUD loading skeletons (SiloList.tsx, Phase 4 workstream F item 5).
+ *
+ * A moving highlight over placeholder shapes rather than a spinner: a
+ * spinner claims indeterminate work is happening somewhere the operator
+ * cannot see, and a skeleton row says "this is what's coming into view" —
+ * which is what the first 15s poll actually is. `prefers-reduced-motion`
+ * drops the animation to a flat tint, same as everywhere else in this app.
+ */
+@keyframes plant3d-shimmer {
+  0% {
+    background-position: -120% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+.plant3d-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.12) 25%,
+    rgba(148, 163, 184, 0.28) 50%,
+    rgba(148, 163, 184, 0.12) 75%
+  );
+  background-size: 200% 100%;
+  animation: plant3d-shimmer 1.6s ease-in-out infinite;
+}
+:root.light .plant3d-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    rgba(100, 116, 139, 0.1) 25%,
+    rgba(100, 116, 139, 0.22) 50%,
+    rgba(100, 116, 139, 0.1) 75%
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  .plant3d-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: rgba(148, 163, 184, 0.16);
+  }
+  :root.light .plant3d-skeleton {
+    background-color: rgba(100, 116, 139, 0.14);
+  }
+}
+
 /* Smooth transitions for page navigation */
 .page-transition {
   transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
