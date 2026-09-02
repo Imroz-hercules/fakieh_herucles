@@ -1620,6 +1620,24 @@ main {
   scrollbar-gutter: stable;
 }
 
+/*
+ * Plant 3D shell — a touch target that grows on a coarse pointer.
+ *
+ * DESIGN.md's touch rule (>=32px desktop, >=44px on a coarse pointer) cannot
+ * be met by sizing an element once: the legend dock is a fixed 32px bar and a
+ * silo-list row is dense by design, so growing every target to 44px
+ * unconditionally would blow both budgets on the laptop/desktop pointer this
+ * view is built for. `pointer: coarse` is true on touch and false on a mouse
+ * or trackpad, which is the actual axis DESIGN.md is asking for — not screen
+ * width, which a touch laptop can share with a mouse-driven one.
+ */
+@media (pointer: coarse) {
+  .touch-target-44 {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* Smooth transitions for page navigation */
 .page-transition {
   transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
@@ -1632,7 +1650,20 @@ main {
 
 .page-transition-enter-active {
   opacity: 1;
-  transform: translateY(0);
+  /*
+   * `transform: none`, NOT `translateY(0)`.
+   *
+   * A transform — even an identity one — makes an element the containing
+   * block for every `position: fixed` descendant. This wrapper sits around
+   * every page's content and both classes are applied statically, so the
+   * "translateY(0)" end state was permanent: the Plant 3D stage's
+   * `fixed inset-0` full-screen mode resolved against this wrapper instead of
+   * the viewport and the canvas never grew. Measured on the client's laptop
+   * (canvas rect unchanged with the fixed class applied). `none` ends the
+   * same transition at the same place without creating the containing block.
+   * `scripts/verify-plant3d.mjs` checks this rule stays that way.
+   */
+  transform: none;
 }
 
 /* Enhanced Dashboard Editor Animations */

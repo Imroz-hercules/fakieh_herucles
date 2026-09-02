@@ -1,9 +1,11 @@
 /**
  * The instanced silo family.
  *
- * Every bin in the plant is one surface of revolution — support, hopper, barrel,
- * roof — so each group becomes a single `LatheGeometry`. 136 bins in eleven
- * groups.
+ * Every bin in the plant is now a merged, multi-part `BufferGeometry` — wall,
+ * roof, hopper, legs, rings, hatches — assembled per archetype in
+ * `siloGeometry.ts` and tagged per-vertex with `aPart` so one shared material
+ * can shade every part differently. 136 bins in eleven groups, still one
+ * instanced draw per pass per group.
  *
  * SEEING THE LEVEL
  * ----------------
@@ -16,8 +18,9 @@
  *
  * Three passes over one shared geometry, per group:
  *
- *   1. CONTENTS   opaque, depth-writing. The outer wall below the surface, plus
- *                 the support structure, which is never see-through.
+ *   1. CONTENTS   opaque, depth-writing. The outer wall below the surface,
+ *                 plus the roof and every structural part (legs, rings,
+ *                 hatches, skirt) — those are never see-through, at any fill.
  *   2. SURFACE    an opaque disc at the material surface, sized to the real
  *                 cross-section at that height — which is smaller inside a
  *                 hopper than inside the barrel.
@@ -28,16 +31,55 @@
  * A single `transparent` material could not do this: everything below the level
  * has to be opaque and depth-writing, or the contents of one bin show through
  * the bin standing in front of it.
+ *
+ * DETAIL LOD
+ * ----------
+ * A second, smaller geometry per group — ladders with safety-cage hoops, plus
+ * a catwalk grating strip per bin on the 800 series — lives in its own
+ * `InstancedMesh`, drawn with the CONTENTS material, and is only made visible
+ * when the camera is within `LOD_DETAIL_DISTANCE` of the group's nearest bin.
+ * Toggled by `mesh.visible` inside the same distance-tracking `useFrame` that
+ * already re-sorts the instance draw order — never remounted, so it costs
+ * nothing extra to mount or unmount.
  */
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { shellColor, storageRadiusAt, type SiloGroupSpec, type SiloPlacement } from './silos';
-import { fillRange, segmentsFor, siloProfile } from './siloGeometry';
-import { makeContentsMaterial, makeShellMaterial, makeSurfaceMaterial } from './siloShader';
+import { shellColor, storageRadiusAt, type SiloGroupSpec, type SiloPlacement, type ShellKind } from './silos';
+import { buildBaseGeometry, buildDetailGeometry, fillRange, segmentsFor } from './siloGeometry';
+import * as SiloShader from './siloShader';
+import { GroupStructures } from './siloStructures';
+import { SiloBeacons, type BeaconState } from './siloBeacons';
 
 /** How much larger than the drawn bin its click target is. See pickMaterial. */
 const HIT_PADDING = 1.6;
+
+/** Camera distance (metres, live scene units) inside which a group's detail
+    LOD mesh — ladders, catwalk grating — is drawn. Beyond it, the base
+    archetype geometry (with its own legs, rings and hatches) reads fine on
+    its own and the detail mesh is hidden, not remounted. */
+/* Not exported: `siloMesh.tsx` must export only `SiloGroupMesh` at runtime —
+   see 'the silo mesh module still builds and exports its component' in
+   verify-plant3d.mjs, which fails the build's Fast Refresh boundary the
+   moment this file exports a second runtime value. */
+const LOD_DETAIL_DISTANCE = 90;
+
+/** `ShellKind` -> the shader's material family, per the Phase 2 contract with
+    `siloShader.ts` (0 galvanised, 1 painted, 2 concrete, 3 tank steel). */
+function familyOf(shell: ShellKind): 0 | 1 | 2 | 3 {
+  switch (shell) {
+    case 'galvanised':
+      return 0;
+    case 'painted':
+      return 1;
+    case 'concrete':
+      return 2;
+    case 'tank':
+      return 3;
+    default:
+      return 0;
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* One group                                                           */
@@ -62,6 +104,14 @@ export interface SiloVisual {
    * ten that mean something can be coloured like they mean it.
    */
   known: number;
+  /**
+   * High-level alarm and lock state, 0/1. Optional and defaulted to 0: the
+   * caller (`Plant3D.tsx`, owned by the HUD workstream) does not thread real
+   * alarm state into `visuals` yet, so beacons stay dark until it does —
+   * degrading safely rather than throwing on a field that is not there.
+   */
+  hl?: number;
+  lock?: number;
 }
 
 interface SiloGroupMeshProps {
@@ -89,17 +139,30 @@ export function SiloGroupMesh({
   const pickRef = useRef<THREE.InstancedMesh>(null);
   const shellRef = useRef<THREE.InstancedMesh>(null);
   const surfaceRef = useRef<THREE.InstancedMesh>(null);
+  const detailRef = useRef<THREE.InstancedMesh>(null);
   const count = placements.length;
   const dims = placements[0]?.dims;
 
   const geometry = useMemo(() => {
     if (!dims) return null;
-    const geo = new THREE.LatheGeometry(siloProfile(dims), segmentsFor(dims.diameter));
+    const geo = buildBaseGeometry(group, dims);
     geo.setAttribute('aColor', new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3));
     geo.setAttribute('aFill', new THREE.InstancedBufferAttribute(new Float32Array(count), 1));
     geo.setAttribute('aFx', new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3));
+    geo.setAttribute('aState', new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3));
     return geo;
-  }, [dims, count]);
+  }, [group, dims, count]);
+
+  const detailGeometry = useMemo(() => {
+    if (!dims) return null;
+    const geo = buildDetailGeometry(group, dims);
+    if (!geo) return null;
+    geo.setAttribute('aColor', new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3));
+    geo.setAttribute('aFill', new THREE.InstancedBufferAttribute(new Float32Array(count), 1));
+    geo.setAttribute('aFx', new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3));
+    geo.setAttribute('aState', new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3));
+    return geo;
+  }, [group, dims, count]);
 
   const surfaceGeometry = useMemo(() => {
     if (!dims) return null;
@@ -110,19 +173,21 @@ export function SiloGroupMesh({
     return geo;
   }, [dims, count]);
 
+  const family = familyOf(group.shell);
+
   const contentsMaterial = useMemo(() => {
     if (!dims) return null;
     const [y0, y1] = fillRange(dims);
-    return makeContentsMaterial(shellColor(group.shell), y0, y1, dims.hopper);
-  }, [dims, group.shell]);
+    return SiloShader.makeContentsMaterial(shellColor(group.shell), y0, y1, dims.hopper, { family });
+  }, [dims, group.shell, family]);
 
   const shellMaterial = useMemo(() => {
     if (!dims) return null;
     const [y0, y1] = fillRange(dims);
-    return makeShellMaterial(shellColor(group.shell), y0, y1, dims.hopper);
-  }, [dims, group.shell]);
+    return SiloShader.makeShellMaterial(shellColor(group.shell), y0, y1, dims.hopper, { family });
+  }, [dims, group.shell, family]);
 
-  const surfaceMaterial = useMemo(() => makeSurfaceMaterial(), []);
+  const surfaceMaterial = useMemo(() => SiloShader.makeSurfaceMaterial(), []);
 
   /*
    * An invisible, slightly larger copy of the bin, purely to be clicked.
@@ -144,6 +209,7 @@ export function SiloGroupMesh({
   /* r3f auto-disposes only what is declared as a JSX child. These are built in a
      memo and handed over as props, so nothing frees them on unmount. */
   useEffect(() => () => geometry?.dispose(), [geometry]);
+  useEffect(() => () => detailGeometry?.dispose(), [detailGeometry]);
   useEffect(() => () => surfaceGeometry?.dispose(), [surfaceGeometry]);
   useEffect(() => () => contentsMaterial?.dispose(), [contentsMaterial]);
   useEffect(() => () => shellMaterial?.dispose(), [shellMaterial]);
@@ -161,11 +227,17 @@ export function SiloGroupMesh({
    *
    * The order is applied to the matrices AND to every per-instance attribute, so
    * all three passes stay in step. It is recomputed only when the camera has
-   * actually moved a couple of metres.
+   * actually moved a couple of metres — the same threshold the LOD detail
+   * toggle below rides on, since both only need to react to real camera
+   * movement, not every frame.
    */
   const orderRef = useRef<number[]>([]);
   const lastCamera = useRef(new THREE.Vector3(Infinity, 0, 0));
   const boundsStale = useRef(true);
+
+  /** The plant is not metered or not monitored at all for this group — the
+      "no data" state the shell shader hatches rather than draws a level for. */
+  const noData = group.metered && group.monitored ? 0 : 1;
 
   const writeInstances = () => {
     const order = orderRef.current;
@@ -181,14 +253,16 @@ export function SiloGroupMesh({
     for (const [mesh, pad] of [
       [solidRef.current, 1],
       [shellRef.current, 1],
+      [detailRef.current, 1],
       [pickRef.current, HIT_PADDING],
     ] as const) {
       if (!mesh) continue;
       order.forEach((src, slot) => {
         const p = placements[src];
         /* Uniform scale, applied on the instance rather than baked into the
-           geometry — so `siloProfile` stays true size and the capacity checks
-           keep testing real geometry rather than the compressed drawing. */
+           geometry — so `buildBaseGeometry` stays true size and the capacity
+           checks (which read `siloProfile`, not this mesh) keep testing real
+           geometry rather than the compressed drawing. */
         const s = p.drawScale * pad;
         m.makeScale(s, s, s);
         m.setPosition(p.x, p.floor, p.z);
@@ -234,8 +308,13 @@ export function SiloGroupMesh({
     const col = geometry.getAttribute('aColor') as THREE.InstancedBufferAttribute;
     const fillAttr = geometry.getAttribute('aFill') as THREE.InstancedBufferAttribute;
     const fx = geometry.getAttribute('aFx') as THREE.InstancedBufferAttribute;
+    const st = geometry.getAttribute('aState') as THREE.InstancedBufferAttribute;
     const sCol = surfaceGeometry.getAttribute('aColor') as THREE.InstancedBufferAttribute;
     const sFx = surfaceGeometry.getAttribute('aFx') as THREE.InstancedBufferAttribute;
+    const dCol = detailGeometry?.getAttribute('aColor') as THREE.InstancedBufferAttribute | undefined;
+    const dFillAttr = detailGeometry?.getAttribute('aFill') as THREE.InstancedBufferAttribute | undefined;
+    const dFx = detailGeometry?.getAttribute('aFx') as THREE.InstancedBufferAttribute | undefined;
+    const dSt = detailGeometry?.getAttribute('aState') as THREE.InstancedBufferAttribute | undefined;
     order.forEach((src, slot) => {
       const v = visuals[src];
       if (!v) return;
@@ -244,25 +323,41 @@ export function SiloGroupMesh({
       fillAttr.setX(slot, v.fill);
       fx.setXYZ(slot, v.dim, v.highlight, v.known);
       sFx.setXYZ(slot, v.dim, v.highlight, v.known);
+      st.setXYZ(slot, v.hl ?? 0, v.lock ?? 0, noData);
+      if (dCol && dFillAttr && dFx && dSt) {
+        dCol.setXYZ(slot, v.color.r, v.color.g, v.color.b);
+        dFillAttr.setX(slot, v.fill);
+        dFx.setXYZ(slot, v.dim, v.highlight, v.known);
+        dSt.setXYZ(slot, v.hl ?? 0, v.lock ?? 0, noData);
+      }
     });
     col.needsUpdate = true;
     fillAttr.needsUpdate = true;
     fx.needsUpdate = true;
+    st.needsUpdate = true;
     sCol.needsUpdate = true;
     sFx.needsUpdate = true;
+    if (dCol) dCol.needsUpdate = true;
+    if (dFillAttr) dFillAttr.needsUpdate = true;
+    if (dFx) dFx.needsUpdate = true;
+    if (dSt) dSt.needsUpdate = true;
   };
 
   /** Which placement each instance slot is currently drawing. */
   const slotToPlacement = orderRef;
 
   useFrame((state) => {
+    if (typeof SiloShader.setSiloTime === 'function') SiloShader.setSiloTime(state.clock.elapsedTime);
+
     /* A hidden group is not being composited, so its draw order cannot be
-       wrong. Sorting it is pure waste on exactly the frames where the camera is
-       moving and the budget is tightest. */
+       wrong and its LOD detail cannot be seen. Sorting and distance work are
+       pure waste on exactly the frames where the camera is moving and the
+       budget is tightest. */
     if (!visible) return;
     const cam = state.camera.position;
     if (cam.distanceToSquared(lastCamera.current) < 4) return;
     lastCamera.current.copy(cam);
+    let nearestSq = Infinity;
     const order = placements
       .map((_, i) => i)
       .sort((a, b) => {
@@ -270,10 +365,15 @@ export function SiloGroupMesh({
         const pb = placements[b];
         const da = (pa.x - cam.x) ** 2 + (pa.z - cam.z) ** 2;
         const db = (pb.x - cam.x) ** 2 + (pb.z - cam.z) ** 2;
+        if (da < nearestSq) nearestSq = da;
+        if (db < nearestSq) nearestSq = db;
         return db - da; /* farthest first */
       });
     orderRef.current = order;
     writeInstances();
+    if (detailRef.current) {
+      detailRef.current.visible = nearestSq < LOD_DETAIL_DISTANCE * LOD_DETAIL_DISTANCE;
+    }
   });
 
   /* Data changed: rewrite in the order already established. */
@@ -282,7 +382,12 @@ export function SiloGroupMesh({
     boundsStale.current = true;
     writeInstances();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placements, visuals, geometry, surfaceGeometry, dims]);
+  }, [placements, visuals, geometry, surfaceGeometry, detailGeometry, dims]);
+
+  const beaconStates: BeaconState[] = useMemo(
+    () => visuals.map((v) => ({ hl: v.hl ?? 0, lock: v.lock ?? 0 })),
+    [visuals],
+  );
 
   if (!geometry || !surfaceGeometry || !contentsMaterial || !shellMaterial || count === 0) {
     return null;
@@ -305,6 +410,8 @@ export function SiloGroupMesh({
       {/* 1. contents and structure — opaque, writes depth */}
       <instancedMesh
         ref={solidRef}
+        name={`silo:${group.id}:contents`}
+        userData={{ silo: true }}
         args={[geometry, contentsMaterial, count]}
         receiveShadow
         raycast={() => null}
@@ -313,6 +420,8 @@ export function SiloGroupMesh({
       {/* 2. the material surface */}
       <instancedMesh
         ref={surfaceRef}
+        name={`silo:${group.id}:surface`}
+        userData={{ silo: true }}
         args={[surfaceGeometry, surfaceMaterial, count]}
         receiveShadow
         raycast={() => null}
@@ -326,6 +435,8 @@ export function SiloGroupMesh({
       */}
       <instancedMesh
         ref={shellRef}
+        name={`silo:${group.id}:shell`}
+        userData={{ silo: true }}
         args={[geometry, shellMaterial, count]}
         castShadow={castShadow}
         receiveShadow
@@ -335,6 +446,8 @@ export function SiloGroupMesh({
       {/* 4. the click target: invisible, padded, never drawn. */}
       <instancedMesh
         ref={pickRef}
+        name={`silo:${group.id}:pick`}
+        userData={{ silo: true }}
         args={[geometry, pickMaterial, count]}
         onPointerMove={(e) => {
           e.stopPropagation();
@@ -350,6 +463,26 @@ export function SiloGroupMesh({
           if (no !== null) onSelect(no);
         }}
       />
+
+      {/* 5. detail LOD — ladders, cages, catwalk grating. Hidden beyond
+          LOD_DETAIL_DISTANCE, toggled by mesh.visible, never remounted. */}
+      {detailGeometry && (
+        <instancedMesh
+          ref={detailRef}
+          name={`silo-detail:${group.id}`}
+          args={[detailGeometry, contentsMaterial, count]}
+          castShadow={castShadow}
+          receiveShadow
+          raycast={() => null}
+          visible={false}
+        />
+      )}
+
+      {/* 6. structure shared by the whole group — the finished-feed conveyors. */}
+      <GroupStructures group={group} placements={placements} />
+
+      {/* 7. alarm beacons — camera-facing, screen-size-clamped, HL/lock only. */}
+      <SiloBeacons placements={placements} states={beaconStates} />
     </group>
   );
 }

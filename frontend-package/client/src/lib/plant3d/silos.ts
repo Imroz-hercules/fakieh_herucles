@@ -47,7 +47,17 @@ export const BULK_DENSITY_T_PER_M3 = 0.75;
  * the honest derived size, the capacity checks keep testing real geometry, and
  * the UI says the heights are exaggerated.
  */
-export const VERTICAL_EXAGGERATION = 1.55;
+/*
+ * 1.55 -> 1.25 on 2026-09-02, on the client's decision after the proportions
+ * were measured: with 1.55 the drawn height-to-diameter ratio was 8.5 for the
+ * 300 series and 10.0 for the 800 series — straws, where a real hopper bin sits
+ * near 3. The two biggest banks cannot get WIDER (11 bins per row already span
+ * 53.9 m of a 55 m traced building; 16 per row span 48.6 m of 55.5 m), so the
+ * stretch is the one lever that makes every bin stockier at once while keeping
+ * relative heights true. The immersive page's canvas is ~40% taller than the
+ * one 1.55 was tuned for, which is what pays for the lost height at site range.
+ */
+export const VERTICAL_EXAGGERATION = 1.25;
 
 /**
  * Size compression, applied to every group on the site — indoor and outdoor
@@ -327,10 +337,42 @@ const SHELL: Record<ShellKind, string> = {
   tank: '#77878f',
 };
 
+/**
+ * The shape each group is drawn in — see `siloGeometry.ts`'s
+ * `buildBaseGeometry` for what each one assembles. Diameters and heights are
+ * unchanged by this; it only dresses the same derived dims in structure.
+ */
+export type SiloArchetype = 'bulk' | 'tank' | 'hopperBin' | 'mineralBin' | 'microHopper';
+
+/** Per-group structure knobs the archetype builder reads. Every field is
+    optional and archetype-specific; see `buildBaseGeometry`. */
+export interface SiloStructureParams {
+  /** leg count (hopperBin/mineralBin/microHopper) */
+  legs?: number;
+  /** stiffener ring count on the barrel (hopperBin) */
+  rings?: number;
+  /** which side the ladder detail mesh stands on; -1 = -X (the default) */
+  ladderSide?: 1 | -1;
+  /** override for the stiffener/rail ring radius ratio, when the nominal
+      value would collide with a neighbour — see the 800-series note in
+      `siloGeometry.ts`'s `buildBaseGeometry` */
+  ringRadiusRatio?: number;
+  /** the six-box spiral-stair suggestion (tank) */
+  stair?: boolean;
+  /** the horizontal screw-feeder stub off the outlet (microHopper) */
+  screwFeeder?: boolean;
+  /** this group gets the shared conveyor structure (hopperBin, 800 series) */
+  conveyors?: boolean;
+}
+
 export interface SiloGroupSpec {
   id: string;
   series: SeriesId;
   label: string;
+  /** the shape this group is drawn in — see `SiloArchetype` */
+  archetype: SiloArchetype;
+  /** structure knobs the archetype builder reads; all optional */
+  structure?: SiloStructureParams;
   /**
    * Which tab this group is grouped under — a statement about what the bins
    * ARE, not about where they stand.
@@ -403,13 +445,15 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's100',
     series: 100,
     label: 'Bulk raw material',
+    archetype: 'bulk',
     zone: 'outside',
     first: 101,
     capacityKg: 1_600_000,
     metered: true,
     monitored: true,
     shell: 'concrete',
-    diameter: 10,
+    /* Widened 2026-09-02 on the client's instruction ("bigger, like a real silo shape", buildings may grow past the aerial); see the proportions table in the design log 8l. */
+    diameter: 11,
     hopperRatio: 0,
     elevation: 1.2,
     floor: 0,
@@ -418,8 +462,8 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
        in X and mask rows step in Z, so this is simply the transpose of what was
        here — the count and the grouping are untouched, only the axis. */
     mask: ['XX', 'XX', 'XX', 'XX', 'XX', 'XX', 'XX', 'X '],
-    pitchX: 11,
-    pitchZ: 12,
+    pitchX: 12,
+    pitchZ: 13,
     cx: -95.5,
     cz: -16,
     arrangement: 'Two columns: eight, then seven',
@@ -428,13 +472,15 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's200',
     series: 200,
     label: 'Flat storage',
+    archetype: 'bulk',
     zone: 'outside',
     first: 201,
     capacityKg: 1_600_000,
     metered: true,
     monitored: true,
     shell: 'concrete',
-    diameter: 10,
+    /* Widened 2026-09-02 on the client's instruction ("bigger, like a real silo shape", buildings may grow past the aerial); see the proportions table in the design log 8l. */
+    diameter: 11,
     hopperRatio: 0,
     elevation: 1.2,
     floor: 0,
@@ -453,13 +499,18 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's500',
     series: 500,
     label: 'Liquid tanks (soya oil)',
+    archetype: 'tank',
+    structure: { stair: true },
     zone: 'outside',
     first: 501,
     capacityKg: 160_000,
     metered: false,
     monitored: false,
     shell: 'tank',
-    diameter: 5,
+    /* 5 -> 6 m (2026-09-02, client's proportions decision): a 160 t oil tank at
+       5 m was 4:1 tall; 6 m brings it near a real tank farm's 3:1. The column
+       pitch is 8 m and opens with the draw scale, so the widening is clear. */
+    diameter: 6.5,
     hopperRatio: 0,
     elevation: 1,
     floor: 0,
@@ -507,18 +558,37 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's300',
     series: 300,
     label: 'Raw material',
+    archetype: 'hopperBin',
+    /*
+     * ringRadiusRatio thinned to 1.012, same reasoning as the 800 series.
+     *
+     * The three stiffener rings the hopperBin archetype adds widen the true
+     * drawn silhouette past what the bare roof eave alone did — `EAVE_RATIO`
+     * (1.02) was tuned to leave this group 0.57 m clear of the mill-a wall
+     * with NO rings on it. At the hopperBin default ring ratio (1.025) the
+     * true `profileMaxRadius` (which now measures the rings' own torus tube,
+     * not just their centreline) shrinks that to 0.487 m — under the 0.5 m
+     * the building-fit check requires. 1.012 restores clearance comfortably;
+     * see the proof in the Phase 2B report.
+     */
+    structure: { legs: 4, rings: 3, ringRadiusRatio: 1.012 },
     zone: 'raw',
     first: 301,
     capacityKg: 160_000,
     metered: true,
     monitored: true,
     shell: 'galvanised',
-    diameter: 4,
+    /* 4 -> 4.45 m, pitch 4.4 -> 4.8 (2026-09-02, client's instruction to go
+       bigger). 4.45 is the most the row can take: eleven bins on the client's
+       arrangement must sit inside mill-a, whose EAST wall cannot pass the
+       dosing floor's west edge at x 15.6, so the building could only grow
+       west and the bins are centred at x -15. mill-a is now 61.5 m long. */
+    diameter: 4.45,
     hopperRatio: 0.7,
     elevation: 2.5,
     floor: 0,
     mask: ['XXXXXXXXXXX', 'XXXXXXXXXXX'],
-    pitchX: 4.4,
+    pitchX: 4.8,
     pitchZ: 8.4,
     cx: -15,
     cz: -6,
@@ -532,6 +602,8 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's400',
     series: 400,
     label: 'Mineral bins',
+    archetype: 'mineralBin',
+    structure: { legs: 4 },
     /* Minerals, per the plant's own docs ("401-408 ... DB3 mineral"), so they
        stay in the Minerals & Micro group — but they stand in mill-a, in front
        of the 300 battery, on the client's instruction. */
@@ -542,13 +614,17 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     metered: false,
     monitored: true,
     shell: 'painted',
-    diameter: 1.5,
+    /* 1.5 -> 2.0 m (2026-09-02, client's proportions decision): a 5 t mineral
+       bin at 1.5 m drew 5.4:1; 2.0 m is a real small hopper bin's shape. The
+       2.4 m pitch opens with the same draw scale, so the pair on the sides
+       stays clear. */
+    diameter: 2.4,
     hopperRatio: 0.7,
     elevation: 0.6,
     floor: 10,
     mask: ['XXX', 'X X', 'XXX'],
-    pitchX: 2.4,
-    pitchZ: 2.4,
+    pitchX: 2.8,
+    pitchZ: 2.8,
     cx: -15,
     cz: 8,
     arrangement: 'Square, three-two-three, the pair on the sides',
@@ -558,6 +634,8 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's900a',
     series: 900,
     label: 'Micro — 5 kg scale',
+    archetype: 'microHopper',
+    structure: { legs: 3, screwFeeder: true },
     zone: 'dosing',
     first: 901,
     capacityKg: 100,
@@ -579,6 +657,8 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's900b',
     series: 900,
     label: 'Micro — 20 kg scale',
+    archetype: 'microHopper',
+    structure: { legs: 3, screwFeeder: true },
     zone: 'dosing',
     first: 911,
     capacityKg: 150,
@@ -600,6 +680,8 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's900c',
     series: 900,
     label: 'Micro — 50 kg scale',
+    archetype: 'microHopper',
+    structure: { legs: 3, screwFeeder: true },
     zone: 'dosing',
     first: 923,
     capacityKg: 300,
@@ -625,13 +707,17 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's600s',
     series: 600,
     label: 'Press buffer',
+    archetype: 'hopperBin',
+    structure: { legs: 4, rings: 2 },
     zone: 'buffer',
     first: 601,
     capacityKg: 5_000,
     metered: true,
     monitored: true,
     shell: 'galvanised',
-    diameter: 1.5,
+    /* 1.5 -> 2.0 m (2026-09-02, client's proportions decision), same reasoning
+       as the 400 series; the 5 x 6 m pitch has room to spare. */
+    diameter: 2.6,
     hopperRatio: 0.7,
     elevation: 0.6,
     floor: 8,
@@ -647,13 +733,18 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's600l',
     series: 600,
     label: 'Press buffer — large',
+    archetype: 'hopperBin',
+    structure: { legs: 4, rings: 2 },
     zone: 'buffer',
     first: 605,
     capacityKg: 50_000,
     metered: true,
     monitored: true,
     shell: 'galvanised',
-    diameter: 3,
+    /* 3 -> 3.5 m (2026-09-02, client's proportions decision): the 50 t buffer
+       silo drew 6:1 tall; 3.5 m brings it under 5:1 at the new stretch. It
+       stands alone, so nothing binds. */
+    diameter: 4.0,
     hopperRatio: 0.7,
     elevation: 0.6,
     floor: 8,
@@ -672,18 +763,37 @@ export const SILO_GROUPS: SiloGroupSpec[] = [
     id: 's800',
     series: 800,
     label: 'Finished feed',
+    archetype: 'hopperBin',
+    /*
+     * ringRadiusRatio thinned from the hopperBin default (1.025) to 1.012.
+     *
+     * Measured against the true drawn silhouette (`profileMaxRadius`, which
+     * now includes the torus tube of the stiffener rings, not just their
+     * centreline): at 1.025 the three rings leave only about 4.7 cm clear on
+     * the tight 2.55 m row pitch over the 2.4 m shell (drawScale ~1.195) —
+     * technically inside the 13 cm the bare eave lip already left, but
+     * uncomfortably close to the overlap check's own tolerance. 1.012 widens
+     * that to about 8.5 cm, which is the plan's own instruction for exactly
+     * this series. See the proof recorded in the Phase 2B report.
+     */
+    structure: { legs: 4, rings: 3, conveyors: true, ringRadiusRatio: 1.012 },
     zone: 'finished',
     first: 801,
     capacityKg: 45_000,
     metered: true,
     monitored: true,
     shell: 'galvanised',
-    diameter: 2.4,
+    /* 2.4 -> 2.65 m, pitch 2.55 -> 2.94 (2026-09-02, client's instruction to
+       go bigger). 2.65 is the most the row can take: sixteen bins on the
+       client's arrangement, centred at x 107.6, must clear the press house,
+       whose east wall cannot come west of the large buffer silo at x 75
+       (+2.4 m radius). The store grew EAST to 59 m instead. */
+    diameter: 2.65,
     hopperRatio: 0.7,
     elevation: 0.8,
     floor: 0,
     mask: ['XXXXXXXXXXXXXXXX', 'XXXXXXXXXXXXXXXX', 'XXXXXXXXXXXXXXXX'],
-    pitchX: 2.55,
+    pitchX: 2.94,
     pitchZ: 3,
     cx: 107.6,
     cz: -4,
@@ -731,6 +841,14 @@ export interface Platform {
   id: string;
   label: string;
   zone: ZoneId;
+  /**
+   * The building the slab stands in when that is not the building of its own
+   * zone — the same split `SiloGroupSpec.zone`/`building` makes. The mineral
+   * dosing floor holds dosing-zone bins but stands in mill-a, the raw
+   * building, so the Raw Material view must draw it or the 400 series hangs
+   * in the air there. `platformInZone` below is the one rule.
+   */
+  building?: string;
   x: number;
   z: number;
   length: number;
@@ -741,10 +859,29 @@ export interface Platform {
 
 export const PLATFORMS: Platform[] = [
   {
+    /*
+     * The 400 series stands at floor 10 in mill-a, in front of the 300
+     * battery, on the client's instruction — and until 2026-09-02 nothing was
+     * drawn under it: the only dosing slab was the one in mill-b. The client
+     * saw eight bins hanging in the air. This is the mezzanine they stand on,
+     * sized to the group's drawn footprint plus a walkway.
+     */
+    id: 'mineral-floor',
+    label: 'Mineral dosing floor',
+    zone: 'dosing',
+    building: 'mill-a',
+    x: -15,
+    z: 8,
+    length: 13,
+    width: 13,
+    y: 10,
+  },
+  {
     id: 'dosing-floor',
     label: 'Dosing floor',
     zone: 'dosing',
-    x: 36.1,
+    /* 36.1 -> 36.6: mill-b's west wall moved to x 16 when mill-a grew (2026-09-02). */
+    x: 36.6,
     z: -12,
     length: 41,
     width: 11,
@@ -761,6 +898,25 @@ export const PLATFORMS: Platform[] = [
     y: 8,
   },
 ];
+
+/**
+ * Is this platform part of the picture when `zone` is selected?
+ *
+ * The same two-way rule the page applies to silo groups (`groupInZone`): a
+ * slab belongs to the zone it serves, and to the zone whose building it
+ * physically stands in. Takes the building list as an argument so this module
+ * stays free of a value import from `site.ts`.
+ */
+export function platformInZone(
+  p: Platform,
+  zone: ZoneId | 'all',
+  buildings: readonly { id: string; zone?: ZoneId }[],
+): boolean {
+  if (zone === 'all') return true;
+  if (p.zone === zone) return true;
+  if (!p.building) return false;
+  return buildings.some((b) => b.id === p.building && b.zone === zone);
+}
 
 function buildPlacements(): SiloPlacement[] {
   const out: SiloPlacement[] = [];

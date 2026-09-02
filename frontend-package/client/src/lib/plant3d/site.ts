@@ -212,11 +212,81 @@ export const SITE = {
   /** the open truck yard, south-west of the process spine */
   yard: { x: 14, z: 48, length: 148, width: 52 },
   /**
-   * Perimeter wall. Approximate: the compound edge is clear enough on the aerial
-   * to place, not to measure. It is here because without a boundary the plant
-   * reads as a handful of objects on an infinite plane rather than as a site.
+   * Perimeter LINE. Approximate: the compound edge is clear enough on the
+   * aerial to place, not to measure. It is here because without a boundary
+   * the plant reads as a handful of objects on an infinite plane rather than
+   * as a site.
+   *
+   * `height`/`thickness` are inherited from the stage-1 slab wall and are no
+   * longer drawn as a slab (workstream 4.E.3 replaces that with the fence
+   * below) — kept so nothing that still reads them breaks, and because they
+   * still describe a plausible compound boundary if a wall is ever wanted
+   * again. `x`/`z`/`length`/`width` are the number this file promises not to
+   * move: they are the fence LINE now.
    */
-  wall: { x: -10, z: 26, length: 320, width: 168, height: 3, thickness: 0.6 },
+  /* z 26/168 -> 20/178 (2026-09-02): the widened 100 bank's far row now
+     reaches z -67; the fence line moves north so it stays inside. */
+  wall: { x: -10, z: 20, length: 320, width: 178, height: 3, thickness: 0.6 },
+  /**
+   * The perimeter fence (workstream 4.E.3, `structures.tsx`'s `<Perimeter>`).
+   * Runs along the exact same rectangle as `wall` above — posts every
+   * `postPitch` metres around the perimeter, `height` metres tall, plus a
+   * translucent panel strip `panelHeight` metres tall at `panelAlpha` opacity.
+   * Reads as a compound boundary without the stage-1 slab's "walled fortress"
+   * silhouette.
+   */
+  fence: {
+    postPitch: 4,
+    height: 2.2,
+    postSize: 0.1,
+    panelHeight: 2,
+    panelAlpha: 0.08,
+  },
+} as const;
+
+/**
+ * Road kerb geometry (workstream 4.E.2). A kerb strip runs along both sides
+ * of every entry in `ROADS`, `offset` metres outside that road's own paved
+ * half-width — additive only, `ROADS` itself is untouched.
+ */
+export const KERB = {
+  width: 0.3,
+  height: 0.15,
+  offset: 0.15,
+} as const;
+
+/**
+ * Building envelope detail (workstream 4.E.4): cladding stripe pitch,
+ * parapet, roof vents, roller door. Additive — no `BUILDINGS` entry's
+ * position, footprint or height changes here; this only adds the numbers
+ * `structures.tsx`'s `<Buildings>` needs to dress the same boxes.
+ */
+export const BUILDING_DETAIL = {
+  /** height of the parapet box wrapping the eaves */
+  parapetHeight: 0.6,
+  parapetThickness: 0.25,
+  /** the box along the roof ridge */
+  ridgeCapSize: 0.25,
+  ventSize: 0.8,
+  ventsPerBuilding: 4,
+  rollerDoorWidth: 4,
+  rollerDoorHeight: 5,
+  /** metres between cladding ribs, sampled off world X — see structures.tsx */
+  claddingStripePitch: 0.9,
+  /** +/- luminance swing of the rib band, as a fraction of 1.0 */
+  claddingStripeLuminance: 0.06,
+} as const;
+
+/**
+ * Gallery truss member sizing (workstream 4.E.6). `GALLERIES` itself is
+ * untouched — every `from`/`to`/`y`/`width` stays exactly as traced.
+ */
+export const TRUSS = {
+  /** cross-section of every chord, vertical and diagonal box */
+  memberSize: 0.2,
+  /** spacing between vertical members along the span */
+  verticalSpacing: 3,
+  deckThickness: 0.05,
 } as const;
 
 /**
@@ -262,9 +332,12 @@ export const BUILDINGS: SiteBuilding[] = [
   {
     id: 'mill-a',
     label: 'Mill building — raw material',
-    x: -15,
+    /* 2026-09-02: grown WEST from 55 to 61.5 m (x -46..15.5) to hold the
+       widened 300 battery on the client's instruction. Past the aerial's
+       ±5 m tolerance by ~1.5 m; the east wall stays at the dosing floor. */
+    x: -15.25,
     z: 9,
-    length: 55,
+    length: 61.5,
     width: 60,
     height: 26,
     roofRise: 2,
@@ -274,9 +347,11 @@ export const BUILDINGS: SiteBuilding[] = [
   {
     id: 'mill-b',
     label: 'Mill building — dosing',
-    x: 36.1,
+    /* 2026-09-02: x 16..60 (was 13.85..58.35) — shifted east to stay
+       contiguous with the grown mill-a; the dosing floor moved with it. */
+    x: 38,
     z: 9,
-    length: 44.5,
+    length: 44,
     width: 58,
     height: 24,
     roofRise: 2,
@@ -286,9 +361,11 @@ export const BUILDINGS: SiteBuilding[] = [
   {
     id: 'press-house',
     label: 'Press house',
-    x: 69.2,
+    /* 2026-09-02: x 60.5..78.5 (was 58.2..80.2) — 4 m shorter so the
+       finished store could grow west around the widened 800 bins. */
+    x: 69.5,
     z: 11,
-    length: 22,
+    length: 18,
     width: 56,
     height: 24.5,
     roofRise: 2,
@@ -298,9 +375,11 @@ export const BUILDINGS: SiteBuilding[] = [
   {
     id: 'finished-store',
     label: 'Finished feed store',
-    x: 107.6,
+    /* 2026-09-02: x 79..138 (was 79.85..135.35), grown east for the
+       widened 800 series; the west wall is pinned by the press house. */
+    x: 108.5,
     z: 12,
-    length: 55.5,
+    length: 59,
     width: 64,
     height: 22.5,
     roofRise: 3,
@@ -363,7 +442,7 @@ export interface Gallery {
 
 export const GALLERIES: Gallery[] = [
   /* outdoor bank -> mill. The one that is actually visible from above. */
-  { from: [-56, -12], to: [-38, -8], y: 26, width: 3.2, observed: true },
+  { from: [-56, -12], to: [-46, -8], y: 26, width: 3.2, observed: true },
   /* along the spine, bay to bay */
   { from: [10, -8], to: [16, -10], y: 21, width: 2.2, observed: false },
   { from: [56, -10], to: [60, -9], y: 19, width: 2.2, observed: false },

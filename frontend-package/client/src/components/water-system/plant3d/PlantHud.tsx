@@ -36,7 +36,7 @@
  * mode. Every control below keeps its visual classes on an inner <span>, which
  * that rule does not match. Do not "simplify" them back onto the button.
  */
-import { useEffect, useId, useState } from 'react';
+import { forwardRef, useEffect, useId, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Building2,
@@ -49,6 +49,7 @@ import {
   Maximize2,
   Minimize2,
   Moon,
+  MoreVertical,
   RefreshCw,
   Search,
   Settings2,
@@ -83,16 +84,77 @@ export type Quality = 'auto' | 'high' | 'low';
 
 /** Control surfaces: a hairline edge, a soft shadow, nothing heavier. Present,
     quiet, never competing with the scene for the eye. */
-const CARD =
+export const CARD =
   'rounded-md border border-slate-800 bg-slate-950/90 shadow-sm backdrop-blur-md ' +
   'light:border-gray-200 light:bg-white/90 light:shadow-sm';
 
 /** The two surfaces that read the plant's own numbers — status and the
     material key — carry a little more weight than a control cluster, without
     going back to the near-black slab this used to be. */
-const CARD_PRIMARY =
+export const CARD_PRIMARY =
   'rounded-md border border-slate-700 bg-slate-950/95 shadow-md backdrop-blur-md ' +
   'light:border-gray-300 light:bg-white/95 light:shadow-md';
+
+/**
+ * A control embedded in the page header strip rather than floating over the
+ * canvas. The header (`WaterSystemLayout`) is `bg-[#0f172a]` UNCONDITIONALLY —
+ * it does not follow the light/dark theme, the same way the sidebar does not
+ * — so anything living in it is styled for a fixed dark background rather
+ * than with the `light:` pairs `Pill`'s floating/card variants carry. Reusing
+ * `Pill` here would put light-theme text colours (tuned for a white card)
+ * against a navy strip that never turns white, and this app's `light:` set
+ * defines no rule that could catch that at build time — the button would
+ * simply go illegible in light mode with no error anywhere.
+ */
+function HeaderPill({
+  active,
+  onClick,
+  title,
+  label,
+  children,
+  className,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  label?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={label ?? title}
+      aria-pressed={active}
+      /*
+       * Deliberately NOT `.touch-target-44` here: the header strip is a
+       * fixed 44px row (WaterSystemLayout's immersive header), and a control
+       * that grows to a 44px box plus the track's own padding overflows that
+       * exactly the way a Codex audit caught on the real tablet width — the
+       * zone switch's own pills pushed 4px past the header's top and bottom
+       * on a coarse pointer. 32px still clears WCAG's 24px minimum; the
+       * header's fixed geometry is the reason it does not also clear 44px.
+       */
+      className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+    >
+      <span
+        className={cn(
+          'flex min-h-[32px] items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium transition-colors',
+          active
+            ? 'bg-cyan-500/90 text-slate-950'
+            : 'text-slate-300 hover:bg-white/10 hover:text-white',
+          className,
+        )}
+      >
+        {children}
+      </span>
+    </button>
+  );
+}
+
+const HEADER_DIVIDER = 'mx-0.5 h-5 w-px shrink-0 bg-white/15';
 
 /**
  * The bins a material code could ever be reported for.
@@ -193,7 +255,21 @@ function Pill({
 
 const DIVIDER = 'mx-1 h-5 w-px bg-slate-700 light:bg-gray-200';
 
-export function ZoneBar({
+/**
+ * Whole site · Yard · Raw · Dosing · Buffer · Finished, as a segmented
+ * control in the header strip (`headerCenter` on `WaterSystemLayout`).
+ *
+ * Was `ZoneBar`, a row of pills floating over the canvas with their own
+ * backdrop each. It now lives in the always-dark header, so the pills read as
+ * one track (a shared rounded-full rail behind them) rather than as
+ * wayfinding markers scattered over the scene — the header itself is the
+ * backdrop.
+ *
+ * `flex-wrap` from the original stays deliberately: a control an operator
+ * cannot see is worse than one that costs a second row, and the header is
+ * short (44px) but wide, not the reverse.
+ */
+export function ZoneSwitch({
   zones,
   zone,
   counts,
@@ -204,46 +280,35 @@ export function ZoneBar({
   zone: ZoneId | 'all';
   counts: Record<string, number>;
   onSelect: (z: ZoneId | 'all') => void;
-  /* On a short screen the cards start costing more canvas than they are worth,
-     so the zone names drop to their short forms rather than wrapping to a
-     second row and taking another 36px off the view. */
+  /*
+   * When there is no room for the long zone names, they drop to their short
+   * forms. `compact` is a HINT from the caller about that, not the only
+   * thing standing between this control and a bug: the track itself never
+   * wraps, ever, regardless of `compact` — a seen-on-the-real-laptop defect
+   * had this wrapping to two rows at 1280px with the long labels, which
+   * pushed the 44px header taller than 44px and clipped its own top row.
+   * `flex-nowrap` plus `overflow-x-auto` means the worst case a wrong
+   * `compact` guess can produce is a horizontal scrollbar, never a vertical
+   * one — the header's height can never depend on how many zones there are
+   * or how long their names happen to be.
+   */
   compact?: boolean;
 }) {
   return (
-    /*
-     * No enclosing card. Each pill carries its own backdrop (see Pill's
-     * `floating` prop), so removing the wrapper costs no legibility and this
-     * reads as a row of wayfinding markers rather than another dark slab
-     * stacked over the status card below it.
-     *
-     * It USED to say: one row that scrolls, never a column that grows, because
-     * wrapping turned six pills into a tall stack at 638px wide. That fear was
-     * real and the remedy was wrong, and a tablet screenshot showed why: at
-     * 1024x768 the row scrolled "Finished" — the largest zone on the plant, 48
-     * bins — clean off the end, behind a hidden scrollbar, on a touch screen
-     * with nothing to say it was there. A zone an operator cannot see is a zone
-     * they will not look in.
-     *
-     * `flex-wrap` is the honest version of the same intent. It costs exactly
-     * nothing while the pills fit — the laptop still shows one row — and it
-     * grows only in the case where the alternative was concealing a control.
-     * Plant3D.tsx already states this rule outright about the top HUD: "a
-     * control you cannot see is worse than a control that costs a little
-     * height." The two comments contradicted each other; this one was wrong.
-     */
-    <div className="flex max-w-full flex-wrap items-center gap-1.5">
-      <Pill
-        floating
+    <div
+      data-plant3d-zone-switch
+      className="flex min-w-0 max-w-full flex-nowrap items-center gap-0.5 overflow-x-auto rounded-full bg-white/5 p-0.5"
+    >
+      <HeaderPill
         active={zone === 'all'}
         onClick={() => onSelect('all')}
         title="Frame the whole site"
       >
         {compact ? 'All' : 'Whole site'}
-      </Pill>
+      </HeaderPill>
       {zones.map((z) => (
-        <Pill
+        <HeaderPill
           key={z.id}
-          floating
           active={zone === z.id}
           onClick={() => onSelect(z.id)}
           title={z.description}
@@ -251,15 +316,13 @@ export function ZoneBar({
           {compact ? z.short : z.label}
           <span
             className={cn(
-              'rounded px-1 font-mono text-[10px]',
-              zone === z.id
-                ? 'bg-cyan-400/20 text-cyan-200 light:bg-cyan-100 light:text-cyan-700'
-                : 'bg-slate-800/80 text-slate-400 light:bg-gray-100 light:text-gray-500',
+              'rounded-full px-1 font-mono text-[10px]',
+              zone === z.id ? 'bg-slate-950/25 text-slate-900' : 'bg-white/10 text-slate-400',
             )}
           >
             {counts[z.id] ?? 0}
           </span>
-        </Pill>
+        </HeaderPill>
       ))}
     </div>
   );
@@ -276,6 +339,7 @@ export function LookBar({
   onDiagnostics,
   numbers,
   onNumbers,
+  compact,
 }: {
   timeOfDay: TimeOfDay;
   onTimeOfDay: (t: TimeOfDay) => void;
@@ -287,64 +351,152 @@ export function LookBar({
   onDiagnostics: (d: boolean) => void;
   numbers: boolean;
   onNumbers: (v: boolean) => void;
+  /*
+   * Under 1100px the six zone segments, three looks, and five utility
+   * controls do not fit in a 44px x 1024px header together (measured: the
+   * full row runs well past 1024px). Day/dusk/night and full screen stay
+   * inline — they are the controls used every visit — and ghosted/numbers/
+   * diagnostics collapse behind one "View options" menu button.
+   */
+  compact?: boolean;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
+
   const times: [TimeOfDay, typeof Sun, string][] = [
     ['day', Sun, 'Daylight'],
     ['dusk', Sunset, 'Dusk'],
     ['night', Moon, 'Night'],
   ];
+
+  /*
+   * One icon that lights up when on, rather than an Eye/EyeOff pair. The eye
+   * pair reads backwards here: everywhere else a crossed-out eye means the
+   * thing is hidden, but the state where these buildings are most visible is
+   * the one where you are NOT seeing through them.
+   *
+   * Rendered as a function, not inline JSX, because it has to appear in two
+   * different places depending on `compact` — inline in the row, or inside
+   * the dropdown — and the aria-label/title on each toggle have to stay
+   * byte-for-byte identical wherever they render: `scripts/shoot-plant3d.mjs`
+   * finds them by exactly these strings, and it does not know or care
+   * whether the button it finds is presently visible.
+   */
+  const ghostedToggle = (
+    <HeaderPill
+      active={ghosted}
+      onClick={() => onGhosted(!ghosted)}
+      title="See inside the buildings"
+      label="See inside the buildings"
+    >
+      <Building2 className="h-4 w-4" />
+      {compact && <span className="text-[11px]">See inside buildings</span>}
+    </HeaderPill>
+  );
+  /* Sits with the view toggles rather than in the diagnostics cluster: it
+     changes what the picture SAYS, the way ghosting the buildings does, not
+     how it is rendered. Silo numbers are the operator's own vocabulary — on
+     the floor the bins are called 312 and 806, not "third from the left". */
+  const numbersToggle = (
+    <HeaderPill
+      active={numbers}
+      onClick={() => onNumbers(!numbers)}
+      title="Show silo numbers"
+      label="Show silo numbers"
+    >
+      <Tag className="h-4 w-4" />
+      {compact && <span className="text-[11px]">Silo numbers</span>}
+    </HeaderPill>
+  );
+  const diagnosticsToggle = (
+    <HeaderPill
+      active={diagnostics}
+      onClick={() => onDiagnostics(!diagnostics)}
+      title="Rendering diagnostics"
+      label="Toggle rendering diagnostics"
+    >
+      <Settings2 className="h-4 w-4" />
+      {compact && <span className="text-[11px]">Diagnostics</span>}
+    </HeaderPill>
+  );
+
+  /* Embedded directly in the header strip now (headerRight on
+     WaterSystemLayout) rather than floating in its own card over the canvas,
+     so no CARD wrapper — the header itself is the backdrop, and it is
+     unconditionally dark, which is why these are HeaderPills rather than the
+     theme-aware Pill the rest of this file still uses. */
   return (
-    <div className={cn(CARD, 'flex items-center gap-1 px-1 py-0.5')}>
+    <div className="relative flex items-center gap-0.5">
       {times.map(([t, Icon, title]) => (
-        <Pill key={t} active={timeOfDay === t} onClick={() => onTimeOfDay(t)} title={title}>
+        <HeaderPill key={t} active={timeOfDay === t} onClick={() => onTimeOfDay(t)} title={title}>
           <Icon className="h-4 w-4" />
-        </Pill>
+        </HeaderPill>
       ))}
-      <span className={DIVIDER} />
-      {/*
-        One icon that lights up when on, rather than an Eye/EyeOff pair. The eye
-        pair reads backwards here: everywhere else a crossed-out eye means the
-        thing is hidden, but the state where these buildings are most visible is
-        the one where you are NOT seeing through them.
-      */}
-      <Pill
-        active={ghosted}
-        onClick={() => onGhosted(!ghosted)}
-        title="See inside the buildings"
-        label="See inside the buildings"
-      >
-        <Building2 className="h-4 w-4" />
-      </Pill>
-      <Pill
+      <span className={HEADER_DIVIDER} />
+
+      {compact ? (
+        <>
+          <HeaderPill
+            active={menuOpen}
+            onClick={() => setMenuOpen((o) => !o)}
+            title="View options"
+            label="View options"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </HeaderPill>
+          {/*
+            Always mounted, never unmounted — only `hidden` toggles. A menu
+            item that only exists in the DOM while the menu happens to be
+            open is a control the screenshot harness (and a screen reader
+            navigating by landmark) cannot find without first opening a menu
+            it does not know exists. `.click()` on a `display: none` element
+            still fires its handler, so this costs nothing for that case.
+          */}
+          {menuOpen && (
+            <button
+              type="button"
+              aria-label="Close"
+              tabIndex={-1}
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-40 cursor-default bg-transparent"
+            />
+          )}
+          <div
+            className={cn(
+              'absolute right-0 top-full z-50 mt-1 flex flex-col gap-0.5 rounded-md bg-slate-900 p-1 shadow-lg ring-1 ring-white/10',
+              !menuOpen && 'hidden',
+            )}
+          >
+            {ghostedToggle}
+            {numbersToggle}
+            {diagnosticsToggle}
+          </div>
+        </>
+      ) : (
+        <>
+          {ghostedToggle}
+          {numbersToggle}
+          {diagnosticsToggle}
+        </>
+      )}
+
+      <span className={HEADER_DIVIDER} />
+      <HeaderPill
         active={expanded}
         onClick={() => onExpanded(!expanded)}
         title={expanded ? 'Exit full screen (Esc)' : 'Fill the screen'}
         label="Toggle full screen"
       >
         {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-      </Pill>
-      {/*
-        Sits with the view toggles rather than in the diagnostics cluster: it
-        changes what the picture SAYS, the way ghosting the buildings does, not
-        how it is rendered. Silo numbers are the operator's own vocabulary — on
-        the floor the bins are called 312 and 806, not "third from the left".
-      */}
-      <Pill
-        active={numbers}
-        onClick={() => onNumbers(!numbers)}
-        title="Show silo numbers"
-        label="Show silo numbers"
-      >
-        <Tag className="h-4 w-4" />
-      </Pill>
-      <Pill
-        active={diagnostics}
-        onClick={() => onDiagnostics(!diagnostics)}
-        title="Rendering diagnostics"
-        label="Toggle rendering diagnostics"
-      >
-        <Settings2 className="h-4 w-4" />
-      </Pill>
+      </HeaderPill>
     </div>
   );
 }
@@ -507,7 +659,7 @@ export interface PlantSummary {
   capacityKg?: number;
 }
 
-const CHIP_TONES = {
+export const CHIP_TONES = {
   amber: 'bg-amber-500/20 text-amber-300 light:bg-orange-100 light:text-orange-600',
   red: 'bg-red-500/20 text-red-300 light:bg-red-100 light:text-red-600',
   slate: 'bg-slate-700/40 text-slate-400 light:bg-gray-100 light:text-gray-600',
@@ -518,7 +670,7 @@ const CHIP_TONES = {
 const CHIP_BASE =
   'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold';
 
-function Chip({
+export function Chip({
   tone,
   children,
   title,
@@ -566,14 +718,14 @@ function Chip({
  * similar to reach for. Used only for gauges that are not a material and not
  * an alarm, so it must not borrow either colour's meaning.
  */
-const GAUGE_FILL = '#94a3b8';
+export const GAUGE_FILL = '#94a3b8';
 
 /**
  * A thin proportion bar — a number lands faster as a shape than as a
  * sentence. Sized to add no height of its own to the row it sits in; the
  * text beside it is always taller.
  */
-function MiniBar({ fraction, title }: { fraction: number; title?: string }) {
+export function MiniBar({ fraction, title }: { fraction: number; title?: string }) {
   const pct = Number.isFinite(fraction) ? Math.max(0, Math.min(100, fraction * 100)) : 0;
   return (
     <span
@@ -585,7 +737,7 @@ function MiniBar({ fraction, title }: { fraction: number; title?: string }) {
   );
 }
 
-function ago(seconds: number): string {
+export function ago(seconds: number): string {
   if (seconds < 90) return `${Math.round(seconds)}s ago`;
   if (seconds < 5400) return `${Math.round(seconds / 60)} min ago`;
   if (seconds < 172800) return `${Math.round(seconds / 3600)} h ago`;
@@ -600,7 +752,7 @@ function ago(seconds: number): string {
  * with numbers it has not changed in six days, and an indicator keyed to the
  * HTTP round trip would have called that "live".
  */
-function freshness(plantWroteAt: Date | null, fetchedAt: Date | null, error: Error | null) {
+export function freshness(plantWroteAt: Date | null, fetchedAt: Date | null, error: Error | null) {
   /* Both clocks, because they fail differently and the difference is the
      diagnosis: a stale plant clock with a fresh fetch clock means the PLC poll
      has stopped, not that the network is down. */
@@ -784,70 +936,106 @@ export function StatusBar({
  */
 const PROVENANCE = [
   `Sizes are derived, not surveyed. Height comes from capacity divided by one bulk density (${BULK_DENSITY_T_PER_M3} t/m3) applied to every bin whatever it holds; the diameter is assumed and the height follows from it. Counts, capacities, materials and the raw quantity are all the plant’s own.`,
-  'Nothing here is drawn to scale. Every height is stretched 1.55x so the site reads at a glance, and every bin on the site — indoors and outdoors alike — is drawn on a compressed size scale keyed to its capacity, so a 100 kg hopper stays visible next to the plant’s biggest silos (the 1,600 t 100 and 200 series, which is the one capacity this never enlarges). The smallest bins are additionally floored at 1.3 m across, so the 900 series is no longer even in true size order against itself.',
+  `Nothing here is drawn to scale. Every height is stretched ${VERTICAL_EXAGGERATION}x so the site reads at a glance, and every bin on the site — indoors and outdoors alike — is drawn on a compressed size scale keyed to its capacity, so a 100 kg hopper stays visible next to the plant’s biggest silos (the 1,600 t 100 and 200 series, which is the one capacity this never enlarges). The smallest bins are additionally floored at 1.3 m across, so the 900 series is no longer even in true size order against itself.`,
   `The material surface assumes that same ${BULK_DENSITY_T_PER_M3} t/m3. A bin full of something lighter — bran is nearer a third of it — will read low, so treat the shaded level as a proportion of rated tonnage rather than as a true physical surface.`,
   'The 400 series has no level. There is no quantity address in the PLC for those bins, so they are never shaded, whatever number the database happens to hold.',
   'Most bins are not colour-coded, and that is the data rather than a fault in the drawing. Only the bins the plant reports a material code for are given a material colour; every other bin is drawn as a neutral vessel rather than being assigned a colour for contents nobody has stated. The count beside the material key says how many of the bins on site are tagged.',
   'The outside yard is schematic. The 100 and 200 series are drawn as cylinders on instruction; in reality they are flat and cellular storage.',
   'Five bins are drawn but not counted. The 500 series is in service — it runs soya oil — but nothing upstream reports on it, so it appears in the yard and is left out of every count on this screen, all of which are over the 131 bins the plant does report. It is drawn rather than hidden because it is there; it is uncounted rather than shown empty because an empty bar would be a claim about it that nobody has made.',
+  'Ladders, stairs, vents, kerbs, trusses and conveyors are typical feed-mill furniture drawn for legibility, not surveyed plant facts.',
 ].join('\n\n');
 
 /**
- * Which colour is which material — the single most-used piece of reference on
- * this screen, and the filter behind "where is my maize?". It gets the
- * heavier CARD_PRIMARY treatment and the bigger swatches, so it reads as the
- * instrument it is rather than a caption tucked in the corner. The provenance
- * text that used to sit under it permanently is now behind the info button —
- * still honest, just not spending the screen's space every second of every
- * shift.
+ * The material legend, redrawn as a 32px dock along the bottom edge of the
+ * canvas pane rather than a card floating over the scene.
+ *
+ * Was `MaterialKey`: a wrapping row of chips, truncated names past a fixed
+ * width, and a provenance panel that opened downward from inside its own
+ * card. All three assumptions broke once this stopped floating: a dock has a
+ * fixed height (so wrapping is not an option — it scrolls instead), it spans
+ * the canvas width (so there is no reason left to truncate a name), and it
+ * sits at the very bottom edge (so a panel opening "down" from it would open
+ * off-screen).
+ *
+ * The provenance popover is `position: fixed`, positioned from the info
+ * button's own measured rect rather than nested in normal flow. That only
+ * works now because full screen mode's `.page-transition` fix (already
+ * landed) means no ancestor between here and the viewport carries a
+ * transform — the same fix that lets the stage's own `fixed inset-0` reach
+ * the real viewport reaches this popover too, so a plain `position: fixed`
+ * escapes the canvas pane's `overflow-hidden` without needing a portal.
  */
-export function MaterialKey({
-  materials,
-  compact,
-  highlighted,
-  onHighlight,
-}: {
-  materials: { code: string; name: string; color: string; count: number }[];
-  compact?: boolean;
-  /** material code currently isolated in the scene, if any */
-  highlighted: string | null;
-  onHighlight: (code: string | null) => void;
-}) {
+export const LegendDock = forwardRef<
+  HTMLDivElement,
+  {
+    materials: { code: string; name: string; color: string; count: number }[];
+    highlighted: string | null;
+    onHighlight: (code: string | null) => void;
+  }
+>(function LegendDock({ materials, highlighted, onHighlight }, ref) {
   const [open, setOpen] = useState(false);
+  const [popover, setPopover] = useState<{ left: number; bottom: number } | null>(null);
+  const infoRef = useRef<HTMLButtonElement>(null);
 
-  /*
-   * Whatever is filtered is always shown, even if it would otherwise be past the
-   * cut. Without this, filtering on a material that then drops out of the top
-   * few — because the data refreshed, or the window got narrower — leaves the
-   * plant greyed out with no visible control to turn it off. Escape worked;
-   * nothing you could click did.
-   */
   /* Counted from the model rather than passed in, so it cannot drift out of
      step with the scene the legend is describing. */
   const tagged = materials.reduce((n, m) => n + m.count, 0);
 
-  const capacity = compact ? 8 : 6;
-  const head = materials.slice(0, capacity);
-  const pinned =
-    highlighted !== null && !head.some((m) => m.code === highlighted)
-      ? materials.find((m) => m.code === highlighted)
-      : undefined;
-  const shown = pinned ? [...head.slice(0, capacity - 1), pinned] : head;
-  const rest = materials.length - shown.length;
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const toggle = () => {
+    if (!open && infoRef.current) {
+      const r = infoRef.current.getBoundingClientRect();
+      /* Anchored to the button's own position in the VIEWPORT, which is what
+         makes this survive full screen mode: the stage there is already
+         `fixed inset-0`, so the button's rect IS relative to the window. */
+      setPopover({ left: Math.max(8, r.right - 340), bottom: window.innerHeight - r.top + 8 });
+    }
+    setOpen((o) => !o);
+  };
 
   if (materials.length === 0) return null;
 
   return (
-    <div className={cn(CARD_PRIMARY, 'max-w-[60vw] p-2')}>
-      <div className="flex flex-wrap items-center gap-1">
-        {/*
-          The legend is also the filter. "Where is my maize?" is the question an
-          operator actually arrives with, and pressing the swatch answers it by
-          quietening every bin that holds something else. Deliberately dimming
-          the rest rather than accenting the matches: the accent colour means
-          "selected" and nothing else on this screen.
-        */}
-        {shown.map((mat) => {
+    <div
+      ref={ref}
+      data-plant3d-dock
+      /*
+       * `scripts/verify-picture.mjs` scrapes the material legend off the DOM
+       * by looking for small square swatches inside a `<button>`, scoped to
+       * `[data-legend]` when one exists rather than the whole document — and
+       * now that SiloList's rows carry their own small colour swatches too
+       * (same visual pattern, a different thing entirely), an unscoped scan
+       * would read list rows as legend entries. This is the container that
+       * check's own comment says to look for.
+       */
+      data-legend
+      className={cn(
+        CARD_PRIMARY,
+        'absolute inset-x-0 bottom-0 z-20 flex h-8 items-center gap-1 rounded-none border-x-0 border-b-0 px-2 shadow-none',
+      )}
+    >
+      {/*
+        The legend is also the filter. "Where is my maize?" is the question an
+        operator actually arrives with, and pressing the swatch answers it by
+        quietening every bin that holds something else. Deliberately dimming
+        the rest rather than accenting the matches: the accent colour means
+        "selected" and nothing else on this screen.
+
+        Horizontally scrollable rather than wrapping or truncating — the dock
+        has a fixed 32px height, so a second row is not an option, and full
+        names are the point (DESIGN.md: "no truncation — the dock is as wide
+        as the canvas").
+      */}
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        {materials.map((mat) => {
           const on = highlighted === mat.code;
           return (
             <button
@@ -860,90 +1048,90 @@ export function MaterialKey({
                   ? `Showing only ${mat.name} — press again to show everything`
                   : `${mat.name} — ${mat.count} bin${mat.count === 1 ? '' : 's'}. Press to pick it out.`
               }
-              className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="touch-target-44 shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
               <span
                 className={cn(
-                  'inline-flex min-h-[28px] items-center gap-1.5 rounded px-1.5 py-1 text-xs transition-colors',
-                  compact ? 'max-w-[7.5rem]' : 'max-w-[13rem]',
+                  'inline-flex min-h-[24px] items-center gap-1.5 whitespace-nowrap rounded px-1.5 py-0.5 text-xs transition-colors',
                   on
                     ? 'bg-slate-700/70 text-white light:bg-gray-200 light:text-gray-900'
                     : 'text-slate-300 hover:bg-slate-800/70 light:text-gray-700 light:hover:bg-gray-100',
                 )}
               >
                 <span
-                  className="h-3 w-3 shrink-0 rounded-sm ring-1 ring-black/20"
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-black/20"
                   style={{ backgroundColor: mat.color }}
                 />
-                {/*
-                  The name stays at every width.
-                  Compact used to drop it and leave a bare swatch, which makes
-                  colour the ONLY channel at exactly the size where it is least
-                  reliable — and two of this plant's live materials come out
-                  close together under deuteranopia. The row already wraps, so
-                  keeping a truncated name costs a line, not a control.
-                */}
-                <span className="truncate">{mat.name}</span>
-                <span className="font-mono text-[10px] text-slate-600 light:text-gray-500">
+                <span>{mat.name}</span>
+                <span className="font-mono text-[10px] text-slate-500 light:text-gray-500">
                   {mat.count}
                 </span>
               </span>
             </button>
           );
         })}
-        {rest > 0 && (
-          <span className="px-1 font-mono text-[10px] text-slate-600 light:text-gray-500">
-            +{rest}
-          </span>
-        )}
-
-        {/*
-          What this legend does NOT cover.
-          A row of six colours next to a picture of 131 bins reads as a key to
-          the picture, and it is not one: only the handful of bins the plant
-          actually reports a material code for are coloured, and the rest are
-          deliberately left as neutral vessels because inventing a colour for
-          contents nobody has reported is the one thing this view must not do.
-          Without this the legend makes a promise the scene cannot keep, and the
-          honest reading — "most bins are untagged" — is indistinguishable from
-          the alarming one, "the colours are broken".
-        */}
-        <span
-          title={`${tagged} of ${TOTAL_BINS} bins report a material code. The rest are drawn as neutral vessels rather than being given a colour the plant has not reported.`}
-          className="px-1 font-mono text-[10px] text-slate-600 light:text-gray-500"
-        >
-          {/* Just the ratio, not "N/131 tagged". The words cost a line: the card
-              is capped at 60vw and the longer form wrapped the key to a second
-              row, taking 28px off a 382px stage — 7% of the picture to explain
-              a number the hover and the provenance note both already explain. */}
-          {tagged}/{TOTAL_BINS}
-        </span>
-
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          title="How these numbers were arrived at"
-          aria-label="How these numbers were arrived at"
-          className="ml-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-        >
-          <span className="flex min-h-[24px] min-w-[24px] items-center justify-center gap-0.5 rounded text-slate-500 hover:bg-slate-800/70 hover:text-slate-200 light:text-gray-500 light:hover:bg-gray-100 light:hover:text-gray-900">
-            <Info className="h-3.5 w-3.5" />
-            {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </span>
-        </button>
       </div>
 
-      {open && (
-        <div className="mt-1.5 max-w-sm space-y-1.5 border-t border-slate-800 px-1.5 pb-1 pt-2 text-[11px] leading-relaxed text-slate-400 light:border-gray-200 light:text-gray-600">
-          {PROVENANCE.split('\n\n').map((para) => (
-            <p key={para.slice(0, 24)}>{para}</p>
-          ))}
-        </div>
+      <span className={DIVIDER} />
+
+      {/*
+        What this legend does NOT cover.
+        A row of colours next to a picture of 131 bins reads as a key to the
+        picture, and it is not one: only the handful of bins the plant
+        actually reports a material code for are coloured, and the rest are
+        deliberately left as neutral vessels because inventing a colour for
+        contents nobody has reported is the one thing this view must not do.
+      */}
+      <span
+        title={`${tagged} of ${TOTAL_BINS} bins report a material code. The rest are drawn as neutral vessels rather than being given a colour the plant has not reported.`}
+        className="shrink-0 px-1 font-mono text-[10px] text-slate-500 light:text-gray-500"
+      >
+        {tagged}/{TOTAL_BINS}
+      </span>
+
+      <button
+        ref={infoRef}
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        title="How these numbers were arrived at"
+        aria-label="How these numbers were arrived at"
+        className="touch-target-44 shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+      >
+        <span className="flex min-h-[24px] min-w-[24px] items-center justify-center rounded text-slate-500 hover:bg-slate-800/70 hover:text-slate-200 light:text-gray-500 light:hover:bg-gray-100 light:hover:text-gray-900">
+          <Info className="h-3.5 w-3.5" />
+          {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </span>
+      </button>
+
+      {open && popover && (
+        <>
+          {/* Invisible click-outside backdrop. A real element rather than a
+              window listener, so it composes with the Escape handler above
+              without a mousedown/click race between the two. */}
+          <button
+            type="button"
+            aria-label="Close"
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40 cursor-default bg-transparent"
+          />
+          <div
+            className={cn(
+              CARD_PRIMARY,
+              'fixed z-50 max-w-sm space-y-1.5 p-3 text-[11px] leading-relaxed text-slate-400 light:text-gray-600',
+            )}
+            style={{ left: popover.left, bottom: popover.bottom }}
+          >
+            {PROVENANCE.split('\n\n').map((para) => (
+              <p key={para.slice(0, 24)}>{para}</p>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
-}
+});
 
 /* ------------------------------------------------------------------ */
 /* Detail panel                                                        */
@@ -1006,7 +1194,7 @@ function MiniSilo({ fill, color, hopper }: { fill: number | null; color: string;
 
 /** A timestamp, or a dash. Never the literal string "Invalid Date". */
 /** Past this, a reading is old enough that an operator must be told. */
-const STALE_AFTER_MS = 900_000;
+export const STALE_AFTER_MS = 900_000;
 
 /**
  * A clock time AND how long ago it was.
@@ -1018,7 +1206,7 @@ const STALE_AFTER_MS = 900_000;
  * is correct and is not enough: it speaks for the plant, not for the bin in
  * front of you.
  */
-function formatTime(iso: string | null | undefined): string {
+export function formatTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return '—';
@@ -1026,7 +1214,7 @@ function formatTime(iso: string | null | undefined): string {
 }
 
 /** True when a reading is old enough to say so in colour as well as in words. */
-function isStale(iso: string | null | undefined): boolean {
+export function isStale(iso: string | null | undefined): boolean {
   if (!iso) return false;
   const t = Date.parse(iso);
   return Number.isFinite(t) && Date.now() - t > STALE_AFTER_MS;
@@ -1074,12 +1262,19 @@ export function SiloDetailPanel({
   group,
   palette,
   onClose,
+  embedded,
 }: {
   placement: SiloPlacement;
   reading: SiloReading | undefined;
   group: SiloGroupSpec;
   palette: MaterialPalette;
   onClose: () => void;
+  /**
+   * Strips the card chrome (border, shadow, rounded corners, fixed width) so
+   * this sits flush inside a `SiloList` row instead of floating over the
+   * scene. The content and every fact are unchanged — only the wrapper.
+   */
+  embedded?: boolean;
 }) {
   const level = siloLevel(placement, reading);
   const color = materialColorIn(palette, reading?.materialCode);
@@ -1088,33 +1283,41 @@ export function SiloDetailPanel({
   const noLevel = level.reason ? NO_LEVEL[level.reason] : null;
 
   return (
-    <div className={cn(CARD_PRIMARY, 'flex w-72 max-w-[80vw] flex-col overflow-hidden')}>
-      <div className="flex items-start gap-2 border-b border-slate-800 px-3 py-2.5 light:border-gray-200">
-        <span
-          className="mt-1 h-3 w-3 shrink-0 rounded-sm ring-1 ring-black/20"
-          style={{ backgroundColor: color }}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="font-mono text-base font-semibold leading-none text-white light:text-gray-900">
-            Silo {placement.siloNo}
-          </p>
-          <p className="mt-1 truncate text-xs text-slate-400 light:text-gray-600" title={material}>
-            {material}
-          </p>
+    <div
+      className={
+        embedded
+          ? 'flex w-full flex-col'
+          : cn(CARD_PRIMARY, 'flex w-72 max-w-[80vw] flex-col overflow-hidden')
+      }
+    >
+      {!embedded && (
+        <div className="flex items-start gap-2 border-b border-slate-800 px-3 py-2.5 light:border-gray-200">
+          <span
+            className="mt-1 h-3 w-3 shrink-0 rounded-sm ring-1 ring-black/20"
+            style={{ backgroundColor: color }}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-base font-semibold leading-none text-white light:text-gray-900">
+              Silo {placement.siloNo}
+            </p>
+            <p className="mt-1 truncate text-xs text-slate-400 light:text-gray-600" title={material}>
+              {material}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close silo details"
+            className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+          >
+            <span className="flex min-h-[28px] min-w-[28px] items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-200 light:text-gray-500 light:hover:bg-gray-100 light:hover:text-gray-900">
+              <X className="h-4 w-4" />
+            </span>
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close silo details"
-          className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-        >
-          <span className="flex min-h-[28px] min-w-[28px] items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-200 light:text-gray-500 light:hover:bg-gray-100 light:hover:text-gray-900">
-            <X className="h-4 w-4" />
-          </span>
-        </button>
-      </div>
+      )}
 
-      <div className="flex gap-3 px-3 py-3">
+      <div className={cn('flex gap-3 px-3 py-3', embedded && 'px-0 pt-0')}>
         <MiniSilo fill={level.fill} color={color} hopper={d.hopper > 0} />
         <div className="min-w-0 flex-1">
           {level.fill === null ? (
@@ -1169,7 +1372,12 @@ export function SiloDetailPanel({
         </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-slate-800 px-3 py-3 light:border-gray-200">
+      <dl
+        className={cn(
+          'grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-slate-800 px-3 py-3 light:border-gray-200',
+          embedded && 'px-0',
+        )}
+      >
         <Fact label="Series" value={`${group.series} · ${group.label}`} hint={group.label} />
         <Fact label="Capacity" value={formatCapacity(group.capacityKg)} />
         {/*
@@ -1215,7 +1423,12 @@ export function SiloDetailPanel({
       </dl>
 
       {group.note && (
-        <p className="border-t border-slate-800 px-3 py-2.5 text-[11px] leading-relaxed text-slate-500 light:border-gray-200 light:text-gray-500">
+        <p
+          className={cn(
+            'border-t border-slate-800 px-3 py-2.5 text-[11px] leading-relaxed text-slate-500 light:border-gray-200 light:text-gray-500',
+            embedded && 'px-0',
+          )}
+        >
           {group.note}
         </p>
       )}

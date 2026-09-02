@@ -43,6 +43,8 @@ import {
 } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import { Link } from 'wouter';
+import { motion, useReducedMotion } from 'framer-motion';
+import { PanelRight } from 'lucide-react';
 import { WaterSystemLayout } from '../../components/water-system/WaterSystemLayout';
 import {
   BUILDINGS,
@@ -83,13 +85,11 @@ import { SiteGround } from '../../lib/plant3d/ground';
 import {
   DiagnosticsBar,
   LookBar,
-  MaterialKey,
-  SiloDetailPanel,
-  SiloFinder,
-  StatusBar,
-  ZoneBar,
+  LegendDock,
+  ZoneSwitch,
   type Quality,
 } from '../../components/water-system/plant3d/PlantHud';
+import { SiloList } from '../../components/water-system/plant3d/SiloList';
 import { LOOKS, lightformersFor, type Look, type TimeOfDay } from '../../lib/plant3d/look';
 
 /* ------------------------------------------------------------------ */
@@ -409,6 +409,20 @@ const MIN_BIN_PX = 13;
 const MAX_LABELS = 70;
 const LABEL_H = 15;
 const LABEL_PAD = 3;
+
+/**
+ * Collapsed height of the narrow-viewport bottom sheet, in CSS pixels.
+ *
+ * Must fit the 48px handle, SiloList's KPI strip, its finder row, AND at
+ * least the first two bin rows — "peek shows only the KPI strip" was the
+ * first cut at this and undersold it: an operator glancing at a tablet
+ * should see the top of the alarm-sorted list without having to drag the
+ * sheet open first. Generous rather than exact, since a coarse pointer
+ * pushes every row and the finder to the 44px touch-target floor. Measured
+ * against a real screenshot at 1024x768: 288px left the second row only
+ * about 70% visible, cropped mid-badge — bumped to keep it whole.
+ */
+const SHEET_PEEK = 320;
 
 function SiloNumberProjector({
   placements,
@@ -1578,39 +1592,11 @@ function isSoftwareRenderer(): boolean {
 
 export default function Plant3D() {
   /*
-   * Daylight by default.
-   *
-   * This opened on dusk, on the reasoning that a midday desert site is the
-   * hardest lighting to make legible — sun overhead, no visible shadow, pale
-   * concrete against pale sky, and not one dark value in the frame. That
-   * reasoning was sound and the conclusion was still wrong, because the fix for
-   * "no dark value" is a dark value, not a warm one. Dusk put an orange cast
-   * over the entire image, and the material colour of a bin — the thing this
-   * view exists to show — cannot survive being filtered through sunset.
-   *
-   * So the world is neutral and the data is the only saturated thing in it. The
-   * sun is off to one side to keep the modelling that dusk was bought for, and
-   * the road and shadow tones carry the dark end. Dusk and night are one press
-   * away for anyone who wants them, and night is now genuinely night.
-   *
-   * ...and the client has since asked for dusk as the default, so dusk it is.
-   * Recording the tension rather than quietly dropping the paragraph above,
-   * because it is a real trade and worth revisiting if the complaint returns:
-   * an orange key light does tint every material swatch in the scene, and
-   * "materials barely show" was one of this view's own rejections. Two things
-   * have changed since that reasoning was written, which is why it is a
-   * reasonable call now rather than a reversal to a known-bad state. The dusk
-   * sun was moved off a genuine defect — it sat 91.3 degrees from the Outside
-   * Yard camera, in FRONT of it, lighting the face turned away and flattening
-   * every bin in that zone; it is 79.4 degrees now. And coded bins were given a
-   * much harder read: a 0.6 alpha floor and a 0.92 tint ceiling, so a named
-   * material no longer depends on a pale key light to be seen.
-   *
-   * The measured check on this is the material key against the scene at dusk:
-   * if the ten tagged bins stop being tellable apart, this decision is what to
-   * look at first.
+   * Daylight by default — client's final decision 2026-09-02 after trying
+   * dusk; the argument about orange casts in the earlier comment is
+   * preserved in the design log 8k/8l.
    */
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('dusk');
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('day');
   /*
    * See-through by default. 113 of the 131 bins are indoors, so with solid
    * shells the opening view of a silo monitor shows eighteen silos and four
@@ -1690,11 +1676,43 @@ export default function Plant3D() {
   const statsRef = useRef<HTMLSpanElement>(null);
   const hoverRef = useRef<number | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const topHudRef = useRef<HTMLDivElement>(null);
-  const bottomHudRef = useRef<HTMLDivElement>(null);
+  /* The legend dock always renders — on tablet it stays, horizontally
+     scrollable, never removed — so it is always part of what the camera
+     leaves room for at the bottom. */
+  const dockRef = useRef<HTMLDivElement>(null);
+  /* The narrow-viewport bottom sheet, a second thing stacked above the dock
+     in that one layout. */
+  const sheetRef = useRef<HTMLDivElement>(null);
+  /* Full screen's own floating top bar — see the note by its JSX below. */
+  const fullscreenBarRef = useRef<HTMLDivElement>(null);
   const [stageHeight, setStageHeight] = useState<number | null>(null);
   const [stageWidth, setStageWidth] = useState<number | null>(null);
-  const [insets, setInsets] = useState({ top: 96, bottom: 48 });
+  const [insets, setInsets] = useState({ top: 0, bottom: 40 });
+  /* Below this container width the list pane becomes a bottom sheet instead
+     of a second grid column (DESIGN.md: "under 1100px the list becomes a
+     bottom sheet"). */
+  const narrow = (stageWidth ?? 9999) < 1100;
+  /*
+   * A SEPARATE, wider threshold for the header's own contents.
+   *
+   * Measured on the real laptop at 1280px: the zone segmented control's long
+   * labels ("Outside Yard", "Minerals & Micro", "Finished Feed" plus their
+   * count badges) plus a full look bar (three looks, three view toggles,
+   * full screen) plus the theme/bell/settings/avatar cluster do not fit in
+   * one 44px-tall row at 1280px, only at something closer to desktop width.
+   * `narrow` (1100px) answers "is there room for a list column beside the
+   * canvas" — a much smaller question than "does the header's own content
+   * fit" — so reusing it here is what produced the wrap. This is checked
+   * against the SAME stage-width measurement, just against a number sized to
+   * the header's own content instead of the list's.
+   */
+  const headerCompact = (stageWidth ?? 9999) < 1400;
+  const [sheetOpen, setSheetOpen] = useState(false);
+  /* Full screen hides the list pane by default so the canvas alone fills
+     innerWidth x innerHeight — the acceptance number for full screen — and
+     brings the list back only as an overlay drawer the operator asks for. */
+  const [listDrawerOpen, setListDrawerOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const [webgl] = useState(hasWebGL);
   const [software] = useState(isSoftwareRenderer);
@@ -1791,47 +1809,75 @@ export default function Plant3D() {
        and the nudge is what covers it. */
   }, [expanded, stageHeight, lowPower]);
 
-  /*
-   * Compact on a short screen OR a narrow one.
-   *
-   * This only ever watched height, so at 1280x720 — the exact laptop this view
-   * is built for, and the one named in the HUD's own docstring — the stage was
-   * tall enough that compact never engaged, the zone pills kept their full
-   * labels, and the last one was clipped to two characters against the controls
-   * beside it. The row does scroll, but nothing says so, and a control you
-   * cannot see is a control you do not have. The short names fit; that is what
-   * compact is for.
-   */
-  const compact = !expanded && ((stageHeight ?? 0) < 430 || (stageWidth ?? 9999) < 1100);
-
   /* A quality change rebuilds the canvas, so a stale "context lost" banner from
      the old one must not survive onto the new, working one. */
   useEffect(() => {
     setContextLost(false);
   }, [lowPower]);
 
-  /* The cards change height with the data (alarm chips appear, the material key
-     wraps), so their footprint is measured rather than assumed. */
+  /* The drawer is a full-screen-only affordance; leaving full screen with it
+     open must not leave it silently open (and reserving camera space) the
+     next time full screen is entered. */
+  useEffect(() => {
+    if (!expanded) setListDrawerOpen(false);
+  }, [expanded]);
+
+  /*
+   * insetTop is 0 outside full screen — nothing floats above the plant there,
+   * the zone switch and the look bar both live in the page header, outside
+   * the stage entirely — and the floating top bar's measured height in full
+   * screen, where the page header is covered by the fixed-position stage and
+   * that bar is what takes its place. insetBottom is always the dock's own
+   * measured height (plus the sheet's, when it is showing) plus an 8px
+   * gutter, so the camera fit and the silo-number projector both leave
+   * exactly the room the floating chrome actually occupies, not a guess.
+   */
   useEffect(() => {
     const measure = () => {
-      const top = topHudRef.current?.offsetHeight ?? 0;
-      const bottom = bottomHudRef.current?.offsetHeight ?? 0;
-      setInsets((prev) =>
-        prev.top === top + 20 && prev.bottom === bottom + 20
-          ? prev
-          : { top: top + 20, bottom: bottom + 20 },
-      );
+      /* The dock always renders (it must stay on tablet too — never
+         removed), and on top of it, in the narrow layout only, the bottom
+         sheet stacks above the dock rather than replacing it. Both are
+         measured live so the camera's reserved band tracks whichever is
+         actually on screen, including the sheet's own open/peek animation —
+         a ResizeObserver fires on every frame of that, not just its ends. */
+      const dock = dockRef.current?.offsetHeight ?? 32;
+      const sheet = narrow && !expanded ? (sheetRef.current?.offsetHeight ?? 0) : 0;
+      /* In full screen the floating top bar (zone switch + look bar,
+         rendered inside the stage because the real page header is covered
+         by the fixed-position stage) takes the top instead of nothing. */
+      const top = expanded ? (fullscreenBarRef.current?.offsetHeight ?? 0) + 8 : 0;
+      const bottom = dock + sheet + 8;
+      setInsets((prev) => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }));
     };
     measure();
     const ro = new ResizeObserver(measure);
-    if (topHudRef.current) ro.observe(topHudRef.current);
-    if (bottomHudRef.current) ro.observe(bottomHudRef.current);
+    if (dockRef.current) ro.observe(dockRef.current);
+    if (sheetRef.current) ro.observe(sheetRef.current);
+    if (fullscreenBarRef.current) ro.observe(fullscreenBarRef.current);
     return () => ro.disconnect();
-  }, [compact, expanded]);
+  }, [narrow, expanded]);
+
+  /*
+   * Any keyboard shortcut here (Escape today, more later — DESIGN.md's
+   * camera workstream adds `/`, `1-6`, arrows, `F`, `N`) has to check this
+   * first. Without it, typing "312" into the silo finder to jump to bin 312
+   * would also step zones on every digit the shortcut layer recognises, and
+   * pressing Escape to clear a half-typed search would instead deselect the
+   * bin the operator is trying to look UP.
+   */
+  const isTypingTarget = (el: EventTarget | null): boolean => {
+    if (!(el instanceof HTMLElement)) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      /* Escape inside the list's search field clears/blurs the field itself
+         (the browser's native behaviour on some inputs, and SiloList's own
+         concern otherwise) rather than walking the selection stack. */
+      if (isTypingTarget(e.target)) return;
       if (focused !== null) setFocused(null);
       else if (selected !== null) setSelected(null);
       else if (highlighted !== null) setHighlighted(null);
@@ -2109,6 +2155,33 @@ export default function Plant3D() {
   const selectedPlacement = selected !== null ? SILO_BY_NO.get(selected) : undefined;
   const zoneLabel = zone === 'all' ? 'Whole site' : (ZONES.find((z) => z.id === zone)?.label ?? 'Whole site');
 
+  /* The exact set of bins the list shows for the current zone — `groupInZone`
+     is the same test `Scene` uses to decide what to draw, so the list and the
+     model can never disagree about what "this zone" means. Includes the
+     unmonitored 500-series tanks when they belong to the view; SiloList
+     renders those as "Not monitored" rows rather than dropping them. */
+  const visibleSilos = useMemo(() => SILOS.filter((p) => groupInZone(p.group, zone)), [zone]);
+
+  const headerCenter = (
+    <ZoneSwitch zones={ZONES} zone={zone} counts={zoneCounts} onSelect={goToZone} compact={headerCompact} />
+  );
+
+  const headerRight = (
+    <LookBar
+      timeOfDay={timeOfDay}
+      onTimeOfDay={setTimeOfDay}
+      ghosted={ghosted}
+      onGhosted={setGhosted}
+      expanded={expanded}
+      onExpanded={setExpanded}
+      diagnostics={diagnostics}
+      onDiagnostics={setDiagnostics}
+      numbers={showNumbers}
+      onNumbers={setShowNumbers}
+      compact={headerCompact}
+    />
+  );
+
   if (!webgl) {
     return (
       <WaterSystemLayout title="Plant 3D" subtitle="3D view of the plant silos">
@@ -2130,10 +2203,37 @@ export default function Plant3D() {
       style={expanded || stageHeight === null ? undefined : { height: stageHeight }}
       className={
         expanded
-          ? 'fixed inset-0 z-50 bg-slate-950'
-          : 'relative h-[60vh] min-h-[260px] w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-950 light:border-gray-200'
+          ? 'fixed inset-0 z-50 overflow-hidden bg-slate-950'
+          : 'relative h-full min-h-[260px] w-full overflow-hidden bg-slate-950'
       }
     >
+      {/*
+        Split view: canvas `minmax(0, 1fr)` + list `clamp(280px, 28%, 360px)`
+        on a wide viewport; a single column with the list riding as a bottom
+        sheet under 1100px container width (DESIGN.md). `grid-template-rows`
+        stays a single row either way — the sheet is an overlay, not a grid
+        cell, so dragging or opening it never triggers a resize of the r3f
+        canvas underneath it.
+
+        Full screen ALSO collapses to a single column — the list pane is a
+        grid column there too, and a grid column still claims its track's
+        width even when nothing sensible would render in it, so a fixed
+        `clamp(280px, 28%, 360px)` column would leave the canvas short of
+        `innerWidth` by exactly that much. Full screen's canvas-must-equal-
+        the-viewport requirement means the list has to leave the grid
+        entirely there, which is what the overlay drawer below is for.
+      */}
+      <div
+        className="relative min-h-0 min-w-0 overflow-hidden"
+        style={{
+          display: 'grid',
+          gridTemplateColumns:
+            narrow || expanded ? '1fr' : 'minmax(0, 1fr) clamp(280px, 28%, 360px)',
+          height: '100%',
+          width: '100%',
+        }}
+      >
+      <div className="relative min-h-0 min-w-0 overflow-hidden">
       <Canvas
         /*
          * Antialiasing is a WebGL context-creation attribute, and r3f builds the
@@ -2262,13 +2362,10 @@ export default function Plant3D() {
       </Canvas>
 
       {/*
-        Silo numbers, drawn over the canvas but UNDER the cards (z-10 against
-        the chrome's z-20). They describe the scene, so the instruments keep
-        precedence: a number may be hidden by the status card, but the status
-        card must never be obscured by a number.
-
-        One overlay rather than 131 <Html> nodes — see SiloNumberProjector for
-        why, and for the culling that decides which of these exist at all.
+        Silo numbers, drawn over the canvas but under the legend dock (z-10
+        against the dock's z-20). One overlay rather than 131 <Html> nodes —
+        see SiloNumberProjector for why, and for the culling that decides
+        which of these exist at all.
       */}
       {showNumbers && (
         <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
@@ -2291,104 +2388,133 @@ export default function Plant3D() {
         </div>
       )}
 
-      {/* --- floating chrome ------------------------------------------- */}
-      <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3">
-        <div className="flex items-start justify-between gap-3">
-          {/*
-            Always stacked. Putting the zone bar, the status card and the finder
-            on one row saves about 48px of height and costs the right-hand zone
-            pills entirely once the canvas is under ~1200px wide — which it is on
-            the target laptop at 965px. A control you cannot see is worse than a
-            control that costs a little height, and the camera's safe-area
-            framing already compensates for the height.
-          */}
-          <div ref={topHudRef} className="pointer-events-auto flex min-w-0 flex-col gap-1.5">
-            <ZoneBar
-              zones={ZONES}
-              zone={zone}
-              counts={zoneCounts}
-              onSelect={goToZone}
-              compact={compact}
-            />
-            {/* Status and finder always share a row, so the finder never costs
-                a third stacked card on a screen that has no room for one. */}
-            <div className="flex min-w-0 items-start gap-2">
-              <StatusBar
-                summary={summary}
-                zoneLabel={zoneLabel}
-                unknownRows={unknownRows}
-                plantWroteAt={readings.plantWroteAt}
-                fetchedAt={readings.fetchedAt}
-                loading={readings.isLoading}
-                error={readings.error}
-                onRefresh={readings.refetch}
-                onGoTo={goToAlarm}
-              />
-              <SiloFinder onFind={findSilo} compact={compact} />
-            </div>
-          </div>
-          <div className="pointer-events-auto flex flex-col items-end gap-2">
-            <LookBar
-              timeOfDay={timeOfDay}
-              onTimeOfDay={setTimeOfDay}
-              ghosted={ghosted}
-              onGhosted={setGhosted}
-              expanded={expanded}
-              onExpanded={setExpanded}
-              diagnostics={diagnostics}
-              onDiagnostics={setDiagnostics}
-              numbers={showNumbers}
-              onNumbers={setShowNumbers}
+      {/*
+        Diagnostics — off by default, and the one HUD element still allowed to
+        float freely over the picture besides the dock, the pills and the
+        hover chip: it is a debug instrument, not part of the operating view,
+        and only ever on screen when someone has explicitly asked for it.
+      */}
+      {diagnostics && (
+        <div className="pointer-events-none absolute left-2 top-2 z-20">
+          <div className="pointer-events-auto">
+            <DiagnosticsBar
+              statsRef={statsRef}
+              quality={quality}
+              onQuality={setQuality}
+              software={software}
+              degraded={degraded}
             />
           </div>
         </div>
-
-        {/* Both bottom cards live on the left. The right-hand strip from the
-            controls down to the floor belongs to the detail panel, which is
-            full-height and would otherwise sit on top of the quality buttons and
-            swallow the clicks. */}
-        <div ref={bottomHudRef} className="flex items-end">
-          <div className="pointer-events-auto flex flex-col items-start gap-1.5">
-            {diagnostics && (
-              <DiagnosticsBar
-                statsRef={statsRef}
-                quality={quality}
-                onQuality={setQuality}
-                software={software}
-                degraded={degraded}
-              />
-            )}
-            <MaterialKey
-              materials={materials}
-              compact={compact}
-              highlighted={highlighted}
-              onHighlight={setHighlighted}
-            />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/*
-        The panel is anchored rather than stacked. Inside the flex column it sized
-        itself to its content and ran 184px past the bottom of a 326px canvas —
-        the last four facts were simply unreachable. Pinning top and bottom gives
-        it a real height to scroll inside on any screen.
+        The single 32px dock along the bottom edge of the canvas pane — the
+        only other thing that floats over the plant besides the pills and the
+        hover chip (DESIGN.md). Always rendered, on every layout including
+        tablet — a Codex audit caught the first version of this hiding it
+        under 1100px, which is exactly the layout the dock's own horizontal
+        scroll exists for. On the narrow layout the bottom sheet stacks
+        ABOVE it (see the sheet below), not in place of it.
       */}
-      {selectedPlacement && (
-        <div className="pointer-events-none absolute right-3 top-[4.5rem] bottom-3 z-20 flex justify-end">
-          <div className="pointer-events-auto max-h-full overflow-y-auto">
-            <SiloDetailPanel
-              placement={selectedPlacement}
-              reading={readings.byNo.get(selectedPlacement.siloNo)}
-              group={selectedPlacement.group}
-              palette={readings.palette}
-              onClose={() => {
-                setSelected(null);
-                setFocused(null);
-              }}
-            />
+      <LegendDock
+        ref={dockRef}
+        materials={materials}
+        highlighted={highlighted}
+        onHighlight={setHighlighted}
+      />
+
+      {/*
+        Full screen's own floating top bar.
+        The real page header (WaterSystemLayout, immersive strip) is a normal
+        in-flow element; the stage in full screen is `fixed inset-0 z-50`,
+        which paints over it regardless of DOM order. So the zone switch and
+        the look bar — both moved OUT of the stage and into that header for
+        the split-view layout — would simply disappear the moment full
+        screen engaged, taking the full-screen EXIT control down with them.
+        This reuses the exact same components (so aria-label/title stay
+        identical for the harness) as a floating overlay INSIDE the stage,
+        the same place they lived before this phase, but only in this one
+        state where the alternative is losing them.
+      */}
+      {expanded && (
+        <div
+          ref={fullscreenBarRef}
+          className="pointer-events-none absolute inset-x-3 top-3 z-40 flex items-center justify-between gap-3"
+        >
+          <div className="pointer-events-auto min-w-0 rounded-full bg-slate-950/90 p-1 shadow-lg ring-1 ring-white/10 backdrop-blur-md">
+            <ZoneSwitch zones={ZONES} zone={zone} counts={zoneCounts} onSelect={goToZone} compact={headerCompact} />
+          </div>
+          <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
+            <div className="rounded-full bg-slate-950/90 p-1 shadow-lg ring-1 ring-white/10 backdrop-blur-md">
+              <LookBar
+                timeOfDay={timeOfDay}
+                onTimeOfDay={setTimeOfDay}
+                ghosted={ghosted}
+                onGhosted={setGhosted}
+                expanded={expanded}
+                onExpanded={setExpanded}
+                diagnostics={diagnostics}
+                onDiagnostics={setDiagnostics}
+                numbers={showNumbers}
+                onNumbers={setShowNumbers}
+                compact={headerCompact}
+              />
+            </div>
+            {/*
+              The list toggle: full screen hides the list pane by default so
+              the canvas alone fills innerWidth x innerHeight (the acceptance
+              number), and this is the one way back to it — a 44px control
+              that slides the list in as an overlay drawer over the right
+              edge rather than reclaiming a grid column, which would shrink
+              the canvas back below the viewport.
+            */}
+            <button
+              type="button"
+              onClick={() => setListDrawerOpen((o) => !o)}
+              title={listDrawerOpen ? 'Hide the silo list' : 'Show the silo list'}
+              aria-label="Toggle silo list"
+              aria-pressed={listDrawerOpen}
+              className="touch-target-44 flex h-11 w-11 items-center justify-center rounded-full bg-slate-950/90 text-slate-200 shadow-lg ring-1 ring-white/10 backdrop-blur-md hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <PanelRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
+      )}
+
+      {/*
+        Full screen's list drawer — an overlay over the right edge of the
+        canvas, not a grid column, so the canvas element's own size never
+        changes when this opens. Rendered off-screen (translateX 100%) and
+        always mounted rather than conditionally, the same reasoning as the
+        View-options menu: a control worth reaching by keyboard or the
+        harness should exist in the DOM whether or not it is presently
+        visible.
+      */}
+      {expanded && (
+        <motion.div
+          className="absolute inset-y-0 right-0 z-40 w-[clamp(280px,28%,360px)] max-w-[85vw] overflow-hidden border-l border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-md light:border-gray-200 light:bg-white/95"
+          initial={false}
+          animate={{ x: listDrawerOpen ? 0 : '100%' }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
+          aria-hidden={!listDrawerOpen}
+        >
+          <SiloList
+            placements={visibleSilos}
+            readings={readings}
+            summary={summary}
+            selected={selected}
+            hovered={hovered}
+            onHover={onHover}
+            onFind={findSilo}
+            onGoToAlarm={goToAlarm}
+            onDeselect={() => {
+              setSelected(null);
+              setFocused(null);
+            }}
+          />
+        </motion.div>
       )}
 
       {contextLost && (
@@ -2403,11 +2529,100 @@ export default function Plant3D() {
           Silo model does not match the plant: {modelProblems.join('; ')}
         </div>
       )}
+      </div>
+
+      {/* ---- list pane (wide viewport: a real grid column) ---------------- */}
+      {!narrow && !expanded && (
+        <div
+          data-plant3d-list-pane
+          className="min-h-0 min-w-0 overflow-hidden border-l border-slate-800 bg-slate-950/95 light:border-gray-200 light:bg-white/95"
+        >
+          <SiloList
+            placements={visibleSilos}
+            readings={readings}
+            summary={summary}
+            selected={selected}
+            hovered={hovered}
+            onHover={onHover}
+            onFind={findSilo}
+            onGoToAlarm={goToAlarm}
+            onDeselect={() => {
+              setSelected(null);
+              setFocused(null);
+            }}
+          />
+        </div>
+      )}
+      </div>
+
+      {/*
+        ---- bottom sheet (narrow, non-full-screen: the list rides below the
+        canvas) --------------------------------------------------------
+        A real DOM sibling of the grid, not a grid cell — its height animates
+        between a peek (the handle, the KPI strip, the finder and the first
+        couple of rows) and 45% of the stage, and animating a grid track
+        height would resize the r3f canvas on every frame of that animation.
+        Overlaying it instead means the canvas never resizes for this.
+
+        Never shown in full screen — full screen has its own drawer above,
+        because full screen's canvas has to equal innerWidth x innerHeight
+        exactly and a sheet is a persistent bottom band, not an overlay that
+        gets out of the way entirely.
+      */}
+      {narrow && !expanded && (
+        <motion.div
+          ref={sheetRef}
+          data-plant3d-sheet
+          className="absolute inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden border-t border-slate-800 bg-slate-950/95 shadow-[0_-4px_16px_rgba(0,0,0,0.25)] backdrop-blur-md light:border-gray-200 light:bg-white/95"
+          initial={false}
+          animate={{ height: sheetOpen ? '45%' : SHEET_PEEK }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
+        >
+          <motion.button
+            type="button"
+            onClick={() => setSheetOpen((o) => !o)}
+            aria-expanded={sheetOpen}
+            aria-label={sheetOpen ? 'Collapse the bin list' : 'Expand the bin list'}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={0.15}
+            onDragEnd={(_, info) => {
+              if (info.offset.y < -20) setSheetOpen(true);
+              else if (info.offset.y > 20) setSheetOpen(false);
+            }}
+            className="touch-target-44 flex h-12 shrink-0 items-center justify-center gap-1.5 border-b border-slate-800 light:border-gray-200"
+          >
+            <span className="h-1 w-10 rounded-full bg-slate-600 light:bg-gray-200" />
+          </motion.button>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <SiloList
+              placements={visibleSilos}
+              readings={readings}
+              summary={summary}
+              selected={selected}
+              hovered={hovered}
+              onHover={onHover}
+              onFind={findSilo}
+              onGoToAlarm={goToAlarm}
+              onDeselect={() => {
+                setSelected(null);
+                setFocused(null);
+              }}
+            />
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 
   return (
-    <WaterSystemLayout title="Plant 3D" subtitle="Fakieh Feed Factory — live silo view">
+    <WaterSystemLayout
+      title="Plant 3D"
+      subtitle="Fakieh Feed Factory — live silo view"
+      immersive
+      headerCenter={headerCenter}
+      headerRight={headerRight}
+    >
       {stage}
     </WaterSystemLayout>
   );

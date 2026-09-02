@@ -717,8 +717,20 @@ async function main() {
      * the comment above says this check exists to prevent: "if a constant
      * changes and this text does not, the view is quietly lying about its own
      * geometry." The check was pinned to the value the text happened to say.
+     *
+     * Accepts the LITERAL number OR a template-literal reference to the
+     * constant itself (`${VERTICAL_EXAGGERATION}`) — the source is scanned as
+     * TEXT here, not evaluated, so a `${VERTICAL_EXAGGERATION}x` in the
+     * PROVENANCE string reads as the two literal characters `$`, `{`, the
+     * identifier, `}`, `x` rather than as "1.25x". That interpolation is a
+     * STRONGER guarantee against the exact drift this check exists to catch
+     * — the text cannot say the wrong number once it is computed from the
+     * constant at runtime — so it has to count as satisfying the rule, not
+     * fail it for no longer spelling the digits out by hand.
      */
-    if (!new RegExp(String(silos.VERTICAL_EXAGGERATION).replace('.', '\.')).test(text)) {
+    const hasLiteral = new RegExp(String(silos.VERTICAL_EXAGGERATION).replace('.', '\.')).test(text);
+    const hasInterpolation = /\$\{\s*VERTICAL_EXAGGERATION\s*\}/.test(text);
+    if (!hasLiteral && !hasInterpolation) {
       bad.push(`the ${silos.VERTICAL_EXAGGERATION}x height stretch`);
     }
     if (!/compress/i.test(text)) bad.push('the indoor size compression');
@@ -1041,6 +1053,8 @@ async function main() {
   await checkErrorBoundary();
   await checkShotsNameTheirZone();
   await checkMaterialCodeCoercion();
+  await checkFixedPositionTrap();
+  await checkTriangleBudget();
 
   await rm(dir, { recursive: true, force: true });
 
@@ -1128,6 +1142,7 @@ async function checkTailwind() {
   const ALLOWED = new Set(Array.from({ length: 21 }, (_, i) => i * 5));
   const files = [
     'client/src/components/water-system/plant3d/PlantHud.tsx',
+    'client/src/components/water-system/plant3d/SiloList.tsx',
     'client/src/pages/water-system/Plant3D.tsx',
     'client/src/lib/plant3d/siloMesh.tsx',
   ];
@@ -1252,6 +1267,7 @@ async function checkLightClasses() {
   const BACKSLASH = String.fromCharCode(92);
   const files = [
     'client/src/components/water-system/plant3d/PlantHud.tsx',
+    'client/src/components/water-system/plant3d/SiloList.tsx',
     'client/src/pages/water-system/Plant3D.tsx',
     'client/src/lib/plant3d/siloMesh.tsx',
   ];
@@ -1526,6 +1542,7 @@ async function checkMaterialCodeCoercion() {
   const files = [
     join('pages', 'water-system', 'Plant3D.tsx'),
     join('components', 'water-system', 'plant3d', 'PlantHud.tsx'),
+    join('components', 'water-system', 'plant3d', 'SiloList.tsx'),
     join('lib', 'plant3d', 'siloData.ts'),
     join('lib', 'plant3d', 'siloMesh.tsx'),
     join('lib', 'plant3d', 'materials.ts'),
@@ -1578,6 +1595,193 @@ async function checkMaterialCodeCoercion() {
       ? `${bad.length} unguarded call site(s):\n${bad.join('\n')}`
       : null;
   });
+}
+
+/**
+ * Full screen must not be trapped by the page wrapper.
+ *
+ * Every page's content sits inside `.page-transition.page-transition-enter-active`
+ * (WaterSystemLayout). A `transform`, `filter`, `perspective` or `contain`
+ * on that wrapper makes it the containing block for every `position: fixed`
+ * descendant — so the Plant 3D stage's `fixed inset-0` full-screen mode
+ * resolved against the wrapper, not the viewport, and the canvas stayed at
+ * 965x326. Found on the client's laptop by reading the canvas rect with the
+ * fixed class applied; nothing here had ever measured it.
+ *
+ * Static because the rule is static: both classes are applied unconditionally
+ * in the JSX, so whatever the stylesheet says for them is the permanent state.
+ * The scanner reads the real stylesheet, so a rule that reappears in either
+ * class fails the build; scanning zero rules is a broken matcher, not a pass.
+ */
+async function checkFixedPositionTrap() {
+  const rel = 'client/src/index.css';
+  let css;
+  try {
+    css = await readFile(join(ROOT, rel), 'utf8');
+  } catch {
+    check('the page wrapper cannot trap position: fixed', () => `${rel} could not be read`);
+    return;
+  }
+  const TRAP = /^\s*(transform|filter|backdrop-filter|perspective|contain|will-change)\s*:\s*([^;]+);/gm;
+  const blocks = [];
+  const re = /\.page-transition(?:-enter-active|-enter)?\s*\{([^}]*)\}/g;
+  let m;
+  while ((m = re.exec(css)) !== null) {
+    /* Strip comments before reading declarations — the fix is documented in a
+       comment that names the exact value it replaced. */
+    blocks.push({ selector: m[0].slice(0, m[0].indexOf('{')).trim(), body: m[1].replace(/\/\*[\s\S]*?\*\//g, '') });
+  }
+  check('the page wrapper cannot trap position: fixed', () => {
+    if (blocks.length === 0) return 'found no .page-transition rules — the matcher is broken, not the CSS clean';
+    const bad = [];
+    for (const b of blocks) {
+      /* `.page-transition-enter` is the pre-mount state; it is never applied on
+         its own in this app, but a translate there is harmless only while that
+         stays true, and the wrapper renders with `-enter-active` from the
+         first paint. The active and base classes are what is on screen. */
+      if (b.selector === '.page-transition-enter') continue;
+      let d;
+      while ((d = TRAP.exec(b.body)) !== null) {
+        const value = d[2].trim();
+        if (d[1] === 'will-change' ? /transform|filter|perspective/.test(value) : value !== 'none') {
+          bad.push(`${b.selector} { ${d[1]}: ${value} }`);
+        }
+      }
+      TRAP.lastIndex = 0;
+    }
+    return bad.length
+      ? `these make the page wrapper a containing block for position: fixed — full screen will not fill the screen:\n${bad.join('\n')}`
+      : null;
+  });
+}
+
+/**
+ * Triangle and draw-call budget — Phase 2B (silo archetypes).
+ *
+ * Bundles `silos.ts`, `siloGeometry.ts` and `siloStructures.tsx` as its OWN
+ * isolated esbuild entry, deliberately separate from the shared bundle
+ * `main()` builds at the top of this file: that shared bundle also includes
+ * `ground.tsx` and `look.ts`, owned by other workstreams, and a break in
+ * either of those aborts `main()` before a single `check()` call runs. This
+ * check has nothing to do with the ground or the sky, so it does not
+ * inherit their failure — it builds only the geometry files it actually
+ * measures, and reports its own COULD-NOT-RUN if THAT build fails.
+ *
+ * It calls the real `buildBaseGeometry`/`buildDetailGeometry`/`triCount`
+ * functions `siloMesh.tsx` calls at runtime — actual triangle counts off the
+ * actual merged geometry, not an estimate — and the actual
+ * `buildConveyors` the finished-feed zone's shared structure uses.
+ */
+async function checkTriangleBudget() {
+  const dir = await mkdtemp(join(tmpdir(), 'plant3d-tris-'));
+  let silos;
+  let geom;
+  let structures;
+  try {
+    await build({
+      entryPoints: ['silos.ts', 'siloGeometry.ts', 'siloStructures.tsx'].map((e) => join(SRC, e)),
+      outdir: dir,
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      logLevel: 'error',
+      external: [],
+    });
+    silos = await import(pathToFileURL(join(dir, 'silos.js')).href);
+    geom = await import(pathToFileURL(join(dir, 'siloGeometry.js')).href);
+    structures = await import(pathToFileURL(join(dir, 'siloStructures.js')).href);
+  } catch (err) {
+    check(
+      'triangle and draw-call budget',
+      () => `could not build siloGeometry.ts/siloStructures.tsx: ${err && err.stack ? err.stack : err}`,
+    );
+    await rm(dir, { recursive: true, force: true });
+    return;
+  }
+
+  check('triangle and draw-call budget', () => {
+    const { SILO_GROUPS, SILOS, deriveDims } = silos;
+    if (!SILO_GROUPS.length || !SILOS.length) {
+      return 'no groups/placements to measure — the matcher is broken, not the geometry clean';
+    }
+
+    let baseTotal = 0;
+    let drawCalls = 0;
+    const rows = [];
+    const byZone = new Map();
+
+    for (const g of SILO_GROUPS) {
+      const count = SILOS.filter((s) => s.group.id === g.id).length;
+      const d = deriveDims(g.capacityKg, g.diameter, g.hopperRatio, g.elevation);
+      const base = geom.buildBaseGeometry(g, d);
+      const baseTris = geom.triCount(base);
+      base.dispose();
+      const detail = geom.buildDetailGeometry(g, d);
+      const detailTris = detail ? geom.triCount(detail) : 0;
+      if (detail) detail.dispose();
+
+      baseTotal += baseTris * count;
+      /* contents + surface + shell + pick per group, +1 draw if it carries a
+         detail LOD mesh, +1 if it carries shared structure (conveyors). */
+      drawCalls += 4 + (detailTris > 0 ? 1 : 0) + (g.structure?.conveyors ? 1 : 0);
+
+      rows.push({ id: g.id, archetype: g.archetype, count, baseTris, detailTris, zone: g.zone });
+      const list = byZone.get(g.zone) ?? [];
+      list.push(g);
+      byZone.set(g.zone, list);
+    }
+    /* the alarm-beacon InstancedMesh and the number-label projector add one
+       more draw each, whole-scene rather than per-group. */
+    drawCalls += SILO_GROUPS.length; /* one SiloBeacons instancedMesh per group */
+
+    console.log('      per-group triangle table:');
+    for (const r of rows) {
+      console.log(
+        `        ${r.id.padEnd(7)} ${r.archetype.padEnd(11)} x${String(r.count).padStart(3)}` +
+          `  base=${String(r.baseTris).padStart(6)} tris/bin (${(r.baseTris * r.count).toLocaleString().padStart(9)} total)` +
+          `  detail=${String(r.detailTris).padStart(5)} tris/bin`,
+      );
+    }
+
+    /* Largest zone by monitored bin count — base + detail + shared structure,
+       for that zone alone, per the plan's "48-bin finished zone" budget. */
+    let largestZone = null;
+    let largestCount = 0;
+    for (const [zone, groups] of byZone) {
+      const n = groups.reduce((a, g) => a + SILOS.filter((s) => s.group.id === g.id).length, 0);
+      if (n > largestCount) {
+        largestCount = n;
+        largestZone = zone;
+      }
+    }
+    let zoneTotal = 0;
+    for (const g of byZone.get(largestZone) ?? []) {
+      const row = rows.find((r) => r.id === g.id);
+      zoneTotal += (row.baseTris + row.detailTris) * row.count;
+      if (g.structure?.conveyors) {
+        const placements = SILOS.filter((s) => s.group.id === g.id);
+        const conv = structures.buildConveyors(placements);
+        if (conv) {
+          zoneTotal += geom.triCount(conv);
+          conv.dispose();
+        }
+      }
+    }
+    console.log(
+      `      largest zone: ${largestZone} (${largestCount} bins), base+detail+structure = ${zoneTotal.toLocaleString()} tris`,
+    );
+    console.log(`      whole-site base total: ${baseTotal.toLocaleString()} tris, ~${drawCalls} draw calls`);
+
+    const bad = [];
+    if (baseTotal > 350_000) bad.push(`base total ${baseTotal.toLocaleString()} tris > 350,000`);
+    if (zoneTotal > 420_000) {
+      bad.push(`${largestZone} zone base+detail+structure ${zoneTotal.toLocaleString()} tris > 420,000`);
+    }
+    if (drawCalls > 120) bad.push(`~${drawCalls} draw calls > 120`);
+    return bad.length ? bad.join(', ') : null;
+  });
+
+  await rm(dir, { recursive: true, force: true });
 }
 
 main().catch((err) => {

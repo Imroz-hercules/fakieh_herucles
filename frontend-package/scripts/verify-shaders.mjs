@@ -107,7 +107,7 @@ async function evaluate(cdp, session, expression) {
  */
 const HARNESS = `
 import * as THREE from 'three';
-import { makeContentsMaterial, makeShellMaterial, makeSurfaceMaterial } from './siloShader.ts';
+import { makeContentsMaterial, makeShellMaterial, makeSurfaceMaterial, makeSelectionMaterial } from './siloShader.ts';
 import { makeGroundMaterial } from './ground.tsx';
 import { deriveDims } from './silos.ts';
 import { siloProfile, segmentsFor } from './siloGeometry.ts';
@@ -115,7 +115,41 @@ import { siloProfile, segmentsFor } from './siloGeometry.ts';
 function withInstanceAttrs(geo, count) {
   geo.setAttribute('aColor', new THREE.InstancedBufferAttribute(new Float32Array(count * 3).fill(0.6), 3));
   geo.setAttribute('aFill', new THREE.InstancedBufferAttribute(new Float32Array(count).fill(0.4), 1));
-  geo.setAttribute('aFx', new THREE.InstancedBufferAttribute(new Float32Array(count * 2), 2));
+  /* aFx is vec3 (dim, highlight, known) in the real shader — this used to be
+     allocated at itemSize 2, silently mismatched against the vec3 the shader
+     declares. It never failed THIS check because WebGL does not validate a
+     vertex attribute's buffer stride against the shader's declared type at
+     link time, only at draw time, and even then it does not error — it just
+     reads whatever bytes happen to sit past the buffer's end. Fixed to match
+     what the real geometry actually carries. */
+  geo.setAttribute('aFx', new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3));
+  /* aState (hl, lock, noData) — new in the aPart/aState contract (see the
+     header of siloShader.ts). Filled with a mix of 0/1 so a compile-only
+     pass still exercises the no-data and HL branches at RENDER time (the
+     bug this file's own header warns about — renderer.compile() alone would
+     not have caught the original uY0 defect). */
+  const state = new Float32Array(count * 3);
+  for (let i = 0; i < count; i += 1) {
+    state[i * 3 + 0] = i % 2; // hl
+    state[i * 3 + 1] = 0; // lock
+    state[i * 3 + 2] = i === count - 1 ? 1 : 0; // noData on the last instance
+  }
+  geo.setAttribute('aState', new THREE.InstancedBufferAttribute(state, 3));
+  return geo;
+}
+
+/*
+ * aPart is per-VERTEX, not per-instance (see the contract note atop
+ * siloShader.ts) — every instance shares one geometry, so this is a plain
+ * BufferAttribute sized to the vertex count, not an InstancedBufferAttribute.
+ * Values cycle through 0..5 so every part branch in the shader (wall, roof,
+ * hopper, structure, rings, accents) actually gets a fragment at render time.
+ */
+function withPartAttr(geo) {
+  const n = geo.attributes.position.count;
+  const part = new Float32Array(n);
+  for (let i = 0; i < n; i += 1) part[i] = i % 6;
+  geo.setAttribute('aPart', new THREE.BufferAttribute(part, 1));
   return geo;
 }
 
@@ -140,26 +174,56 @@ async function run() {
   const y1 = dims.elevation + dims.hopper + dims.barrel;
   const segs = segmentsFor(dims.diameter);
   const count = 3;
-  const siloGeo = withInstanceAttrs(new THREE.LatheGeometry(siloProfile(dims), segs), count);
+  const siloGeo = withPartAttr(withInstanceAttrs(new THREE.LatheGeometry(siloProfile(dims), segs), count));
   const discGeo = withInstanceAttrs(new THREE.CircleGeometry(1, segs).rotateX(-Math.PI / 2), count);
 
   const entries = [];
+  let nextX = 0;
   const addInstanced = (label, geometry, material, scale) => {
     const mesh = new THREE.InstancedMesh(geometry, material, count);
     const m = new THREE.Matrix4();
     for (let i = 0; i < count; i += 1) {
       m.makeScale(scale, scale, scale);
-      m.setPosition(i * 10, 0, 0);
+      m.setPosition(nextX + i * 10, 0, 0);
       mesh.setMatrixAt(i, m);
     }
     mesh.instanceMatrix.needsUpdate = true;
     scene.add(mesh);
     entries.push({ label, material });
+    nextX += count * 10 + 20;
   };
 
   addInstanced('silo contents', siloGeo, makeContentsMaterial('#4ade80', y0, y1, dims.hopper), 1);
   addInstanced('silo shell', siloGeo, makeShellMaterial('#4ade80', y0, y1, dims.hopper), 1);
   addInstanced('silo surface disc', discGeo, makeSurfaceMaterial(), 1);
+  /* Every material family (galvanised/painted/concrete/tank steel), both
+     passes — customProgramCacheKey is distinct per pass AND per family (see
+     siloShader.ts), which means each of these is a genuinely different
+     compiled program, not a cache hit off the entries above. */
+  for (const family of [0, 1, 2, 3]) {
+    addInstanced(
+      \`silo contents (family \${family})\`,
+      siloGeo,
+      makeContentsMaterial('#4ade80', y0, y1, dims.hopper, { family }),
+      1,
+    );
+    addInstanced(
+      \`silo shell (family \${family})\`,
+      siloGeo,
+      makeShellMaterial('#4ade80', y0, y1, dims.hopper, { family }),
+      1,
+    );
+  }
+  {
+    /* The selection proxy is a plain, non-instanced Mesh — the geometry
+       worker's real proxy mesh over one selected bin — not an InstancedMesh,
+       so it needs none of aColor/aFill/aFx/aState/aPart. */
+    const material = makeSelectionMaterial();
+    const mesh = new THREE.Mesh(siloGeo, material);
+    mesh.position.set(nextX, 0, 0);
+    scene.add(mesh);
+    entries.push({ label: 'selection proxy', material });
+  }
   {
     const { material } = makeGroundMaterial();
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(10, 10), material));
