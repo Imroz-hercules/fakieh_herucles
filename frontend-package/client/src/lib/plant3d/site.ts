@@ -212,11 +212,81 @@ export const SITE = {
   /** the open truck yard, south-west of the process spine */
   yard: { x: 14, z: 48, length: 148, width: 52 },
   /**
-   * Perimeter wall. Approximate: the compound edge is clear enough on the aerial
-   * to place, not to measure. It is here because without a boundary the plant
-   * reads as a handful of objects on an infinite plane rather than as a site.
+   * Perimeter LINE. Approximate: the compound edge is clear enough on the
+   * aerial to place, not to measure. It is here because without a boundary
+   * the plant reads as a handful of objects on an infinite plane rather than
+   * as a site.
+   *
+   * `height`/`thickness` are inherited from the stage-1 slab wall and are no
+   * longer drawn as a slab (workstream 4.E.3 replaces that with the fence
+   * below) — kept so nothing that still reads them breaks, and because they
+   * still describe a plausible compound boundary if a wall is ever wanted
+   * again. `x`/`z`/`length`/`width` are the number this file promises not to
+   * move: they are the fence LINE now.
    */
-  wall: { x: -10, z: 26, length: 320, width: 168, height: 3, thickness: 0.6 },
+  /* z 26/168 -> 20/178 (2026-09-02): the widened 100 bank's far row now
+     reaches z -67; the fence line moves north so it stays inside. */
+  wall: { x: -10, z: 20, length: 320, width: 178, height: 3, thickness: 0.6 },
+  /**
+   * The perimeter fence (workstream 4.E.3, `structures.tsx`'s `<Perimeter>`).
+   * Runs along the exact same rectangle as `wall` above — posts every
+   * `postPitch` metres around the perimeter, `height` metres tall, plus a
+   * translucent panel strip `panelHeight` metres tall at `panelAlpha` opacity.
+   * Reads as a compound boundary without the stage-1 slab's "walled fortress"
+   * silhouette.
+   */
+  fence: {
+    postPitch: 4,
+    height: 2.2,
+    postSize: 0.1,
+    panelHeight: 2,
+    panelAlpha: 0.08,
+  },
+} as const;
+
+/**
+ * Road kerb geometry (workstream 4.E.2). A kerb strip runs along both sides
+ * of every entry in `ROADS`, `offset` metres outside that road's own paved
+ * half-width — additive only, `ROADS` itself is untouched.
+ */
+export const KERB = {
+  width: 0.3,
+  height: 0.15,
+  offset: 0.15,
+} as const;
+
+/**
+ * Building envelope detail (workstream 4.E.4): cladding stripe pitch,
+ * parapet, roof vents, roller door. Additive — no `BUILDINGS` entry's
+ * position, footprint or height changes here; this only adds the numbers
+ * `structures.tsx`'s `<Buildings>` needs to dress the same boxes.
+ */
+export const BUILDING_DETAIL = {
+  /** height of the parapet box wrapping the eaves */
+  parapetHeight: 0.6,
+  parapetThickness: 0.25,
+  /** the box along the roof ridge */
+  ridgeCapSize: 0.25,
+  ventSize: 0.8,
+  ventsPerBuilding: 4,
+  rollerDoorWidth: 4,
+  rollerDoorHeight: 5,
+  /** metres between cladding ribs, sampled off world X — see structures.tsx */
+  claddingStripePitch: 0.9,
+  /** +/- luminance swing of the rib band, as a fraction of 1.0 */
+  claddingStripeLuminance: 0.06,
+} as const;
+
+/**
+ * Gallery truss member sizing (workstream 4.E.6). `GALLERIES` itself is
+ * untouched — every `from`/`to`/`y`/`width` stays exactly as traced.
+ */
+export const TRUSS = {
+  /** cross-section of every chord, vertical and diagonal box */
+  memberSize: 0.2,
+  /** spacing between vertical members along the span */
+  verticalSpacing: 3,
+  deckThickness: 0.05,
 } as const;
 
 /**
@@ -262,9 +332,12 @@ export const BUILDINGS: SiteBuilding[] = [
   {
     id: 'mill-a',
     label: 'Mill building — raw material',
-    x: -15,
+    /* 2026-09-02: grown WEST from 55 to 61.5 m (x -46..15.5) to hold the
+       widened 300 battery on the client's instruction. Past the aerial's
+       ±5 m tolerance by ~1.5 m; the east wall stays at the dosing floor. */
+    x: -15.25,
     z: 9,
-    length: 55,
+    length: 61.5,
     width: 60,
     height: 26,
     roofRise: 2,
@@ -274,9 +347,11 @@ export const BUILDINGS: SiteBuilding[] = [
   {
     id: 'mill-b',
     label: 'Mill building — dosing',
-    x: 36.1,
+    /* 2026-09-02: x 16..60 (was 13.85..58.35) — shifted east to stay
+       contiguous with the grown mill-a; the dosing floor moved with it. */
+    x: 38,
     z: 9,
-    length: 44.5,
+    length: 44,
     width: 58,
     height: 24,
     roofRise: 2,
@@ -286,9 +361,11 @@ export const BUILDINGS: SiteBuilding[] = [
   {
     id: 'press-house',
     label: 'Press house',
-    x: 69.2,
+    /* 2026-09-02: x 60.5..78.5 (was 58.2..80.2) — 4 m shorter so the
+       finished store could grow west around the widened 800 bins. */
+    x: 69.5,
     z: 11,
-    length: 22,
+    length: 18,
     width: 56,
     height: 24.5,
     roofRise: 2,
@@ -298,9 +375,11 @@ export const BUILDINGS: SiteBuilding[] = [
   {
     id: 'finished-store',
     label: 'Finished feed store',
-    x: 107.6,
+    /* 2026-09-02: x 79..138 (was 79.85..135.35), grown east for the
+       widened 800 series; the west wall is pinned by the press house. */
+    x: 108.5,
     z: 12,
-    length: 55.5,
+    length: 59,
     width: 64,
     height: 22.5,
     roofRise: 3,
@@ -308,14 +387,25 @@ export const BUILDINGS: SiteBuilding[] = [
     kind: 'store',
   },
   {
-    id: 'admin',
-    label: 'Offices',
-    x: -10,
-    z: 84,
-    length: 34,
-    width: 12,
-    height: 8,
-    kind: 'office',
+    /*
+     * 2026-09-02, from the calibrated overlay (7.2 px/m, origin (1872.5, 1871.5)
+     * on site_esri_z19_site_grid10m.png): a single ridged-roof warehouse about
+     * 290 m long runs along the whole south-west side of the truck yard, inside
+     * this compound's fence line, from beyond the bulk bank to past the finished
+     * store. The 34 x 12 m "Offices" box that stood here was a guess drawn on
+     * top of it. Whether it is the plant's own bagged-feed store or a
+     * neighbour's is not known; it is drawn because it is there, unzoned, and
+     * never ghosted.
+     */
+    id: 'south-warehouse',
+    label: 'Warehouse along the yard',
+    x: 10,
+    z: 90,
+    length: 290,
+    width: 26,
+    height: 9,
+    roofRise: 2,
+    kind: 'store',
   },
 ];
 
@@ -363,7 +453,7 @@ export interface Gallery {
 
 export const GALLERIES: Gallery[] = [
   /* outdoor bank -> mill. The one that is actually visible from above. */
-  { from: [-56, -12], to: [-38, -8], y: 26, width: 3.2, observed: true },
+  { from: [-56, -12], to: [-46, -8], y: 26, width: 3.2, observed: true },
   /* along the spine, bay to bay */
   { from: [10, -8], to: [16, -10], y: 21, width: 2.2, observed: false },
   { from: [56, -10], to: [60, -9], y: 19, width: 2.2, observed: false },
@@ -371,7 +461,202 @@ export const GALLERIES: Gallery[] = [
 ];
 
 /** Simple road strips, drawn as flat quads on the ground. */
+/* Re-placed 2026-09-02 against the calibrated overlay: the south street runs
+   beyond the long warehouse (z ~112-128), the west street just outside the
+   fence (x ~-186..-170). Both were inside the compound before. */
 export const ROADS = [
-  { x: 0, z: 100, length: 320, width: 16 },
-  { x: -150, z: 20, length: 16, width: 150 },
+  { x: 0, z: 120, length: 380, width: 16 },
+  { x: -178, z: 20, length: 16, width: 220 },
 ] as const;
+
+/**
+ * Outside-world dressing (client request 2026-09-02: "play with the outside
+ * world a bit… look at the satellite images and see what we can add, to make
+ * the world filled but not take from the GPU").
+ *
+ * `siteDressing.tsx` reads all of the below. Every entry here comes from
+ * READING the aerial imagery, not from a survey — same standing as
+ * `LIGHT_MASTS` ("plausible rather than surveyed") and `GALLERIES`' inferred
+ * links, one step further removed again: these are the plant's NEIGHBOURS,
+ * imagery the client was never asked to ground-truth for us. Treat every
+ * number below as "traced by eye from `esri_wide_800m.png` /
+ * `model_overlay_v2.png` / `site_esri_z19_site_grid10m.png`, accurate to
+ * roughly a building-width, not a metre" — good enough to fill the world in
+ * believably, never presented as plant data. This whole file's worth of
+ * numbers must stay OUTSIDE `SITE.wall` (the plant's own fence) and outside
+ * every `BUILDINGS` footprint; `scripts/verify-structures.mjs` enforces both
+ * against `siteDressing.tsx`'s expanded instances, not just these specs.
+ */
+
+/** One neighbouring warehouse block, traced from the aerial's roof outlines. */
+export interface NeighbourBuilding {
+  id: string;
+  /** footprint centre, plant-local metres */
+  x: number;
+  z: number;
+  /** footprint size along X and Z, metres */
+  length: number;
+  width: number;
+  /** eaves height, metres */
+  height: number;
+  roof: 'flat' | 'ridged';
+}
+
+/**
+ * ~14 neighbouring warehouse footprints. The aerial shows this as a dense
+ * industrial estate on a rectangular street grid whose blocks run PARALLEL
+ * to the plant's own axes (that alignment is exactly why the plant-local
+ * frame reads so well against the imagery) — so every footprint below is
+ * axis-aligned, no rotation needed. Covers: the long ridged-roof warehouse
+ * directly south of the yard (`neighbour-south-long`), the blocks across the
+ * street to the north-west and north-east of the compound, and further
+ * blocks west, east and south so the estate reads as continuous rather than
+ * an island.
+ */
+export const NEIGHBOURS: NeighbourBuilding[] = [
+  { id: 'neighbour-nw-1', x: -70, z: -105, length: 90, width: 40, height: 10, roof: 'flat' },
+  { id: 'neighbour-ne-1', x: 55, z: -100, length: 80, width: 38, height: 11, roof: 'ridged' },
+  { id: 'neighbour-ne-2', x: 140, z: -95, length: 60, width: 32, height: 9, roof: 'flat' },
+  { id: 'neighbour-west-1', x: -235, z: -30, length: 90, width: 42, height: 10, roof: 'flat' },
+  { id: 'neighbour-west-2', x: -235, z: 40, length: 100, width: 40, height: 9, roof: 'ridged' },
+  { id: 'neighbour-west-3', x: -238, z: 100, length: 70, width: 35, height: 8, roof: 'flat' },
+  { id: 'neighbour-south-1', x: 0, z: 150, length: 80, width: 34, height: 10, roof: 'ridged' },
+  { id: 'neighbour-south-2', x: -95, z: 155, length: 70, width: 36, height: 9, roof: 'flat' },
+  { id: 'neighbour-south-3', x: 105, z: 155, length: 65, width: 34, height: 10, roof: 'flat' },
+  { id: 'neighbour-east-1', x: 210, z: 0, length: 75, width: 38, height: 9, roof: 'flat' },
+  { id: 'neighbour-east-2', x: 215, z: 70, length: 70, width: 36, height: 10, roof: 'ridged' },
+  { id: 'neighbour-far-ne', x: 205, z: -145, length: 55, width: 30, height: 8, roof: 'flat' },
+  { id: 'neighbour-far-nw', x: -255, z: -95, length: 50, width: 30, height: 9, roof: 'flat' },
+];
+
+/** One estate street, drawn as flat instanced slabs + kerb strips (never the
+ *  ground shader's own `ROADS` — see `siteDressing.tsx`'s header). */
+export interface Street {
+  id: string;
+  /** centre, plant-local metres */
+  x: number;
+  z: number;
+  /** length along its own `axis`, and width across it, metres */
+  length: number;
+  width: number;
+  /** which plant-local axis the street's long dimension runs along */
+  axis: 'x' | 'z';
+}
+
+/**
+ * The two streets that box the compound in (north, running the long way
+ * like `ROADS[0]`; west, like `ROADS[1]`) plus two more that close the
+ * estate's grid around the plant on its other two sides, matching the
+ * rectangular block pattern visible on the aerial.
+ */
+export const STREETS: Street[] = [
+  /* The north-east street measured at z ~-93 on the calibrated overlay; the
+     south and west streets are ROADS (ground shader + kerbs), not drawn here. */
+  { id: 'street-north', x: 0, z: -92, length: 380, width: 16, axis: 'x' },
+  { id: 'street-east', x: 190, z: 20, length: 220, width: 14, axis: 'z' },
+];
+
+/** A row of trees along one street edge — the builder walks `from` -> `to`
+ *  at `spacing` and drops one X-billboard tree at every step. */
+export interface TreeLine {
+  from: [number, number];
+  to: [number, number];
+  spacing: number;
+}
+
+/** One line per street, on the side away from the compound (the only side
+ *  with clearance between the fence and the paved slab). ~76 trees total. */
+export const TREE_LINES: TreeLine[] = [
+  { from: [-100, -103], to: [100, -103], spacing: 10 },
+  { from: [-100, 131], to: [100, 131], spacing: 10 },
+  { from: [-190, -40], to: [-190, 120], spacing: 10 },
+  { from: [196, -40], to: [196, 120], spacing: 10 },
+];
+
+/** A row of parked vehicles — the builder walks `from` -> `to` at `spacing`,
+ *  each vehicle facing along the row. STATIC: no motion, per the client's
+ *  "purposeful motion only" rule (`PRODUCT.md`). */
+export interface VehicleRow {
+  from: [number, number];
+  to: [number, number];
+  kind: 'truck' | 'car';
+  spacing: number;
+}
+
+/**
+ * Trucks along the plant's east side (between the fence and `street-east`,
+ * matching the aerial) and cars along three of the estate streets.
+ * ~9 trucks, ~34 cars.
+ */
+export const PARKED_VEHICLES: VehicleRow[] = [
+  { from: [165, -20], to: [165, 95], kind: 'truck', spacing: 14 },
+  { from: [-140, -85], to: [10, -85], kind: 'car', spacing: 11 },
+  { from: [-183, -25], to: [-183, 85], kind: 'car', spacing: 11 },
+  { from: [183, -15], to: [183, 85], kind: 'car', spacing: 12 },
+];
+
+/** One low sand/aggregate cone, from the light-toned dirt lot on the
+ *  aerial's north-east edge. */
+export interface Stockpile {
+  x: number;
+  z: number;
+  diameter: number;
+  height: number;
+}
+
+/* Moved 2026-09-02: the calibrated overlay puts the brown aggregate lot
+   NORTH-WEST of the plant across the north street (x -205..-135,
+   z -125..-85), where a neighbour block had been drawn by eye. */
+export const STOCKPILES: Stockpile[] = [
+  { x: -195, z: -112, diameter: 16, height: 3 },
+  { x: -172, z: -98, diameter: 18, height: 3 },
+  { x: -150, z: -115, diameter: 14, height: 3 },
+  { x: -185, z: -88, diameter: 12, height: 2.5 },
+];
+
+/**
+ * A container/truck depot's bays, from the rows of orange containers
+ * south-east of the compound. `rows` x `perRow` boxes, laid end to end along
+ * `+X` (spacing `itemSpacing`) with each row offset `rowSpacing` along Z from
+ * `(originX, originZ)`.
+ */
+export interface ContainerRowSpec {
+  id: string;
+  originX: number;
+  originZ: number;
+  rows: number;
+  perRow: number;
+  rowSpacing: number;
+  itemSpacing: number;
+}
+
+export const CONTAINER_ROWS: ContainerRowSpec[] = [
+  { id: 'container-depot', originX: 162, originZ: 100, rows: 3, perRow: 8, rowSpacing: 4, itemSpacing: 13 },
+];
+
+/** One tank in the liquid-tank farm south-west of the compound (round white
+ *  tanks visible on the aerial near the raw-material end). */
+export interface DressingTank {
+  x: number;
+  z: number;
+  diameter: number;
+  height: number;
+}
+
+/* Re-placed 2026-09-02 against the calibrated overlay: the white tanks sit
+   south-west of the long warehouse beyond the south street, centred near
+   (-96, 204), with a smaller cluster near (30, 172). The first placement was
+   ~80 m west of them, on a street. */
+export const TANK_FARM: DressingTank[] = [
+  { x: -112, z: 199, diameter: 8, height: 6 },
+  { x: -101, z: 199, diameter: 8, height: 6 },
+  { x: -90, z: 199, diameter: 8, height: 6 },
+  { x: -79, z: 199, diameter: 8, height: 6 },
+  { x: -112, z: 210, diameter: 8, height: 6 },
+  { x: -101, z: 210, diameter: 8, height: 6 },
+  { x: -90, z: 210, diameter: 8, height: 6 },
+  { x: -79, z: 210, diameter: 8, height: 6 },
+  { x: 22, z: 172, diameter: 7, height: 5 },
+  { x: 31, z: 172, diameter: 7, height: 5 },
+  { x: 40, z: 172, diameter: 7, height: 5 },
+];

@@ -11,7 +11,8 @@
     "check": "tsc",
     "verify:plant3d": "node scripts/verify-plant3d.mjs",
     "verify:shaders": "node scripts/verify-shaders.mjs",
-    "verify:picture": "node scripts/verify-picture.mjs"
+    "verify:picture": "node scripts/verify-picture.mjs",
+    "verify:structures": "node scripts/verify-structures.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

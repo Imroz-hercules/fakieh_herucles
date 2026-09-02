@@ -96,7 +96,38 @@ const FADE_END = 260;
  */
 const DEPTH_NEAR = 50;
 const DEPTH_FAR = 300;
-const DEPTH_STRENGTH = 0.38;
+/*
+ * Tuned down from 0.38 to the plan's 0.30 (§4.E.1): at 0.38 the whole-site
+ * frame was pulling ground tone toward the fog colour hard enough to fight
+ * the joint/bay contrast raised below — two effects both flattening the same
+ * pixels. 0.30 keeps the "ground recedes into haze" read at range without
+ * cancelling out the markings that make the near ground legible.
+ */
+const DEPTH_STRENGTH = 0.3;
+
+/*
+ * Ground-marking contrast (§4.E.1): "joints and bay lines raised to 18%
+ * contrast so they survive at site range." Named here, rather than left as
+ * bare multipliers inline, so the target is traceable to a number instead of
+ * a magic constant buried in the shader body below.
+ */
+/** Expansion joints: apron tone darkened by this fraction. */
+const JOINT_CONTRAST = 0.18;
+/** Yard border/bay-line paint: blended toward `paint` by this fraction —
+ *  raised from the previous 0.6, which under-separated the yard's own mid
+ *  grey from its painted lines at whole-site distance. */
+const BAY_LINE_CONTRAST = 0.72;
+
+/*
+ * Ghost floor-plan grid (§4.E.5): a dot at every `GHOST_GRID_SPACING` metres
+ * inside a ghosted building's own footprint, so the room reads as a plan even
+ * with no walls and no roof. `GHOST_INSET` keeps the grid off the very edge
+ * of the footprint, clear of where the parapet/edge-cage sits.
+ */
+const GHOST_GRID_SPACING = 8;
+const GHOST_DOT_RADIUS = 0.16;
+const GHOST_DOT_STRENGTH = 0.3;
+const GHOST_INSET = 0.6;
 
 /*
  * Fixed-size uniform arrays. `site.ts` has 2 roads and 5 buildings today;
@@ -171,6 +202,13 @@ uniform vec2 uRoadHalf[ MAX_ROADS ];
 uniform int uBuildingCount;
 uniform vec2 uBuildingCenter[ MAX_BUILDINGS ];
 uniform vec2 uBuildingHalf[ MAX_BUILDINGS ];
+
+/* Ghost floor-plan grid (§4.E.5) — same fixed-size-array pattern as the
+   building plinths above, sized off the same MAX_BUILDINGS: a ghosted
+   building is always one of the buildings already in uBuildingCenter. */
+uniform int uGhostCount;
+uniform vec2 uGhostCenter[ MAX_BUILDINGS ];
+uniform vec2 uGhostHalf[ MAX_BUILDINGS ];
 
 /* ---- cheap value noise / fbm, prefixed to stay out of three's way ---- */
 
@@ -259,7 +297,7 @@ const FRAG_BODY = /* glsl */ `
   float apronMacro = gFbm( p * 0.007 );
   float joints = gGridLines( p - uApronCenter, ${glslFloat(JOINT_SPACING)}, 0.06 );
   vec3 apronColor = uGroundColor * ( 0.9 + apronN * 0.1 + apronMacro * 0.14 );
-  apronColor = mix( apronColor, apronColor * 0.82, joints );
+  apronColor = mix( apronColor, apronColor * ( 1.0 - ${glslFloat(JOINT_CONTRAST)} ), joints );
 
   vec3 groundOut = mix( terrainColor, apronColor, apron );
 
@@ -280,7 +318,7 @@ const FRAG_BODY = /* glsl */ `
   float bayX = mod( yRel.x + uYardHalf.x, ${glslFloat(BAY_SPACING)} );
   float bayLine = ( 1.0 - smoothstep( 0.0, 0.1, min( bayX, ${glslFloat(BAY_SPACING)} - bayX ) ) )
                 * step( abs( yRel.y ), uYardHalf.y - 1.5 );
-  yardColor = mix( yardColor, paint, max( yardBorder, bayLine ) * 0.6 );
+  yardColor = mix( yardColor, paint, max( yardBorder, bayLine ) * ${glslFloat(BAY_LINE_CONTRAST)} );
 
   groundOut = mix( groundOut, yardColor, yard );
 
@@ -316,6 +354,24 @@ const FRAG_BODY = /* glsl */ `
       vec3 plinth = mix( apronColor, vec3( 0.0 ), 0.16 );
       groundOut = mix( groundOut, plinth, m );
     }
+  }
+
+  /* ghost floor-plan grid: a dot at every ${glslFloat(GHOST_GRID_SPACING)} m
+     inside a ghosted building's own footprint, so a see-through building
+     reads as a room even with no walls and no roof drawn at all. Layered
+     after the plinth so it sits on top of that darker ring rather than under
+     it. GHOST_INSET keeps the dots off the very edge of the footprint. */
+  for ( int i = 0; i < MAX_BUILDINGS; i++ ) {
+    if ( i >= uGhostCount ) break;
+    vec2 c = uGhostCenter[ i ];
+    vec2 h = uGhostHalf[ i ] - ${glslFloat(GHOST_INSET)};
+    if ( h.x <= 0.0 || h.y <= 0.0 ) continue;
+    float insideD = gBoxSDF( p, c, h );
+    if ( insideD > 0.0 ) continue;
+    vec2 rel = p - c;
+    vec2 cell = mod( rel + ${glslFloat(GHOST_GRID_SPACING)} * 0.5, ${glslFloat(GHOST_GRID_SPACING)} ) - ${glslFloat(GHOST_GRID_SPACING)} * 0.5;
+    float dot = 1.0 - smoothstep( 0.0, ${glslFloat(GHOST_DOT_RADIUS)}, length( cell ) );
+    groundOut = mix( groundOut, groundOut * 0.35, dot * ${glslFloat(GHOST_DOT_STRENGTH)} );
   }
 
   /* depth cueing toward the camera, not the origin — see the note on
@@ -417,6 +473,28 @@ export function buildGroundStatics(): GroundStatics {
   };
 }
 
+/**
+ * Bakes whichever buildings are currently ghosted into the same fixed-size
+ * `uGhostCenter`/`uGhostHalf` shape the statics above use — separate from
+ * `buildGroundStatics` because this one is NOT static: it depends on the
+ * `ghostedIds` prop, which changes as the operator toggles see-through mode
+ * or frames a zone. Pure, so it can be exercised on its own by a check.
+ */
+export function buildGhostStatics(ghostedIds: readonly string[]): {
+  ghostCount: number;
+  ghostCenter: THREE.Vector2[];
+  ghostHalf: THREE.Vector2[];
+} {
+  const ghostCenter = filledVec2Array(MAX_BUILDINGS, 0, 0);
+  const ghostHalf = filledVec2Array(MAX_BUILDINGS, -1, -1);
+  const ghosted = BUILDINGS.filter((b) => ghostedIds.includes(b.id)).slice(0, MAX_BUILDINGS);
+  ghosted.forEach((b, i) => {
+    ghostCenter[i].set(b.x, b.z);
+    ghostHalf[i].set(b.length / 2, b.width / 2);
+  });
+  return { ghostCount: ghosted.length, ghostCenter, ghostHalf };
+}
+
 /* ------------------------------------------------------------------ */
 /* The material                                                        */
 /* ------------------------------------------------------------------ */
@@ -436,6 +514,9 @@ export interface GroundUniforms {
   uBuildingCount: { value: number };
   uBuildingCenter: { value: THREE.Vector2[] };
   uBuildingHalf: { value: THREE.Vector2[] };
+  uGhostCount: { value: number };
+  uGhostCenter: { value: THREE.Vector2[] };
+  uGhostHalf: { value: THREE.Vector2[] };
 }
 
 /** Builds the patched ground material once. Colours start neutral; the
@@ -444,10 +525,18 @@ export interface GroundUniforms {
 export function makeGroundMaterial(): { material: THREE.MeshStandardMaterial; uniforms: GroundUniforms } {
   const statics = buildGroundStatics();
   const uniforms: GroundUniforms = {
-    uGroundColor: { value: new THREE.Color('#5c5445') },
-    uYardColor: { value: new THREE.Color('#6a6253') },
-    uRoadColor: { value: new THREE.Color('#33353a') },
-    uFogColor: { value: new THREE.Color('#9fb6cc') },
+    /*
+     * Defaults tuned toward DESIGN.md's day apron/yard/road/fog values
+     * (§"Scene palette (day look)") rather than the old placeholder tones —
+     * these are only what paints for the one frame before the `ground`/
+     * `yard`/`road`/`fog` props (driven by `look.ts`, which this file does
+     * not own) land in the effect below, but there is no reason for that
+     * frame to be a colour nobody asked for.
+     */
+    uGroundColor: { value: new THREE.Color('#b9b5ad') },
+    uYardColor: { value: new THREE.Color('#a8a49b') },
+    uRoadColor: { value: new THREE.Color('#4a4d52') },
+    uFogColor: { value: new THREE.Color('#dfe8f0') },
     uApronCenter: { value: statics.apronCenter },
     uApronHalf: { value: statics.apronHalf },
     uYardCenter: { value: statics.yardCenter },
@@ -458,6 +547,9 @@ export function makeGroundMaterial(): { material: THREE.MeshStandardMaterial; un
     uBuildingCount: { value: statics.buildingCount },
     uBuildingCenter: { value: statics.buildingCenter },
     uBuildingHalf: { value: statics.buildingHalf },
+    uGhostCount: { value: 0 },
+    uGhostCenter: { value: filledVec2Array(MAX_BUILDINGS, 0, 0) },
+    uGhostHalf: { value: filledVec2Array(MAX_BUILDINGS, -1, -1) },
   };
 
   const material = new THREE.MeshStandardMaterial({
@@ -491,18 +583,26 @@ export interface SiteGroundProps {
   road: string;
   /** scene fog colour, also the horizon this ground dissolves into — `Look.fog` */
   fog: string;
+  /**
+   * `SiteBuilding['id']`s currently drawn ghosted (see-through). The ground
+   * draws a floor-plan dot grid inside each one's footprint — see the ghost
+   * grid note on `GHOST_GRID_SPACING` above — so a room with no walls and no
+   * roof still reads as a room. Defaults to none.
+   */
+  ghostedIds?: readonly string[];
 }
 
 /**
- * The whole ground: apron, yard, roads, building plinths and the fade to the
- * horizon, as one plane and one draw call. Replaces `Ground` (the base
- * plane) and the separate yard/road quads it used to sit next to.
+ * The whole ground: apron, yard, roads, building plinths, the ghost
+ * floor-plan grid and the fade to the horizon, as one plane and one draw
+ * call. Replaces `Ground` (the base plane) and the separate yard/road quads
+ * it used to sit next to.
  *
  * Kept outside any `scale={[1, VERTICAL_EXAGGERATION, 1]}` wrapper, same as
  * the component it replaces — the ground is flat and stays outside that
  * group in `Plant3D.tsx`.
  */
-export function SiteGround({ ground, yard, road, fog }: SiteGroundProps) {
+export function SiteGround({ ground, yard, road, fog, ghostedIds }: SiteGroundProps) {
   const { material, uniforms } = useMemo(() => makeGroundMaterial(), []);
   const geometry = useMemo(() => new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE), []);
 
@@ -523,6 +623,21 @@ export function SiteGround({ ground, yard, road, fog }: SiteGroundProps) {
     uniforms.uRoadColor.value.set(road);
     uniforms.uFogColor.value.set(fog);
   }, [uniforms, ground, yard, road, fog]);
+
+  /* `ghostedIds` is a prop, not a ref — a new array identity every render is
+     the normal case for a derived id list, so this keys off its CONTENT
+     (join), not the array reference, to avoid rewriting three fixed-size
+     uniform arrays on every frame for no reason. */
+  const ghostKey = (ghostedIds ?? []).join(',');
+  useEffect(() => {
+    const { ghostCount, ghostCenter, ghostHalf } = buildGhostStatics(ghostedIds ?? []);
+    uniforms.uGhostCount.value = ghostCount;
+    for (let i = 0; i < ghostCenter.length; i++) {
+      uniforms.uGhostCenter.value[i].copy(ghostCenter[i]);
+      uniforms.uGhostHalf.value[i].copy(ghostHalf[i]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uniforms, ghostKey]);
 
   return (
     <mesh args={[geometry, material]} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow />
