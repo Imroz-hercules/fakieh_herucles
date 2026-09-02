@@ -29,7 +29,14 @@ import {
 import asmLogo from '@/assets/Asm_Logo.png';
 import fakiehBrandLogo from '@/assets/fakiehlogo.webp';
 import herculesLogo from '@/assets/Hercules_New.png';
-
+import {
+  buildDetailedReportExcel,
+  buildFlatReportExcel,
+  downloadExcelBlob,
+  excelFilename,
+  loadLogoForExcel,
+  type ReportExcelCellStyle,
+} from '@/lib/reportExcelExport';
 const tabs = [
   "Product Batch Summary",
   "Weekly",
@@ -1540,7 +1547,7 @@ export function BatchHistoricalReports() {
     </div>
   );
 
-  // Helper function to get date range string for CSV
+  // Helper function to get date range string for reports
   const getDateRangeString = () => {
     if (activeTab === "Weekly") {
       const end = addSaudiDays(weeklyStartDate, 6);
@@ -1557,268 +1564,213 @@ export function BatchHistoricalReports() {
   };
 
   // Avoid "Report Report" when the tab name already ends with Report
-  const getReportTitle = () =>
-    /\breport$/i.test(activeTab) ? activeTab : `${activeTab} Report`;
+  const getReportTitle = () => {
+    switch (activeTab) {
+      case 'Weekly':
+        return 'Weekly Summary Report';
+      case 'Monthly':
+        return 'Monthly Summary Report';
+      case 'Daily Report':
+        return 'Daily Report';
+      default:
+        return /\breport$/i.test(activeTab) ? activeTab : `${activeTab} Report`;
+    }
+  };
 
-  // CSV Export functionality
-  const exportToCSV = () => {
+  const getExportDateRange = () => {
+    if (activeTab === 'Weekly' || activeTab === 'Monthly' || activeTab === 'Daily Report') {
+      return getDateRangeString();
+    }
+    return `Date Range: ${appliedStartDate} to ${appliedEndDate} (AST)`;
+  };
+
+  const mapExportCellValue = (item: Record<string, unknown>, header: string): string => {
+    switch (header) {
+      case 'Batch Name':
+        return String(item.batchName || '');
+      case 'Product Name':
+        return String(item.productName || '');
+      case 'Product Code':
+        return String(item.productCode || '');
+      case 'Batch Start':
+        return formatSaudiTime(String(item.batchStart || ''), true);
+      case 'Batch End':
+        return formatSaudiTime(String(item.batchEnd || ''), true);
+      case 'Batch Quantity':
+        return String(item.batchQuantity || item.quantity || '');
+      case 'Material Name':
+        return String(item.materialName || '');
+      case 'Material Code':
+        return String(item.materialCode || '');
+      case 'SetPoint':
+      case 'Set Point':
+        return item.setPointFloat != null ? Number(item.setPointFloat).toFixed(2) : String(item.setPoint || '');
+      case 'Actual':
+        return item.actualValueFloat != null ? Number(item.actualValueFloat).toFixed(2) : String(item.actual || '');
+      case 'Order ID':
+        return String(item.orderId || '');
+      case 'No Of Batches':
+        return String(item.noOfBatches || '');
+      case 'Sum SP':
+        return item.sumSP != null ? Number(item.sumSP).toFixed(2) : '';
+      case 'Sum Act':
+        return item.sumAct != null ? Number(item.sumAct).toFixed(2) : '';
+      case 'Err Kg':
+        return String(item.errKg || '');
+      case 'Err %':
+        return item.errPercent ? String(item.errPercent) : '';
+      case 'Code':
+        return String(item.code || item.materialCode || '');
+      case 'Planned (kg)':
+        return item.plannedKG != null ? Number(item.plannedKG).toFixed(2) : '';
+      case 'Actual (kg)':
+        return item.actualKG != null ? Number(item.actualKG).toFixed(2) : '';
+      case 'Difference %':
+        return item.differencePercent ? `${item.differencePercent}%` : '';
+      case 'Batch':
+        return String(item.batchName || '');
+      default:
+        return String(item[header.toLowerCase().replace(/\s+/g, '')] || '');
+    }
+  };
+
+  const getExportCellStyle = (header: string, value: string): ReportExcelCellStyle | undefined => {
+    if (header === 'Err Kg') {
+      return { font: { bold: true }, alignment: { horizontal: 'right' } };
+    }
+    if (header === 'Err %' || header === 'Difference %') {
+      const num = parseFloat(value);
+      const color = !Number.isNaN(num) && num < 5 ? '28A745' : 'DC3545';
+      return { font: { bold: true, color: { argb: `FF${color}` } }, alignment: { horizontal: 'right' } };
+    }
+    return undefined;
+  };
+
+  const buildExportFilters = (totalRecords: number) => ({
+    dateRange: getExportDateRange(),
+    products: selectedProduct,
+    batches: selectedBatch,
+    materials: selectedMaterial,
+    totalRecords,
+  });
+
+  const loadExportLogos = async () => {
+    const [hercules, fakieh, asm] = await Promise.all([
+      loadLogoForExcel(herculesLogo),
+      loadLogoForExcel(fakiehBrandLogo),
+      loadLogoForExcel(asmLogo),
+    ]);
+    return { hercules, fakieh, asm };
+  };
+
+  const buildTotalsCells = (tabName: string, headers: string[]) => {
+    const totals = getTabTotals(tabName);
+    if (!totals) return undefined;
+
+    if (totals.kind === 'batchSummary') {
+      return headers.map((header) => {
+        if (header === 'Batch Name') return { header, value: totals.label };
+        if (header === 'Batch Quantity') return { header, value: totals.totalQuantity.toFixed(2) };
+        return { header, value: '' };
+      });
+    }
+    if (totals.kind === 'productSummary') {
+      return headers.map((header) => {
+        if (header === 'Product Code') return { header, value: totals.label };
+        if (header === 'No Of Batches') return { header, value: String(totals.totalBatches) };
+        if (header === 'Sum SP') return { header, value: totals.totalSP.toFixed(2) };
+        if (header === 'Sum Act') return { header, value: totals.totalAct.toFixed(2) };
+        if (header === 'Err Kg') return { header, value: totals.totalErrKg.toFixed(2) };
+        if (header === 'Err %') return { header, value: totals.totalErrPercent.toFixed(2) };
+        return { header, value: '' };
+      });
+    }
+    if (totals.kind === 'material') {
+      return headers.map((header) => {
+        if (header === 'Material Name') return { header, value: totals.label };
+        if (header === 'Planned (kg)') return { header, value: totals.totalPlanned.toFixed(2) };
+        if (header === 'Actual (kg)') return { header, value: totals.totalActual.toFixed(2) };
+        if (header === 'Difference %') return { header, value: `${totals.totalDiffPercent.toFixed(2)}%` };
+        return { header, value: '' };
+      });
+    }
+    return undefined;
+  };
+
+  const exportToExcel = async () => {
     try {
-      // Get current data based on active tab
-      let currentData = getCurrentTabData();
-
+      const currentData = getCurrentTabData();
       if (!currentData || currentData.length === 0) {
         showToast('No data available to export', 'error');
         return;
       }
 
-      // Get headers based on active tab
       const headers = getTableHeaders(activeTab);
-
-      // Convert data to CSV format
-      let csvContent = '';
-
-      // Add BOM for Excel compatibility
-      csvContent += '\ufeff';
-
-      // Add report title and metadata
-      csvContent += `${getReportTitle()}\n`;
-      csvContent += `${getDateRangeString()}\n`;
-      csvContent += `ASM Logo: ASM Company Logo\n`;
-      // csvContent += `Aghtia Logo: Aghtia Company Logo\n`; // Agthia logo commented out
-      if (selectedProduct.length > 0) {
-        csvContent += `Product Filter: ${selectedProduct.join(', ')}\n`;
-      }
-      if (selectedBatch.length > 0) {
-        csvContent += `Batch Filter: ${selectedBatch.join(', ')}\n`;
-      }
-      if (selectedMaterial.length > 0) {
-        csvContent += `Material Filter: ${selectedMaterial.join(', ')}\n`;
-      }
-      csvContent += `Generated on: ${new Date().toLocaleString()}\n`;
-      csvContent += `Total Records: ${currentData.length}\n`;
-      csvContent += '\n'; // Empty line before headers
-
-      // Add headers
-      csvContent += headers.join(',') + '\n';
-
-      // Add data rows
-      currentData.forEach((item: any, index: number) => {
-        const row = headers.map(header => {
-          let value = '';
-
-          switch (header) {
-            case 'Batch Name':
-              value = item.batchName || '';
-              break;
-            case 'Product Name':
-              value = item.productName || '';
-              break;
-            case 'Product Code':
-              value = item.productCode || '';
-              break;
-            case 'Batch Start':
-              value = formatSaudiTime(item.batchStart || '', true);
-              break;
-            case 'Batch End':
-              value = formatSaudiTime(item.batchEnd || '', true);
-              break;
-            case 'Batch Quantity':
-              value = item.batchQuantity || item.quantity || '';
-              break;
-            case 'Material Name':
-              value = item.materialName || '';
-              break;
-            case 'Material Code':
-              value = item.materialCode || '';
-              break;
-            case 'SetPoint':
-              value = item.setPointFloat?.toFixed(2) || item.setPoint || '';
-              break;
-            case 'Actual':
-              value = item.actualValueFloat?.toFixed(2) || item.actual || '';
-              break;
-            case 'Order ID':
-              value = item.orderId || '';
-              break;
-            case 'No Of Batches':
-              value = item.noOfBatches || '';
-              break;
-            case 'Sum SP':
-              value = item.sumSP?.toFixed(2) || '';
-              break;
-            case 'Sum Act':
-              value = item.sumAct?.toFixed(2) || '';
-              break;
-            case 'Err Kg':
-              value = item.errKg || '';
-              break;
-            case 'Err %':
-              value = item.errPercent ? item.errPercent : '';
-              break;
-            case 'Code':
-              value = item.code || item.materialCode || '';
-              break;
-            case 'Planned (kg)':
-              value = item.plannedKG?.toFixed(2) || '';
-              break;
-            case 'Actual (kg)':
-              value = item.actualKG?.toFixed(2) || '';
-              break;
-            case 'Difference %':
-              value = item.differencePercent ? `${item.differencePercent}%` : '';
-              break;
-            case 'Batch':
-              value = item.batchName || '';
-              break;
-            default:
-              value = item[header.toLowerCase().replace(/\s+/g, '')] || '';
-          }
-
-          // Convert to string and escape commas and quotes in CSV
-          const stringValue = String(value);
-          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
-            return `"${stringValue.replace(/"/g, '""')}"`;
-          }
-
-          return stringValue;
-        });
-
-        csvContent += row.join(',') + '\n';
+      const logos = await loadExportLogos();
+      const blob = await buildFlatReportExcel({
+        title: getReportTitle(),
+        headers,
+        rows: currentData as Record<string, unknown>[],
+        mapCellValue: mapExportCellValue,
+        getCellStyle: (header, value) => getExportCellStyle(header, value),
+        filters: buildExportFilters(currentData.length),
+        logos,
+        totalsCells: buildTotalsCells(activeTab, headers),
       });
 
-
-      // Create and download the file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-
-      // Generate filename based on active tab and current date
-      const now = new Date();
-      const dateStr = now.toISOString().split('T')[0];
-      const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
-      const tabName = activeTab.replace(/\s+/g, '_');
-      const filename = `${tabName}_${dateStr}_${timeStr}.csv`;
-
-      // Create download link
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.href = url;
-      link.download = filename;
-
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Clean up the URL object
-      setTimeout(() => URL.revokeObjectURL(url), 100);
-      showToast(`CSV file "${filename}" downloaded successfully!`, 'success');
+      const filename = excelFilename(activeTab);
+      downloadExcelBlob(blob, filename);
+      showToast(`Excel file "${filename}" downloaded successfully!`, 'success');
     } catch (error) {
-      showToast('Error exporting CSV file. Please try again.', 'error');
+      showToast('Error exporting Excel file. Please try again.', 'error');
     }
   };
 
-  // Special CSV export for Detailed Report (handles batch groups)
-  const exportDetailedReportToCSV = () => {
+  const exportDetailedReportToExcel = async () => {
     try {
-
       if (!detailedBatchGroups || detailedBatchGroups.length === 0) {
         showToast('No data available to export', 'error');
         return;
       }
 
-      const headers = ['Batch Name', 'Product Name', 'Product Code', 'Batch Start', 'Batch End', 'Batch Quantity', 'Material Name', 'Material Code', 'Set Point', 'Actual', 'Err Kg', 'Err %'];
-      let csvContent = '';
-
-      // Add BOM for Excel compatibility
-      csvContent += '\ufeff';
-
-      // Add report title and metadata
-      csvContent += `${getReportTitle()}\n`;
-      csvContent += `${getDateRangeString()}\n`;
-      csvContent += `ASM Logo: ASM Company Logo\n`;
-      // csvContent += `Aghtia Logo: Aghtia Company Logo\n`; // Agthia logo commented out
-      if (selectedProduct.length > 0) {
-        csvContent += `Product Filter: ${selectedProduct.join(', ')}\n`;
-      }
-      if (selectedBatch.length > 0) {
-        csvContent += `Batch Filter: ${selectedBatch.join(', ')}\n`;
-      }
-      if (selectedMaterial.length > 0) {
-        csvContent += `Material Filter: ${selectedMaterial.join(', ')}\n`;
-      }
-      csvContent += `Generated on: ${new Date().toLocaleString()}\n`;
       const totalItems = detailedBatchGroups.reduce((sum, group) => sum + group.length, 0);
-      csvContent += `Total Batches: ${detailedBatchGroups.length}, Total Records: ${totalItems}\n`;
-      csvContent += '\n'; // Empty line before headers
+      const logos = await loadExportLogos();
+      const totals = getTabTotals('Detailed Report');
+      const grandTotalsCells = totals?.kind === 'detailed'
+        ? [
+            { header: 'Batch', value: totals.label },
+            { header: 'Material Name', value: '' },
+            { header: 'Code', value: '' },
+            { header: 'Set Point', value: totals.totalSP.toFixed(2) },
+            { header: 'Actual', value: totals.totalAct.toFixed(2) },
+            { header: 'Err Kg', value: totals.totalErrKg.toFixed(2) },
+            { header: 'Err %', value: totals.totalErrPercent.toFixed(2) },
+          ]
+        : undefined;
 
-      // Add headers
-      csvContent += headers.join(',') + '\n';
-
-      // Add data rows for each batch group
-      detailedBatchGroups.forEach((group: any[], groupIndex: number) => {
-
-        group.forEach((item: any, itemIndex: number) => {
-          const row = [
-            item.batchName || '',
-            item.productName || '',
-            item.productCode || '',
-            formatSaudiTime(item.batchStart || '', true),
-            formatSaudiTime(item.batchEnd || '', true),
-            item.batchQuantity || '',
-            item.materialName || '',
-            item.materialCode || '',
-            item.setPointFloat?.toFixed(2) || '',
-            item.actualValueFloat?.toFixed(2) || '',
-            item.errKg || '',
-            item.errPercent ? item.errPercent : ''
-          ];
-
-          // Escape commas and quotes in CSV
-          const escapedRow = row.map(value => {
-            const stringValue = String(value);
-            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
-              return `"${stringValue.replace(/"/g, '""')}"`;
-            }
-            return stringValue;
-          });
-
-          csvContent += escapedRow.join(',') + '\n';
-        });
+      const blob = await buildDetailedReportExcel({
+        title: getReportTitle(),
+        groups: detailedBatchGroups,
+        formatBatchTime: (value) => formatSaudiTime(value, true),
+        filters: buildExportFilters(totalItems),
+        logos,
+        grandTotalsCells,
       });
 
-
-      // Create and download the file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-
-      const now = new Date();
-      const dateStr = now.toISOString().split('T')[0];
-      const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
-      const filename = `Detailed_Report_${dateStr}_${timeStr}.csv`;
-
-      // Create download link
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.href = url;
-      link.download = filename;
-
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Clean up the URL object
-      setTimeout(() => URL.revokeObjectURL(url), 100);
-      showToast(`Detailed Report CSV file "${filename}" downloaded successfully!`, 'success');
+      const filename = excelFilename('Detailed_Report');
+      downloadExcelBlob(blob, filename);
+      showToast(`Detailed Report Excel file "${filename}" downloaded successfully!`, 'success');
     } catch (error) {
-      showToast('Error exporting CSV file. Please try again.', 'error');
+      showToast('Error exporting Excel file. Please try again.', 'error');
     }
   };
 
   // Handle export button click
   const handleExportClick = () => {
     if (activeTab === "Detailed Report") {
-      exportDetailedReportToCSV();
+      exportDetailedReportToExcel();
     } else {
-      exportToCSV();
+      exportToExcel();
     }
   };
 
@@ -2167,7 +2119,7 @@ export function BatchHistoricalReports() {
             <div class="filter-row">
               <div class="filter-item">
                 <span class="filter-label">Date Range:</span> 
-                ${appliedStartDate} to ${appliedEndDate}
+                ${getExportDateRange()}
               </div>
             </div>
             ${selectedProduct.length > 0 ? `
@@ -2632,20 +2584,14 @@ export function BatchHistoricalReports() {
             PRINT
           </Button>
           <Button
-            className="rounded-md border border-cyan-800 bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white shadow-md transition-colors hover:bg-cyan-700"
+            className="rounded-md border border-cyan-800 bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white shadow-md transition-colors hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => {
-              // Force a small delay to ensure data is ready
-              setTimeout(() => {
-                if (activeTab === "Detailed Report") {
-                  exportDetailedReportToCSV();
-                } else {
-                  exportToCSV();
-                }
-              }, 100);
+              setTimeout(() => handleExportClick(), 100);
             }}
+            disabled={loading}
           >
             <Download className="h-4 w-4 mr-2" />
-            EXPORT TO CSV
+            EXPORT TO EXCEL
           </Button>
         </div>
 

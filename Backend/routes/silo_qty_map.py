@@ -1,5 +1,5 @@
 # routes/silo_qty_map.py
-"""DB5 quantity offsets from PLC_QTY_BIN_Address_List.xlsx (sheet QTY_BIN_Struct)."""
+"""DB5 quantity offsets from docs/silo_bin_tags.md (123 QTY_BIN tags, bytes 0–488)."""
 from typing import Dict, Tuple, Any
 
 # silo_no -> (byte_offset, type)
@@ -15,15 +15,19 @@ QTY_MAP_DB5: Dict[int, Tuple[int, str]] = {
     313: (120, "REAL"), 314: (124, "REAL"), 315: (128, "REAL"), 316: (132, "REAL"),
     317: (136, "REAL"), 318: (140, "REAL"), 319: (144, "REAL"), 320: (148, "REAL"),
     321: (152, "REAL"), 322: (156, "REAL"),
-    601: (160, "REAL"), 602: (164, "REAL"), 603: (168, "REAL"), 604: (172, "REAL"),
-    605: (176, "REAL"),
 }
 
-for _s in range(801, 849):
-    QTY_MAP_DB5[_s] = (180 + (_s - 801) * 4, "REAL")
-
+# BIN9xx: 901–930 @ 160–276
 for _s in range(901, 931):
-    QTY_MAP_DB5[_s] = (372 + (_s - 901) * 4, "REAL")
+    QTY_MAP_DB5[_s] = (160 + (_s - 901) * 4, "REAL")
+
+# BIN6xx: 601–605 @ 280–296
+for _s in range(601, 606):
+    QTY_MAP_DB5[_s] = (280 + (_s - 601) * 4, "REAL")
+
+# BIN8xx: 801–848 @ 300–488
+for _s in range(801, 849):
+    QTY_MAP_DB5[_s] = (300 + (_s - 801) * 4, "REAL")
 
 
 def load_qty_map(db_no: int = 5) -> Dict[str, Any]:

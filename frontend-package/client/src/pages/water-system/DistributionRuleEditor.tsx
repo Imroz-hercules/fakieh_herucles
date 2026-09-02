@@ -30,7 +30,7 @@ const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 const EMPTY: DistributionRule = {
   name: '',
   report_sources: [],
-  formats: ['pdf'],
+  formats: ['pdf', 'xlsx'],
   delivery_method: 'email',
   recipients: [],
   save_path: '',
@@ -285,7 +285,7 @@ export default function DistributionRuleEditor({ rule, catalog, onSave, onCancel
               placeholder="C:\\Reports\\Distribution" />
           </div>
         )}
-
+ 
         {/* Schedule */}
         <div>
           <label className={labelClass}>Schedule</label>

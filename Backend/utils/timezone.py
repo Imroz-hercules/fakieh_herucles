@@ -1,5 +1,5 @@
 """Business timezone helpers — DB stores UTC; UI uses Asia/Riyadh (UTC+3)."""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, time, timezone
 from zoneinfo import ZoneInfo
 
 # Single source of truth for the plant's business timezone. Use BUSINESS_TZ_NAME
@@ -99,3 +99,67 @@ def format_saudi_display(dt: datetime | None, include_seconds: bool = True) -> s
     if include_seconds:
         return local.strftime("%m/%d/%Y, %I:%M:%S %p")
     return local.strftime("%m/%d/%Y, %I:%M %p")
+
+
+def historical_report_window(source_key: str) -> tuple[datetime, datetime]:
+    """UTC half-open ``[start, end)`` windows matching ``BatchHistoricalReports`` tab defaults.
+
+    All boundaries are 07:00 AST (production day), converted to naive UTC for SQL Server.
+
+    * **daily** — yesterday 07:00 AST → today 07:00 AST
+    * **weekly** — previous Mon 07:00 AST → this Mon 07:00 AST (7 production days)
+    * **monthly** — 1st of previous calendar month 07:00 AST → 1st of current month 07:00 AST
+    """
+    now_local = datetime.now(BUSINESS_TZ)
+    y, m, d = now_local.year, now_local.month, now_local.day
+
+    if source_key == 'daily':
+        end = saudi_local_to_utc_naive(y, m, d, 7, 0)
+        start = end - timedelta(days=1)
+        return start, end
+
+    if source_key == 'weekly':
+        # Match frontend getSpecificDateDefaults(): last Monday 07:00 → this Monday 07:00
+        today_7 = saudi_local_to_utc_naive(y, m, d, 7, 0)
+        dow_map = {'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6}
+        dow = dow_map[now_local.strftime('%a')]
+        days_to_this_monday = 6 if dow == 0 else dow - 1
+        this_monday = today_7 - timedelta(days=days_to_this_monday)
+        last_monday = this_monday - timedelta(days=7)
+        return last_monday, this_monday
+
+    if source_key == 'monthly':
+        # Match frontend: 1st of previous month 07:00 → 1st of current month 07:00
+        prev_y, prev_m = (y - 1, 12) if m == 1 else (y, m - 1)
+        start = saudi_local_to_utc_naive(prev_y, prev_m, 1, 7, 0)
+        end = saudi_local_to_utc_naive(y, m, 1, 7, 0)
+        return start, end
+
+    raise ValueError(f'No historical window for source: {source_key}')
+
+
+def rule_window_utc(rule) -> tuple[datetime, datetime]:
+    """Rule schedule window as naive UTC (for detailed / material / batch_raw sources)."""
+    window_mode = getattr(rule, 'window_mode', 'auto') or 'auto'
+    if window_mode == 'custom' and rule.custom_start and rule.custom_end:
+        return rule.custom_start, rule.custom_end
+
+    start_time = getattr(rule, 'window_start_time', None) or time(7, 0)
+    end_time = getattr(rule, 'window_end_time', None) or time(7, 0)
+
+    now_local = datetime.now(BUSINESS_TZ)
+    y, m, d = now_local.year, now_local.month, now_local.day
+    end_candidate = now_local.replace(hour=end_time.hour, minute=end_time.minute, second=0, microsecond=0)
+    if now_local < end_candidate:
+        end_local = end_candidate - timedelta(days=1)
+    else:
+        end_local = end_candidate
+
+    schedule_type = getattr(rule, 'schedule_type', 'daily') or 'daily'
+    days = {'daily': 1, 'weekly': 7, 'monthly': 30}.get(schedule_type, 1)
+    start_local = end_local - timedelta(days=days)
+    start_local = start_local.replace(hour=start_time.hour, minute=start_time.minute, second=0, microsecond=0)
+
+    start = start_local.astimezone(UTC).replace(tzinfo=None)
+    end = end_local.astimezone(UTC).replace(tzinfo=None)
+    return start, end

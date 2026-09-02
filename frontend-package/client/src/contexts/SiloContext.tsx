@@ -20,6 +20,7 @@ interface SiloContextType {
   db1Silos: Silo[];
   db2Silos: Silo[];
   db3Silos: Silo[];
+  db5Silos: Silo[];
   loading: boolean;
   error: string | null;
   lastUpdated: string;
@@ -47,6 +48,7 @@ export const SiloProvider: React.FC<SiloProviderProps> = ({ children }) => {
   const [db1Silos, setDb1Silos] = useState<Silo[]>([]);
   const [db2Silos, setDb2Silos] = useState<Silo[]>([]);
   const [db3Silos, setDb3Silos] = useState<Silo[]>([]);
+  const [db5Silos, setDb5Silos] = useState<Silo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
@@ -131,12 +133,32 @@ function siloNoFromName(binName: unknown): number {
           silo_no: silo.siloNo || siloNoFromName(silo.binName)
         }));
 
+      const db5SilosWithSource = allSilosData
+        .filter((silo: any) => silo.dbNo === 0)
+        .map((silo: any) => ({
+          bin_name: silo.binName,
+          material_code: silo.materialCode,
+          material_name: silo.materialName,
+          hl_active: silo.hlActive,
+          lock_active: silo.lockActive,
+          quantity_kg: silo.quantityKg ?? 0,
+          updated_at: silo.updatedAt,
+          dbSource: 'DB5',
+          dbType: 'Quantity',
+          silo_no: silo.siloNo || siloNoFromName(silo.binName),
+        }));
+
       setDb1Silos(db1SilosWithSource);
       setDb2Silos(db2SilosWithSource);
       setDb3Silos(db3SilosWithSource);
+      setDb5Silos(db5SilosWithSource);
 
-      // Combine all silos
-      const combinedSilos = [...db1SilosWithSource, ...db2SilosWithSource, ...db3SilosWithSource];
+      const combinedSilos = [
+        ...db1SilosWithSource,
+        ...db2SilosWithSource,
+        ...db3SilosWithSource,
+        ...db5SilosWithSource,
+      ].sort((a, b) => (a.silo_no ?? 0) - (b.silo_no ?? 0));
       setAllSilos(combinedSilos);
 
       setLastUpdated(new Date().toLocaleTimeString());
@@ -184,6 +206,7 @@ function siloNoFromName(binName: unknown): number {
     db1Silos,
     db2Silos,
     db3Silos,
+    db5Silos,
     loading,
     error,
     lastUpdated,

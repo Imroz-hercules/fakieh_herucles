@@ -28,6 +28,9 @@ __pycache__/
 
 # Logs
 *.log
+# Backend debug logs (RotatingFileHandler: api_debug.log, .log.1, .log.2, ...)
+Backend/api_debug.log*
+api_debug.log*
 
 # OS files
 .DS_Store

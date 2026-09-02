@@ -23,7 +23,7 @@ from models import db
 from models.distribution import DistributionRule
 from models.kpi_material import KPIMaterial
 import smtp_config
-from utils.timezone import format_saudi_display
+from utils.timezone import format_saudi_display, historical_report_window, rule_window_utc
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +33,9 @@ DEFAULT_SAVE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dis
 # ── Report catalog ────────────────────────────────────────────────────────────
 # key -> metadata. ``source`` is informational for the UI.
 REPORT_CATALOG = [
-    {'key': 'daily', 'label': 'Daily Reports', 'description': 'Per-product production summary (SQL Server, read-only)', 'source': 'sqlserver'},
-    {'key': 'weekly', 'label': 'Weekly Reports', 'description': 'Per-product production summary (SQL Server, read-only)', 'source': 'sqlserver'},
-    {'key': 'monthly', 'label': 'Monthly Reports', 'description': 'Per-product production summary (SQL Server, read-only)', 'source': 'sqlserver'},
+    {'key': 'daily', 'label': 'Daily Report', 'description': 'Per-product production summary — last 1 production day', 'source': 'sqlserver'},
+    {'key': 'weekly', 'label': 'Weekly Report', 'description': 'Per-product production summary — last 7 production days', 'source': 'sqlserver'},
+    {'key': 'monthly', 'label': 'Monthly Report', 'description': 'Per-product production summary — previous calendar month (07:00 AST)', 'source': 'sqlserver'},
     {'key': 'detailed', 'label': 'Detailed Report', 'description': 'Per-batch material detail (SQL Server, read-only)', 'source': 'sqlserver'},
     {'key': 'material', 'label': 'Material Consumption', 'description': 'Planned vs actual material usage (SQL Server, read-only)', 'source': 'sqlserver'},
     {'key': 'batch_historical', 'label': 'Batch Historical Reports', 'description': 'Per-batch material detail (SQL Server, read-only)', 'source': 'sqlserver'},
@@ -49,36 +49,26 @@ def get_report_catalog():
     return REPORT_CATALOG
 
 
-def _resolve_window(rule):
-    """Compute the (from_dt, to_dt) data window for a rule.
+def _resolve_window_for_source(source_key, rule):
+    """Compute ``(from_dt, to_dt)`` naive UTC for one report source.
 
-    Two modes:
-      * ``custom`` — uses the rule's explicit ``custom_start`` / ``custom_end``.
-      * ``auto``   — period_back: ``to_dt`` is the most recent occurrence of
-        ``window_end_time``; ``from_dt`` = ``to_dt`` minus the period
-        (daily 1d / weekly 7d / monthly 30d), placed at ``window_start_time``.
-        So daily 07:00→07:00 = "yesterday 07:00 → today 07:00".
+    ``daily`` / ``weekly`` / ``monthly`` use the same 07:00 AST windows as
+    ``BatchHistoricalReports`` (not the rule's schedule_type or 30-day lookback).
     """
     window_mode = getattr(rule, 'window_mode', 'auto') or 'auto'
 
-    if window_mode == 'custom':
-        if rule.custom_start and rule.custom_end:
-            return rule.custom_start, rule.custom_end
-        # Fall back to auto if custom dates are missing.
+    if window_mode == 'custom' and rule.custom_start and rule.custom_end:
+        return rule.custom_start, rule.custom_end
 
-    now = datetime.now()
-    end_time = getattr(rule, 'window_end_time', None) or time(7, 0)
-    start_time = getattr(rule, 'window_start_time', None) or time(7, 0)
+    if source_key in ('daily', 'weekly', 'monthly'):
+        return historical_report_window(source_key)
 
-    # to_dt = most recent past occurrence of end_time
-    to_dt = now.replace(hour=end_time.hour, minute=end_time.minute, second=0, microsecond=0)
-    if now < to_dt:
-        to_dt = to_dt - timedelta(days=1)
+    return rule_window_utc(rule)
 
-    days = {'daily': 1, 'weekly': 7, 'monthly': 30}.get(rule.schedule_type, 1)
-    from_day = (to_dt - timedelta(days=days)).date()
-    from_dt = datetime.combine(from_day, start_time)
-    return from_dt, to_dt
+
+def _resolve_window(rule):
+    """Email-summary window (rule schedule, UTC)."""
+    return rule_window_utc(rule)
 
 
 # ── Data fetchers — return (columns, rows) where rows is list[dict] ────────────
@@ -114,16 +104,120 @@ def _fetch_batch_materials(from_dt, to_dt, limit=2000):
     return columns, rows
 
 
+def _title_for_source(source_key):
+    """Display title aligned with BatchHistoricalReports export/print."""
+    titles = {
+        'daily': 'Daily Report',
+        'weekly': 'Weekly Summary Report',
+        'monthly': 'Monthly Summary Report',
+        'detailed': 'Detailed Report',
+        'batch_historical': 'Detailed Report',
+        'material': 'Material Consumption Report',
+        'batch_raw': 'Batch Raw Data',
+    }
+    return titles.get(source_key) or _label_for(source_key)
+
+
+def _period_label_for_source(source_key):
+    labels = {
+        'daily': 'Daily Production Period',
+        'weekly': 'Weekly Production Period',
+        'monthly': 'Monthly Production Period',
+    }
+    return labels.get(source_key, 'Date Range')
+
+
 def _fetch_batch_rows(from_dt, to_dt, limit=5000):
-    """Read-only SQL Server BatchMaterials rows for the window (ascending by start)."""
+    """Read-only SQL Server BatchMaterials rows for the window (ascending by start).
+
+    Uses half-open ``[from_dt, to_dt)`` — same as ``/api/reports`` and Batch Calendar.
+    """
     return (
         KPIMaterial.query
         .filter(KPIMaterial.batch_act_start >= from_dt,
-                KPIMaterial.batch_act_start <= to_dt)
+                KPIMaterial.batch_act_start < to_dt)
         .order_by(KPIMaterial.batch_act_start.asc())
         .limit(limit)
         .all()
     )
+
+
+def _fetch_product_summary_sql(from_dt, to_dt):
+    """SQL aggregates per product — mirrors ``GET /api/reports/product-summary``.
+
+    No row-cap truncation; safe for weekly/monthly windows.
+    Returns ``(columns, rows, totals_dict)``.
+    """
+    from sqlalchemy import text
+
+    tbl = SQLSERVER_BATCH_MATERIALS_TABLE
+    where = [
+        f"dbo.[{tbl}].[Batch Act Start] >= :start_date",
+        f"dbo.[{tbl}].[Batch Act Start] < :end_date",
+        f"LOWER(LTRIM(RTRIM(dbo.[{tbl}].[Product Name]))) <> 'not selected'",
+        f"dbo.[{tbl}].[Product Name] IS NOT NULL",
+        f"LTRIM(RTRIM(dbo.[{tbl}].[Product Name])) <> ''",
+    ]
+    bind = {'start_date': from_dt, 'end_date': to_dt}
+    where_sql = ' AND '.join(where)
+
+    sql_products = text(
+        f"""
+        SELECT dbo.[{tbl}].[ProductCode] AS product_code,
+               dbo.[{tbl}].[Product Name] AS product_name,
+               COUNT(DISTINCT dbo.[{tbl}].[Batch GUID]) AS batch_count,
+               SUM(dbo.[{tbl}].[SetPoint Float]) AS sum_sp,
+               SUM(dbo.[{tbl}].[Actual Value Float]) AS sum_act
+        FROM dbo.[{tbl}]
+        WHERE {where_sql}
+        GROUP BY dbo.[{tbl}].[ProductCode], dbo.[{tbl}].[Product Name]
+        ORDER BY dbo.[{tbl}].[Product Name], dbo.[{tbl}].[ProductCode]
+        """
+    )
+    sql_totals = text(
+        f"""
+        SELECT COUNT(DISTINCT dbo.[{tbl}].[Batch GUID]) AS batch_count,
+               SUM(dbo.[{tbl}].[SetPoint Float]) AS sum_sp,
+               SUM(dbo.[{tbl}].[Actual Value Float]) AS sum_act
+        FROM dbo.[{tbl}]
+        WHERE {where_sql}
+        """
+    )
+
+    columns = ['Product Code', 'Product Name', 'No Of Batches', 'Sum SP', 'Sum Act', 'Err Kg', 'Err %']
+    rows = []
+    engine = db.get_engine(bind='sqlserver')
+    with engine.connect() as conn:
+        product_rows = conn.execute(sql_products, bind).fetchall()
+        total_row = conn.execute(sql_totals, bind).fetchone()
+
+    for row in product_rows:
+        sum_sp = float(row.sum_sp or 0)
+        sum_act = float(row.sum_act or 0)
+        err_kg = abs(sum_act - sum_sp)
+        err_pct = (err_kg / sum_sp * 100) if sum_sp else 0.0
+        rows.append({
+            'Product Code': (row.product_code or '').strip() if row.product_code else '',
+            'Product Name': row.product_name,
+            'No Of Batches': int(row.batch_count or 0),
+            'Sum SP': f'{sum_sp:.2f}',
+            'Sum Act': f'{sum_act:.2f}',
+            'Err Kg': f'{err_kg:.2f}',
+            'Err %': f'{err_pct:.2f}',
+        })
+
+    tot_sp = float(total_row.sum_sp or 0) if total_row else 0.0
+    tot_act = float(total_row.sum_act or 0) if total_row else 0.0
+    tot_err = abs(tot_act - tot_sp)
+    tot_pct = (tot_err / tot_sp * 100) if tot_sp else 0.0
+    totals = {
+        'noOfBatches': int(total_row.batch_count or 0) if total_row else 0,
+        'sumSP': tot_sp,
+        'sumAct': tot_act,
+        'errKg': tot_err,
+        'errPercent': tot_pct,
+    }
+    return columns, rows, totals
 
 
 def _aggregate_by_product(from_dt, to_dt):
@@ -329,10 +423,15 @@ def _fetch_source(source_key, from_dt, to_dt):
         {'kind': 'flat'|'detailed', 'columns': [...], 'rows': [...], 'groups': [...]|None}
     """
     if source_key in ('daily', 'weekly', 'monthly'):
-        # All three are product summaries over the rule's resolved window
-        # (daily=1d / weekly=7d / monthly=30d), mirroring the frontend.
-        cols, rows = _aggregate_by_product(from_dt, to_dt)
-        return {'kind': 'flat', 'columns': cols, 'rows': rows, 'groups': None}
+        cols, rows, totals = _fetch_product_summary_sql(from_dt, to_dt)
+        return {
+            'kind': 'flat',
+            'columns': cols,
+            'rows': rows,
+            'groups': None,
+            'totals': totals,
+            'source_key': source_key,
+        }
     if source_key == 'material':
         cols, rows = _aggregate_by_material(from_dt, to_dt)
         return {'kind': 'flat', 'columns': cols, 'rows': rows, 'groups': None}
@@ -364,29 +463,288 @@ def _render_csv(columns, rows):
     return buf.getvalue().encode('utf-8-sig')
 
 
-def _render_xlsx(title, columns, rows):
+def _xlsx_openpyxl_styles():
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    thin = Side(style='thin', color='DDDDDD')
+    return {
+        'teal_fill': PatternFill(start_color='0088A9', end_color='0088A9', fill_type='solid'),
+        'filter_fill': PatternFill(start_color='F3FAFC', end_color='F3FAFC', fill_type='solid'),
+        'total_fill': PatternFill(start_color='E8F4F8', end_color='E8F4F8', fill_type='solid'),
+        'alt_fill': PatternFill(start_color='F9F9F9', end_color='F9F9F9', fill_type='solid'),
+        'batch_fill': PatternFill(start_color='F7FBFD', end_color='F7FBFD', fill_type='solid'),
+        'header_font': Font(bold=True, color='FFFFFF', size=10),
+        'title_font': Font(bold=True, color='0088A9', size=17),
+        'sub_font': Font(color='555555', size=10),
+        'filt_head_font': Font(bold=True, color='0088A9', size=11),
+        'filt_font': Font(size=10),
+        'footer_font': Font(color='666666', size=9),
+        'thin_border': Border(left=thin, right=thin, top=thin, bottom=thin),
+        'err_ok_font': Font(bold=True, color='28A745'),
+        'err_bad_font': Font(bold=True, color='DC3545'),
+    }
+
+
+def _xlsx_err_font(value, styles):
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return styles['filt_font']
+    return styles['err_ok_font'] if num < 5 else styles['err_bad_font']
+
+
+def _xlsx_add_logos(ws):
+    """Best-effort logo row — mirrors PDF header band."""
+    from openpyxl.drawing.image import Image as XLImage
+
+    ws.row_dimensions[1].height = 48
+    ws.row_dimensions[2].height = 8
+    placements = [
+        ('Hercules_New.png', 'A1', 170, 52),
+        ('fakiehlogo.webp', 'F1', 110, 48),
+        ('Asm_Logo.png', 'G1', 110, 48),
+    ]
+    for filename, anchor, width, height in placements:
+        data = _logo_png_bytes(filename)
+        if not data:
+            continue
+        try:
+            img = XLImage(io.BytesIO(data))
+            img.width = width
+            img.height = height
+            ws.add_image(img, anchor)
+        except Exception as e:  # pragma: no cover
+            logger.warning('Could not embed logo %s in XLSX: %s', filename, e)
+
+
+def _xlsx_write_header(ws, row, title, window, total_rows, col_count, styles, source_key=None):
+    from openpyxl.styles import Alignment
+
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+    c = ws.cell(row=row, column=1, value=_display_title(title))
+    c.font = styles['title_font']
+    row += 1
+
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+    c = ws.cell(row=row, column=1, value='Generated on: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    c.font = styles['sub_font']
+    row += 2
+
+    filt_start = row
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+    ws.cell(row=row, column=1, value='Report Filters').font = styles['filt_head_font']
+    row += 1
+
+    period = _period_label_for_source(source_key or '')
+    date_range = f"{_fmt_dt_print(window[0])} to {_fmt_dt_print(window[1])}" if window else '—'
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+    label = f'{period}: {date_range}' if period != 'Date Range' else f'Date Range: {date_range}'
+    ws.cell(row=row, column=1, value=label).font = styles['filt_font']
+    row += 1
+
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+    ws.cell(row=row, column=1, value=f'Total Records: {total_rows}').font = styles['filt_font']
+    row += 1
+
+    for r in range(filt_start, row):
+        for col in range(1, col_count + 1):
+            cell = ws.cell(row=r, column=col)
+            cell.fill = styles['filter_fill']
+            cell.border = styles['thin_border']
+
+    return row + 1
+
+
+def _product_summary_totals_cells(columns, totals):
+    """Build footer totals row for product summary tables."""
+    if not totals:
+        return None
+    cells = []
+    for col in columns:
+        if col == 'Product Code':
+            cells.append({'header': col, 'value': 'Total'})
+        elif col == 'No Of Batches':
+            cells.append({'header': col, 'value': str(totals.get('noOfBatches', ''))})
+        elif col == 'Sum SP':
+            cells.append({'header': col, 'value': f"{float(totals.get('sumSP', 0)):.2f}"})
+        elif col == 'Sum Act':
+            cells.append({'header': col, 'value': f"{float(totals.get('sumAct', 0)):.2f}"})
+        elif col == 'Err Kg':
+            cells.append({'header': col, 'value': f"{float(totals.get('errKg', 0)):.2f}"})
+        elif col == 'Err %':
+            cells.append({'header': col, 'value': f"{float(totals.get('errPercent', 0)):.2f}"})
+        else:
+            cells.append({'header': col, 'value': ''})
+    return cells
+
+
+def _xlsx_write_table_header(ws, row, columns, styles):
+    from openpyxl.styles import Alignment
+
+    for col_idx, col in enumerate(columns, start=1):
+        cell = ws.cell(row=row, column=col_idx, value=str(col).upper())
+        cell.fill = styles['teal_fill']
+        cell.font = styles['header_font']
+        cell.border = styles['thin_border']
+        cell.alignment = Alignment(vertical='center', wrap_text=True)
+    ws.row_dimensions[row].height = 22
+    return row + 1
+
+
+def _xlsx_autosize(ws, col_count, start_row, end_row, min_width=10, max_width=40):
+    for col in range(1, col_count + 1):
+        max_len = min_width
+        for row in range(start_row, end_row + 1):
+            val = ws.cell(row=row, column=col).value
+            if val is not None:
+                max_len = max(max_len, min(len(str(val)) + 2, max_width))
+        ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = max_len
+
+
+def _render_xlsx_flat(title, columns, rows, window, dataset=None):
+    """Styled flat-table XLSX — mirrors frontend ``reportExcelExport`` / print layout."""
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
+    from openpyxl.styles import Alignment, Font
+
+    styles = _xlsx_openpyxl_styles()
+    col_count = max(1, len(columns))
+    source_key = (dataset or {}).get('source_key')
+    totals = (dataset or {}).get('totals')
+    totals_cells = _product_summary_totals_cells(columns, totals) if totals else None
 
     wb = Workbook()
     ws = wb.active
-    ws.title = (title or 'Report')[:31]
+    ws.title = (_display_title(title) or 'Report')[:31]
 
-    header_fill = PatternFill(start_color='0F766E', end_color='0F766E', fill_type='solid')
-    header_font = Font(bold=True, color='FFFFFF')
-    for col_idx, col in enumerate(columns, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=col)
-        cell.fill = header_fill
-        cell.font = header_font
-    for row_idx, row in enumerate(rows, start=2):
+    _xlsx_add_logos(ws)
+    table_start = _xlsx_write_header(
+        ws, 4, title, window, len(rows), col_count, styles, source_key=source_key,
+    )
+    data_row = _xlsx_write_table_header(ws, table_start, columns, styles)
+
+    err_cols = {'Err %', 'Difference %'}
+    for row_idx, row in enumerate(rows):
         for col_idx, col in enumerate(columns, start=1):
-            ws.cell(row=row_idx, column=col_idx, value=row.get(col, ''))
-    for col_idx, col in enumerate(columns, start=1):
-        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = max(12, min(40, len(str(col)) + 4))
+            val = str(row.get(col, ''))
+            cell = ws.cell(row=data_row, column=col_idx, value=val)
+            cell.border = styles['thin_border']
+            cell.alignment = Alignment(vertical='top', wrap_text=True)
+            if row_idx % 2 == 1:
+                cell.fill = styles['alt_fill']
+            if col in err_cols and val:
+                cell.font = _xlsx_err_font(val, styles)
+                cell.alignment = Alignment(horizontal='right', vertical='top')
+            elif col == 'Err Kg':
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='right', vertical='top')
+        data_row += 1
+
+    if totals_cells:
+        for col_idx, col in enumerate(columns, start=1):
+            match = next((t for t in totals_cells if t['header'] == col), None)
+            cell = ws.cell(row=data_row, column=col_idx, value=match['value'] if match else '')
+            cell.font = Font(bold=True)
+            cell.fill = styles['total_fill']
+            cell.border = styles['thin_border']
+            if col in err_cols and match and match['value']:
+                cell.font = _xlsx_err_font(match['value'], styles)
+                cell.alignment = Alignment(horizontal='right', vertical='top')
+        data_row += 1
+
+    ws.merge_cells(start_row=data_row + 1, start_column=1, end_row=data_row + 1, end_column=col_count)
+    footer = ws.cell(row=data_row + 1, column=1,
+                     value=f'Total Records: {len(rows)} | Generated by Fakieh Reporting')
+    footer.font = styles['footer_font']
+    footer.alignment = Alignment(horizontal='center')
+
+    _xlsx_autosize(ws, col_count, table_start, data_row)
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+def _render_xlsx_detailed(title, groups, window):
+    """Per-batch grouped XLSX — mirrors ``_render_pdf_detailed``."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font
+
+    styles = _xlsx_openpyxl_styles()
+    columns = ['Batch', 'Material Name', 'Code', 'Set Point', 'Actual', 'Err Kg', 'Err %']
+    col_count = len(columns)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = (_display_title(title) or 'Detailed Report')[:31]
+
+    total_rows = sum(len(g['materials']) + 1 for g in groups)
+    _xlsx_add_logos(ws)
+    table_start = _xlsx_write_header(ws, 4, title, window, total_rows, col_count, styles)
+    data_row = _xlsx_write_table_header(ws, table_start, columns, styles)
+
+    for g in groups:
+        mats = g['materials']
+        batch_row_span = max(1, len(mats))
+        batch_start = data_row
+        batch_text = (
+            f"Batch: {g['batchName'] or 'N/A'}\n"
+            f"Product: {g['productName'] or 'N/A'}\n"
+            f"Start: {_fmt_dt_print(g['batchStart'])}\n"
+            f"End: {_fmt_dt_print(g['batchEnd'])}\n"
+            f"Quantity: {g['batchQuantity'] if g['batchQuantity'] is not None else 'N/A'}"
+        )
+
+        for i, mat in enumerate(mats):
+            if i == 0:
+                batch_cell = ws.cell(row=data_row, column=1, value=batch_text)
+                batch_cell.fill = styles['batch_fill']
+                batch_cell.border = styles['thin_border']
+                batch_cell.alignment = Alignment(vertical='top', wrap_text=True)
+                if batch_row_span > 1:
+                    ws.merge_cells(start_row=batch_start, start_column=1,
+                                   end_row=batch_start + batch_row_span - 1, end_column=1)
+
+            ws.cell(row=data_row, column=2, value=mat['materialName'] or '').border = styles['thin_border']
+            ws.cell(row=data_row, column=3, value=mat['materialCode'] or '').border = styles['thin_border']
+            ws.cell(row=data_row, column=4, value=f"{mat['setPoint']:.2f}").border = styles['thin_border']
+            ws.cell(row=data_row, column=5, value=f"{mat['actual']:.2f}").border = styles['thin_border']
+            err_kg = ws.cell(row=data_row, column=6, value=f"{mat['errKg']:.2f}")
+            err_kg.border = styles['thin_border']
+            err_kg.font = Font(bold=True)
+            err_pct = ws.cell(row=data_row, column=7, value=f"{mat['errPercent']:.2f}")
+            err_pct.border = styles['thin_border']
+            err_pct.font = _xlsx_err_font(mat['errPercent'], styles)
+            data_row += 1
+
+        t = g['total']
+        ws.cell(row=data_row, column=1, value='').border = styles['thin_border']
+        for col_idx, val in enumerate(['Total', '', f"{t['setPoint']:.2f}", f"{t['actual']:.2f}",
+                                       f"{t['errKg']:.2f}", f"{t['errPercent']:.2f}"], start=2):
+            cell = ws.cell(row=data_row, column=col_idx, value=val)
+            cell.fill = styles['total_fill']
+            cell.border = styles['thin_border']
+            cell.font = Font(bold=True)
+            if col_idx == 7:
+                cell.font = _xlsx_err_font(t['errPercent'], styles)
+        data_row += 1
+
+    ws.merge_cells(start_row=data_row + 1, start_column=1, end_row=data_row + 1, end_column=col_count)
+    footer = ws.cell(row=data_row + 1, column=1,
+                     value=f'Total Records: {total_rows} | Generated by Fakieh Reporting')
+    footer.font = styles['footer_font']
+    footer.alignment = Alignment(horizontal='center')
+
+    _xlsx_autosize(ws, col_count, table_start, data_row)
+    ws.column_dimensions['A'].width = max(ws.column_dimensions['A'].width or 10, 28)
 
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
+
+
+def _render_xlsx(title, columns, rows, window=None, dataset=None):
+    """Dispatch styled XLSX generation (matches PDF / Historical Reports Excel)."""
+    if dataset and dataset.get('kind') == 'detailed' and dataset.get('groups') is not None:
+        return _render_xlsx_detailed(title, dataset['groups'], window)
+    return _render_xlsx_flat(title, columns, rows, window, dataset=dataset)
 
 
 # ── PDF rendering (ReportLab) — mirrors BatchHistoricalReports print layout ────
@@ -659,7 +1017,7 @@ def _render_pdf_detailed(title, groups, window):
         return _render_pdf_flat(title, cols, rows, window)
 
 
-def _render_pdf_flat(title, columns, rows, window):
+def _render_pdf_flat(title, columns, rows, window, dataset=None):
     """Styled flat-table PDF for non-batch report sources (ReportLab)."""
     from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
     from reportlab.lib import colors
@@ -676,13 +1034,25 @@ def _render_pdf_flat(title, columns, rows, window):
         for c in columns:
             val = str(row.get(c, ''))
             if c in err_cols and val != '':
-                cells.append(_err_para(val, styles))  # green < 5%, red otherwise
+                cells.append(_err_para(val, styles))
             else:
                 cells.append(Paragraph(escape(val), styles['cell']))
         data.append(cells)
 
+    totals_cells = _product_summary_totals_cells(columns, (dataset or {}).get('totals'))
+    if totals_cells:
+        total_row = []
+        for c in columns:
+            match = next((t for t in totals_cells if t['header'] == c), None)
+            val = match['value'] if match else ''
+            if c in err_cols and val:
+                total_row.append(_err_para(val, styles))
+            else:
+                total_row.append(Paragraph(escape(val), styles['cell_b']))
+        data.append(total_row)
+
     table = Table(data, colWidths=col_w, repeatRows=1)
-    table.setStyle(TableStyle([
+    style_cmds = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(_TEAL)),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor(_GRID)),
@@ -691,7 +1061,10 @@ def _render_pdf_flat(title, columns, rows, window):
         ('RIGHTPADDING', (0, 0), (-1, -1), 4),
         ('TOPPADDING', (0, 0), (-1, -1), 3),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-    ]))
+    ]
+    if totals_cells:
+        style_cmds.append(('BACKGROUND', (0, len(data) - 1), (-1, len(data) - 1), colors.HexColor(_TOTAL_BG)))
+    table.setStyle(TableStyle(style_cmds))
 
     story = _pdf_header_story(title, window, len(rows), usable, styles)
     story.append(table)
@@ -706,11 +1079,11 @@ def _render(fmt, title, dataset, window=None):
     if fmt == 'csv':
         return _render_csv(columns, rows)
     if fmt == 'xlsx':
-        return _render_xlsx(title, columns, rows)
+        return _render_xlsx(title, columns, rows, window=window, dataset=dataset)
     if fmt == 'pdf':
         if dataset['kind'] == 'detailed' and dataset.get('groups') is not None:
             return _render_pdf_detailed(title, dataset['groups'], window)
-        return _render_pdf_flat(title, columns, rows, window)
+        return _render_pdf_flat(title, columns, rows, window, dataset=dataset)
     raise ValueError(f'Unknown format: {fmt}')
 
 
@@ -884,15 +1257,20 @@ def execute_distribution_rule(rule_id):
         return {'success': False, 'error': 'No output formats selected'}
 
     try:
-        from_dt, to_dt = _resolve_window(rule)
+        email_from_dt, email_to_dt = _resolve_window(rule)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M')
         attachments = []  # (filename, bytes)
         total_rows = 0
 
         for source_key in sources:
+            from_dt, to_dt = _resolve_window_for_source(source_key, rule)
             dataset = _fetch_source(source_key, from_dt, to_dt)
             total_rows += len(dataset['rows'])
-            title = _label_for(source_key)
+            title = _title_for_source(source_key)
+            logger.info(
+                'Distribution source=%s window=%s → %s rows=%s',
+                source_key, from_dt, to_dt, len(dataset['rows']),
+            )
             for fmt in formats:
                 content = _render(fmt, title, dataset, window=(from_dt, to_dt))
                 filename = f'{source_key}_{timestamp}.{fmt}'
@@ -907,7 +1285,7 @@ def execute_distribution_rule(rule_id):
             if not recipients:
                 raise ValueError('Email delivery selected but no recipients configured')
             subject = f"{rule.name or 'Scheduled Report'} — {datetime.now().strftime('%Y-%m-%d')}"
-            body = _build_email_html(rule.name, sources, from_dt, to_dt, file_names)
+            body = _build_email_html(rule.name, sources, email_from_dt, email_to_dt, file_names)
             res = smtp_config.send_email(
                 recipients, subject, body,
                 attachments=attachments,
@@ -925,7 +1303,7 @@ def execute_distribution_rule(rule_id):
         rule.last_run_status = 'success'
         rule.last_run_error = None
         db.session.commit()
-        window = f"{from_dt.strftime('%b %d %H:%M')} → {to_dt.strftime('%b %d %H:%M')}"
+        window = f"{email_from_dt.strftime('%b %d %H:%M')} → {email_to_dt.strftime('%b %d %H:%M')}"
         return {
             'success': True,
             'message': f"Delivered {total_rows} row(s) for {window} — " + ', '.join(messages),

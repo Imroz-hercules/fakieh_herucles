@@ -100,7 +100,7 @@ export function Storage() {
     materialCode: "",
     hlActive: "all",
     lockActive: "all",
-    dbFilter: "all", // Filter by database (DB1, DB2, DB3)
+    dbFilter: "all", // Filter by database (DB1, DB2, DB3, DB5)
   });
   
   const syncWithPLC = async () => {
@@ -372,6 +372,7 @@ export function Storage() {
                     <SelectItem value="DB1">DB1 - Intake</SelectItem>
                     <SelectItem value="DB2">DB2 - Outloading</SelectItem>
                     <SelectItem value="DB3">DB3 - Main Storage</SelectItem>
+                    <SelectItem value="DB5">DB5 - Qty Only</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
