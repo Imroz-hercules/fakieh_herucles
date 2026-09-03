@@ -95,7 +95,7 @@ import {
 import { SiloList } from '../../components/water-system/plant3d/SiloList';
 import { KpiStrip } from '../../components/water-system/plant3d/KpiStrip';
 import { Hint } from '../../components/water-system/plant3d/Hint';
-import { ControlBar, type ViewMode, type LabelMode } from '../../components/water-system/plant3d/ControlBar';
+import type { ViewMode, LabelMode } from '../../components/water-system/plant3d/ControlBar';
 import { DataChip, NUMBER_CHIP_W, DATA_CHIP_W, type ChipStatus } from '../../components/water-system/plant3d/DataChip';
 import { statusCategoryFor } from '../../components/water-system/plant3d/PlantHud';
 import { cn } from '@/lib/utils';
@@ -2357,26 +2357,10 @@ export default function Plant3D() {
         }}
       />
       <Hint />
-      {/* Bottom-left control cluster, above the legend dock (h-8): 3D/2D,
-          X-ray (the acrylic shells), Reset, Fit all, Labels, zoom. */}
-      <div className="pointer-events-none absolute left-2 z-20" style={{ bottom: 32 + 8 }}>
-        <div className="pointer-events-auto">
-          <ControlBar
-            viewMode={viewMode}
-            onViewMode={setViewMode}
-            xray={!solidShells}
-            onXray={(v) => setSolidShellsState(!v)}
-            onReset={() => setFitNonce((n) => n + 1)}
-            onFit={() => {
-              goToZone('all');
-              setFitNonce((n) => n + 1);
-            }}
-            labels={labelMode}
-            onLabels={setLabelMode}
-            onZoom={(dir) => setZoomReq((r) => ({ n: r.n + 1, f: dir === 'in' ? 0.85 : 1.18 }))}
-          />
-        </div>
-      </div>
+      {/* The bottom-left control bar (3D/2D, X-ray, Reset, Fit, Labels, zoom)
+          was removed on 2026-09-03 at the client's request ("unneeded"). The
+          state it drove stays: view mode is fixed at 3D, labels come from the
+          header pill, shells from the look. */}
 
       {/*
         Full screen's own floating top bar.
