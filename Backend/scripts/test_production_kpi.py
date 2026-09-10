@@ -505,32 +505,90 @@ def test_clock_hour_buckets():
         }
     ]
     kpi = compute_production_kpi(rows, ws, we, now=we)
-    buckets = kpi["by_hour"]
+    buckets = kpi["buckets"]
 
-    check("every bucket starts on the hour", all(h["hour_start"].minute == 0 for h in buckets), True)
+    check("every bucket starts on the hour", all(h["start"].minute == 0 for h in buckets), True)
     check("every bucket is one hour long",
-          all((h["hour_end"] - h["hour_start"]) == timedelta(hours=1) for h in buckets), True)
-    check("the first bucket opens on the hour before the window", buckets[0]["hour_start"],
+          all((h["end"] - h["start"]) == timedelta(hours=1) for h in buckets), True)
+    check("the first bucket opens on the hour before the window", buckets[0]["start"],
           datetime(2025, 3, 28, 11, 0))
     check("buckets span the ragged window", len(buckets), 25)
     check("no gaps between buckets",
-          all(buckets[i]["hour_start"] == buckets[i - 1]["hour_end"] for i in range(1, len(buckets))),
+          all(buckets[i]["start"] == buckets[i - 1]["end"] for i in range(1, len(buckets))),
           True)
 
     holding = [h for h in buckets if h["batches"]]
     check("the batch lands in its own clock hour", len(holding), 1)
-    check("which is 12:00, not the window's opening minute", holding[0]["hour_start"],
+    check("which is 12:00, not the window's opening minute", holding[0]["start"],
           datetime(2025, 3, 28, 12, 0))
     check("and the bucket reports when it really started", holding[0]["first_start"],
           datetime(2025, 3, 28, 12, 30))
     check("tonnage still sums to the total", round(sum(h["tons"] for h in buckets), 3), kpi["tons"])
+
+    check("a short window is bucketed by hour", kpi["granularity"], "hour")
 
     # A batch outside the window must not be booked to a bucket that overlaps it.
     early = [dict(rows[0], guid="b", start=datetime(2025, 3, 28, 11, 10),
                   end=datetime(2025, 3, 28, 11, 30))]
     kpi2 = compute_production_kpi(early, ws, we, now=we)
     check("a batch before the window is not booked to the overhanging bucket",
-          sum(h["batches"] for h in kpi2["by_hour"]), 0)
+          sum(h["batches"] for h in kpi2["buckets"]), 0)
+
+
+def test_production_day_buckets():
+    """Past 48 h the chart switches to one bar per production day (07:00 AST)."""
+    print("\nproduction-day buckets")
+    # A week, which as hourly bars would be 168 of them.
+    ws = datetime(2025, 3, 24, 4, 0)
+    we = ws + timedelta(days=7)
+
+    def batch(start, kg=3000.0):
+        return {
+            "guid": str(start),
+            "start": start,
+            "end": start + timedelta(minutes=50),
+            "category": "FeedMill_Hammer",
+            "actual_kg": kg,
+            "setpoint_kg": kg,
+            "deviation_kg": 0.0,
+            "on_target_rows": 10,
+            "scored_rows": 10,
+        }
+
+    rows = [
+        batch(datetime(2025, 3, 25, 9, 0)),    # morning, after 07:00
+        batch(datetime(2025, 3, 25, 20, 0)),   # evening, same production day
+        # 03:00 UTC is 06:00 plant time -- before the 07:00 turnover, so this
+        # belongs to the PREVIOUS production day despite its calendar date.
+        batch(datetime(2025, 3, 26, 3, 0)),
+    ]
+    kpi = compute_production_kpi(rows, ws, we, now=we)
+    buckets = kpi["buckets"]
+
+    check("a long window is bucketed by day", kpi["granularity"], "day")
+    check("a week is seven buckets, not 168", len(buckets), 7)
+    check("every bucket is 24 h",
+          all((b["end"] - b["start"]) == timedelta(days=1) for b in buckets), True)
+    # 07:00 Asia/Riyadh is 04:00 UTC, and the columns are naive UTC.
+    check("days open at 07:00 plant time", all(b["start"].hour == 4 for b in buckets), True)
+    check("no gaps between days",
+          all(buckets[i]["start"] == buckets[i - 1]["end"] for i in range(1, len(buckets))), True)
+
+    holding = [b for b in buckets if b["batches"]]
+    check("all three land on one production day", len(holding), 1)
+    check("which is the 25th", holding[0]["start"], datetime(2025, 3, 25, 4, 0))
+    # The 05:00 batch is the point: by calendar date it is the 26th, but the
+    # plant's day does not turn over until 07:00, and /api/kpi_calendar books
+    # it to the 25th. This card must agree.
+    check("an 06:00 plant-time batch belongs to the previous production day",
+          holding[0]["batches"], 3)
+    check("tonnage sums to the total", round(sum(b["tons"] for b in buckets), 3), kpi["tons"])
+
+    # The boundary itself: 48 h stays hourly, a minute more switches.
+    short = compute_production_kpi([], ws, ws + timedelta(hours=48), now=we)
+    longer = compute_production_kpi([], ws, ws + timedelta(hours=48, minutes=1), now=we)
+    check("48 h is still hourly", short["granularity"], "hour")
+    check("just over 48 h switches to days", longer["granularity"], "day")
 
 
 def test_outloading_excluded():
@@ -671,10 +729,10 @@ def test_against_real_extract():
     check("the merged figure does not", kpi["availability_pct"] < 100.0, True)
 
     # The other bug: reading [Quantity] as the batch weight.
-    check("hourly buckets cover the window", len(kpi["by_hour"]), 24)
+    check("hourly buckets cover the window", len(kpi["buckets"]), 24)
     check(
         "hourly tonnage sums to the total",
-        round(sum(h["tons"] for h in kpi["by_hour"]), 2),
+        round(sum(h["tons"] for h in kpi["buckets"]), 2),
         round(kpi["tons"], 2),
         tol=0.02,
     )
@@ -708,6 +766,7 @@ def main():
     test_resolve_window()
     test_window_clipping()
     test_clock_hour_buckets()
+    test_production_day_buckets()
     test_outloading_excluded()
     test_against_real_extract()
 

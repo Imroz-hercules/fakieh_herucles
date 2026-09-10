@@ -100,6 +100,11 @@ RUNNING_BATCH_MAX_HOURS = 12
 # query string can ask for a decade of GROUP BY and a 262,800-entry hour array.
 MAX_WINDOW = timedelta(days=31)
 
+# Past this, one bar per hour stops being readable -- a week is 168 of them --
+# so the chart switches to one bar per production day. Two days of hours is
+# still legible and keeps the shape of a shift visible.
+HOURLY_BUCKET_LIMIT = timedelta(hours=48)
+
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -288,6 +293,8 @@ def compute_production_kpi(
         prod["on_target_rows"] / prod["scored_rows"] * 100.0 if prod["scored_rows"] > 0 else None
     )
 
+    buckets, granularity = _tons_by_bucket(production, window_start, window_end)
+
     return {
         "window": {
             "start": window_start,
@@ -314,7 +321,8 @@ def compute_production_kpi(
         ),
         "concurrency": prod["concurrency"],
         "timeline": prod["merged_spans"],
-        "by_hour": _tons_by_hour(production, window_start, window_end),
+        "granularity": granularity,
+        "buckets": buckets,
         "non_production": {
             "categories": list(non_production_categories),
             "batches": other["batches"],
@@ -323,40 +331,71 @@ def compute_production_kpi(
     }
 
 
-def _tons_by_hour(batches, window_start, window_end):
-    """Tonnage per WHOLE CLOCK HOUR overlapping the window.
+def _production_day_floor(dt: datetime) -> datetime:
+    """The 07:00 plant-time day boundary at or before `dt`, in naive UTC.
 
-    Bucketed by the hour a batch started, for the same reason tonnage is
-    attributed by start: to agree with the calendar. A batch's weight is never
-    split across two hours; the batching system reports batches, not a
-    continuous rate.
+    The plant's day runs 07:00 to 07:00 Asia/Riyadh, which is how
+    /api/kpi_calendar buckets a batch; Riyadh is UTC+3 with no DST, so this is
+    the same instant every day, but it is derived rather than hardcoded so it
+    stays right if that ever stops being true.
+    """
+    local = dt.replace(tzinfo=UTC).astimezone(BUSINESS_TZ)
+    day = local.date() if local.hour >= 7 else (local - timedelta(days=1)).date()
+    return saudi_local_to_utc_naive(day.year, day.month, day.day, 7, 0)
 
-    The buckets are real clock hours -- 13:00 to 14:00 -- not offsets from the
-    window's opening. A rolling window opens at whatever minute it is now, so
-    offset buckets produced labels like "11:38 to 12:38", which read as though
-    they disagreed with a "first batch start" of 12:30 sitting inside one.
-    Clock hours are what anyone reading a plant screen already thinks in.
 
-    The first and last bucket therefore stick out past the window. Each is
-    reported with its true clock-hour span so the caller can clip it to the
-    window when drawing; the tonnage inside is unaffected, because a batch
-    either started inside the window or was never counted at all.
+def _bucket_edges(window_start: datetime, window_end: datetime):
+    """The bucket boundaries covering the window, and what they are called.
+
+    Clock hours for a short window, production days for a long one. Either
+    way the edges are real plant boundaries -- the top of an hour, or 07:00 --
+    rather than offsets from a window that opens at an arbitrary minute.
+    """
+    if window_end - window_start <= HOURLY_BUCKET_LIMIT:
+        step = timedelta(hours=1)
+        cursor = window_start.replace(minute=0, second=0, microsecond=0)
+        granularity = "hour"
+    else:
+        step = timedelta(days=1)
+        cursor = _production_day_floor(window_start)
+        granularity = "day"
+
+    edges = []
+    # A day step is a fixed 24 h because Riyadh has no DST; if that changed,
+    # this is the line that would need to walk day by day instead.
+    while cursor < window_end:
+        edges.append((cursor, cursor + step))
+        cursor += step
+    return edges, granularity
+
+
+def _tons_by_bucket(batches, window_start, window_end):
+    """Tonnage per bucket, by the bucket a batch STARTED in.
+
+    Bucketed by start for the same reason tonnage is attributed by start: to
+    agree with the calendar. A batch's weight is never split across buckets;
+    the batching system reports batches, not a continuous rate.
+
+    The first and last bucket may overhang the window -- a clock hour or a
+    production day rarely lines up with a rolling window's edges. Each is
+    reported with its true span so the caller can clip it when drawing. The
+    tonnage inside is unaffected: a batch is only ever counted if it started
+    inside the window itself.
     """
     if window_end <= window_start:
-        return []
+        return [], "hour"
 
-    first_hour = window_start.replace(minute=0, second=0, microsecond=0)
-    total_hours = math.ceil((window_end - first_hour).total_seconds() / 3600.0)
-    if total_hours <= 0:
-        return []
+    edges, granularity = _bucket_edges(window_start, window_end)
+    if not edges:
+        return [], granularity
 
-    tons = [0.0] * total_hours
-    counts = [0] * total_hours
-    # The bucket is an hour wide; the batches in it started at particular
-    # moments. Carrying both is what lets the card say "1 batch, started
-    # 12:30 PM" under an hour labelled 12:00.
-    first_start = [None] * total_hours
-    last_start = [None] * total_hours
+    tons = [0.0] * len(edges)
+    counts = [0] * len(edges)
+    # The bucket is wide; the batches in it started at particular moments.
+    # Carrying both is what lets the card say "4 batches, started 02:24 PM"
+    # under a bucket labelled 02:00.
+    first_start = [None] * len(edges)
+    last_start = [None] * len(edges)
 
     for b in batches:
         start, end = b.get("start"), b.get("end")
@@ -364,26 +403,27 @@ def _tons_by_hour(batches, window_start, window_end):
             continue
         if not (window_start <= start < window_end):
             continue
-        idx = int((start - first_hour).total_seconds() // 3600)
-        if 0 <= idx < total_hours:
-            tons[idx] += (b.get("actual_kg") or 0.0) / 1000.0
-            counts[idx] += 1
-            if first_start[idx] is None or start < first_start[idx]:
-                first_start[idx] = start
-            if last_start[idx] is None or start > last_start[idx]:
-                last_start[idx] = start
+        for i, (lo, hi) in enumerate(edges):
+            if lo <= start < hi:
+                tons[i] += (b.get("actual_kg") or 0.0) / 1000.0
+                counts[i] += 1
+                if first_start[i] is None or start < first_start[i]:
+                    first_start[i] = start
+                if last_start[i] is None or start > last_start[i]:
+                    last_start[i] = start
+                break
 
     return [
         {
-            "hour_start": first_hour + timedelta(hours=i),
-            "hour_end": first_hour + timedelta(hours=i + 1),
+            "start": lo,
+            "end": hi,
             "tons": round(tons[i], 3),
             "batches": counts[i],
             "first_start": first_start[i],
             "last_start": last_start[i],
         }
-        for i in range(total_hours)
-    ]
+        for i, (lo, hi) in enumerate(edges)
+    ], granularity
 
 
 # --------------------------------------------------------------------------
@@ -578,14 +618,14 @@ def _serialise(kpi: dict) -> dict:
         {"start": format_db_datetime_utc_iso(s), "end": format_db_datetime_utc_iso(e)}
         for s, e in kpi["timeline"]
     ]
-    out["by_hour"] = [
+    out["buckets"] = [
         {
-            **h,
-            "hour_start": format_db_datetime_utc_iso(h["hour_start"]),
-            "hour_end": format_db_datetime_utc_iso(h["hour_end"]),
-            "first_start": format_db_datetime_utc_iso(h["first_start"]),
-            "last_start": format_db_datetime_utc_iso(h["last_start"]),
+            **b,
+            "start": format_db_datetime_utc_iso(b["start"]),
+            "end": format_db_datetime_utc_iso(b["end"]),
+            "first_start": format_db_datetime_utc_iso(b["first_start"]),
+            "last_start": format_db_datetime_utc_iso(b["last_start"]),
         }
-        for h in kpi["by_hour"]
+        for b in kpi["buckets"]
     ]
     return out

@@ -44,13 +44,14 @@ export interface ProductionKpi {
   dosing_accuracy_pct: number | null
   concurrency: number | null
   timeline: Array<{ start: string | null; end: string | null }>
-  by_hour: Array<{
-    hour_start: string | null
-    /** the end of the clock hour this bucket covers */
-    hour_end: string | null
+  /** Whether `buckets` are clock hours or production days -- see HOURLY_BUCKET_LIMIT. */
+  granularity: 'hour' | 'day'
+  buckets: Array<{
+    start: string | null
+    end: string | null
     tons: number
     batches: number
-    /** When the batches in this hour actually started, which is not the hour label. */
+    /** When the batches in this bucket actually started, which is not the bucket label. */
     first_start: string | null
     last_start: string | null
   }>
@@ -98,12 +99,21 @@ function formatDay(iso: string | null | undefined): string {
   return d ? dayFmt.format(d) : ''
 }
 
-/** "01:00 PM - 02:00 PM" for the hour a bucket covers. */
-function hourRangeLabel(iso: string | null | undefined): string {
-  const start = parseUtcDate(iso)
+/** What one bar covers: an hour of the clock, or a production day. */
+function bucketLabel(
+  granularity: 'hour' | 'day',
+  from: string | null | undefined,
+  to: string | null | undefined,
+): string {
+  const start = parseUtcDate(from)
   if (!start) return 'No data'
-  const end = new Date(start.getTime() + 3600000)
-  return `${timeFmt.format(start)} - ${timeFmt.format(end)}`
+  if (granularity === 'day') {
+    // The plant's day, not the calendar's: 07:00 to 07:00, which is how the
+    // Batch Calendar books a batch too.
+    return `Production day ${dayFmt.format(start)} · 07:00 to 07:00`
+  }
+  const end = parseUtcDate(to) ?? new Date(start.getTime() + 3600000)
+  return `Hour ${timeFmt.format(start)} - ${timeFmt.format(end)}`
 }
 
 function formatHours(hours: number | null | undefined): string {
@@ -159,7 +169,19 @@ function Chip({ label, value }: { label: string; value: string }) {
   )
 }
 
-export default function ProductionPerformanceCard() {
+export interface ProductionPerformanceCardProps {
+  /**
+   * The range the page's filter is set to, once the operator has applied one.
+   *
+   * Null until then, and the card shows a live rolling 24 hours -- the figure
+   * the plant asked for, and the one worth seeing on a screen left open. Once
+   * a filter is applied the card follows it like every other card on the page,
+   * rather than being the one panel that ignores the controls above it.
+   */
+  range?: { start: Date; end: Date } | null
+}
+
+export default function ProductionPerformanceCard({ range }: ProductionPerformanceCardProps = {}) {
   const [kpi, setKpi] = useState<ProductionKpi | null>(null)
   // Operators read this card, so the visible message stays plain; whatever the
   // browser or the server actually said is kept for the tooltip.
@@ -175,6 +197,15 @@ export default function ProductionPerformanceCard() {
   const abortRef = useRef<AbortController | null>(null)
   const inFlightRef = useRef(false)
 
+  /*
+   * `parse_calendar_range` on the server reads these the way the Batch
+   * Calendar does, so the same filter lands on the same window in both.
+   */
+  const query = range
+    ? `startDate=${encodeURIComponent(range.start.toISOString())}` +
+      `&endDate=${encodeURIComponent(range.end.toISOString())}`
+    : 'hours=24'
+
   const fetchKpi = useCallback(async () => {
     // Skip the tick rather than restarting the request. Aborting the previous
     // call every 60 s means a query that takes 61 s never finishes once, and
@@ -184,7 +215,7 @@ export default function ProductionPerformanceCard() {
     const controller = new AbortController()
     abortRef.current = controller
     try {
-      const res = await fetch('/api/sqlserver/production-kpi?hours=24', {
+      const res = await fetch(`/api/sqlserver/production-kpi?${query}`, {
         signal: controller.signal,
       })
       let body: ProductionKpiResponse | null = null
@@ -218,7 +249,7 @@ export default function ProductionPerformanceCard() {
       inFlightRef.current = false
       if (!controller.signal.aborted) setLoading(false)
     }
-  }, [])
+  }, [query])
 
   useEffect(() => {
     fetchKpi()
@@ -249,7 +280,7 @@ export default function ProductionPerformanceCard() {
     })
     .filter(Boolean) as Array<{ left: number; width: number; s: Date; e: Date }>
 
-  const byHour = kpi?.by_hour ?? []
+  const byHour = kpi?.buckets ?? []
   const peakHour = byHour.reduce((max, h) => Math.max(max, h.tons), 0)
   const busiest = peakHour > 0 ? byHour.find((h) => h.tons === peakHour) ?? null : null
 
@@ -260,8 +291,8 @@ export default function ProductionPerformanceCard() {
    */
   const bars = byHour
     .map((h, i) => {
-      const from = parseUtcDate(h.hour_start)
-      const to = parseUtcDate(h.hour_end)
+      const from = parseUtcDate(h.start)
+      const to = parseUtcDate(h.end)
       if (!from || !to || !windowStart) return null
       const left = Math.max(0, Math.min(100, pct(from)))
       const right = Math.max(0, Math.min(100, pct(to)))
@@ -280,7 +311,10 @@ export default function ProductionPerformanceCard() {
     .filter((b) => b.i % 3 === 0)
     .map((b) => ({
       pct: b.left,
-      label: axisFmt.format(parseUtcDate(b.h.hour_start) as Date),
+      label:
+        kpi?.granularity === 'day'
+          ? dayFmt.format(parseUtcDate(b.h.start) as Date)
+          : axisFmt.format(parseUtcDate(b.h.start) as Date),
     }))
 
   // A batch that ran across the opening edge and finished before any new one
@@ -288,6 +322,18 @@ export default function ProductionPerformanceCard() {
   const hasData =
     !!kpi && (kpi.batches > 0 || kpi.batches_running > 0 || kpi.running_hours > 0)
   const availability = kpi?.availability_pct ?? 0
+  /* The window is 24 h only when no filter is applied; every sentence that
+     names it reads from here rather than assuming. */
+  const windowHours = kpi?.window?.hours ?? 24
+  // "240h 00m" is arithmetic; "10 days" is what a person would say.
+  const windowLabel =
+    windowHours === 24
+      ? '24h'
+      : windowHours >= 48
+        ? `${Math.round(windowHours / 24)} days`
+        : formatHours(windowHours)
+  const windowWords =
+    windowHours === 24 ? 'the last 24 hours' : `the ${windowLabel} shown`
 
   return (
     <div className="bg-slate-800/50 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-lg p-6 shadow-lg light:shadow-xl relative overflow-hidden">
@@ -295,14 +341,16 @@ export default function ProductionPerformanceCard() {
       <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
         <div className="min-w-0">
           <h3 className="text-lg font-semibold text-white light:text-gray-900">
-            24-Hour Production Performance
+            {range ? 'Production Performance' : '24-Hour Production Performance'}
           </h3>
           <p className="text-xs text-slate-400 light:text-gray-600 mt-1">
             {windowStart && windowEnd
               ? `${formatDay(kpi?.window?.start)} ${formatClock(kpi?.window?.start)} → ${formatDay(
                   kpi?.window?.end,
                 )} ${formatClock(kpi?.window?.end)} · plant time`
-              : 'Rolling 24-hour window · plant time'}
+              : range
+                ? 'Filtered range · plant time'
+                : 'Rolling 24-hour window · plant time'}
           </p>
         </div>
         <div className="flex items-center space-x-2 shrink-0">
@@ -318,7 +366,7 @@ export default function ProductionPerformanceCard() {
                 : 'text-cyan-400 light:text-cyan-600'
             }`}
           >
-            {error ? 'Unavailable' : 'Last 24 hours'}
+            {error ? 'Unavailable' : range ? 'Filtered range' : 'Last 24 hours'}
           </span>
         </div>
       </div>
@@ -363,8 +411,8 @@ export default function ProductionPerformanceCard() {
               </div>
               <p className="text-xs text-slate-400 light:text-gray-600 truncate">
                 {hasData
-                  ? `Running ${formatHours(kpi?.running_hours)} of 24h`
-                  : 'Running time ÷ 24 hours'}
+                  ? `Running ${formatHours(kpi?.running_hours)} of ${windowLabel}`
+                  : `Running time ÷ ${windowLabel}`}
               </p>
             </div>
 
@@ -374,7 +422,7 @@ export default function ProductionPerformanceCard() {
               value={hasData ? `${(kpi?.throughput_tph ?? 0).toFixed(1)} t/h` : '--'}
               sub={
                 hasData
-                  ? `${(kpi?.throughput_window_tph ?? 0).toFixed(1)} t/h across the full 24h`
+                  ? `${(kpi?.throughput_window_tph ?? 0).toFixed(1)} t/h across the full ${windowLabel}`
                   : 'Tonnage ÷ running time'
               }
               muted={!hasData}
@@ -413,7 +461,7 @@ export default function ProductionPerformanceCard() {
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-slate-400 light:text-gray-600">
-                Tonnage per hour
+                {kpi?.granularity === 'day' ? 'Tonnage per production day' : 'Tonnage per hour'}
               </span>
               <span className="text-xs text-slate-500 light:text-gray-500 tabular-nums">
                 {peakHour > 0 ? `peak ${peakHour.toFixed(1)} t` : ''}
@@ -453,9 +501,9 @@ export default function ProductionPerformanceCard() {
                 role="group"
                 aria-label={
                   hasData
-                    ? `Tonnage produced per hour over the last 24 hours. ` +
+                    ? `Tonnage produced per ${kpi?.granularity ?? 'hour'} over ${windowWords}. ` +
                       `${(kpi?.tons ?? 0).toFixed(1)} tonnes in ${kpi?.batches ?? 0} batches.`
-                    : 'Tonnage per hour. No batches recorded in the last 24 hours.'
+                    : `Tonnage per ${kpi?.granularity ?? 'hour'}. No batches recorded in ${windowWords}.`
                 }
               >
                 {bars.map(({ h, i, left, width }) => {
@@ -463,7 +511,7 @@ export default function ProductionPerformanceCard() {
                   const batches = h.batches
                   const height =
                     peakHour > 0 ? Math.max((tons / peakHour) * 100, tons > 0 ? 6 : 0) : 0
-                  const label = `Hour ${hourRangeLabel(h.hour_start)}`
+                  const label = bucketLabel(kpi?.granularity ?? 'hour', h.start, h.end)
                   // The bar covers an hour; the batches inside it started at
                   // particular moments. Saying both stops the hour label from
                   // looking like it contradicts "first batch start" above.
@@ -604,7 +652,7 @@ export default function ProductionPerformanceCard() {
           ) : !hasData ? (
             <p className="flex items-center gap-2 text-xs text-slate-400 light:text-gray-600 mt-4">
               <Activity className="h-3.5 w-3.5" />
-              No batches recorded in the last 24 hours.
+              No batches recorded in {windowWords}.
             </p>
           ) : null}
         </>

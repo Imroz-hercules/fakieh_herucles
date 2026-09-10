@@ -61,6 +61,8 @@ const saudiTimeInputValue = (date: Date) => {
 
 export default function FakiehDashboard() {
   const [startDate, setStartDate] = useState<Date>(defaultDates.startDate)
+  /* Null until Apply Filters is pressed -- see handleApplyFilters. */
+  const [appliedRange, setAppliedRange] = useState<{ start: Date; end: Date } | null>(null)
   const [endDate, setEndDate] = useState<Date>(defaultDates.endDate)
   const [selectedProduct, setSelectedProduct] = useState<string>('all')
   const [selectedBatch, setSelectedBatch] = useState<string>('all')
@@ -801,6 +803,13 @@ export default function FakiehDashboard() {
 
   const handleApplyFilters = () => {
     fetchBatchMaterials()
+    /*
+     * The 24-hour card only starts following the filter once the operator has
+     * actually applied one. The pickers default to last week, so binding it to
+     * `startDate`/`endDate` directly would quietly turn the plant's live
+     * 24-hour figure into a week-old one before anyone touched a control.
+     */
+    setAppliedRange({ start: startDate, end: endDate })
   }
 
   return (
@@ -1101,7 +1110,7 @@ export default function FakiehDashboard() {
         </div>
 
         {/* 24-hour production performance: start, end, throughput, efficiency */}
-        <ProductionPerformanceCard />
+        <ProductionPerformanceCard range={appliedRange} />
 
         {/* Floating Statistics Panel */}
         {/* <div className="bg-gradient-to-r from-slate-800/80 to-slate-700/80 light:from-white/90 light:to-gray-50/90 border border-slate-600/50 light:border-gray-200/50 rounded-xl p-4 shadow-2xl backdrop-blur-sm">
