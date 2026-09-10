@@ -257,6 +257,15 @@ export default function ProductionPerformanceCard({ range }: ProductionPerforman
     return () => {
       clearInterval(interval)
       abortRef.current?.abort()
+      /*
+       * abort() rejects the in-flight promise, but its `finally` -- where
+       * inFlightRef is cleared -- does not run until a microtask later. The
+       * replacement effect body runs BEFORE that, so without this line the new
+       * window's first fetch hits the in-flight guard and is skipped, and the
+       * card sits on the old range until the next 60 s tick. Pressing Apply
+       * Filters would look like it had done nothing.
+       */
+      inFlightRef.current = false
     }
   }, [fetchKpi])
 
@@ -624,14 +633,6 @@ export default function ProductionPerformanceCard({ range }: ProductionPerforman
             <Chip label="Batches" value={hasData ? String(kpi?.batches ?? 0) : '--'} />
             <Chip label="Produced" value={hasData ? `${(kpi?.tons ?? 0).toFixed(1)} t` : '--'} />
             <Chip label="Idle" value={hasData ? formatHours(kpi?.idle_hours) : '--'} />
-            <Chip
-              label={`On target ±${kpi?.dosing_tolerance_pct ?? 2}%`}
-              value={
-                kpi?.on_target_pct !== null && kpi?.on_target_pct !== undefined
-                  ? `${kpi.on_target_pct.toFixed(1)}%`
-                  : '--'
-              }
-            />
             {kpi?.non_production?.tons ? (
               <Chip label="Outloaded (not counted)" value={`${kpi.non_production.tons.toFixed(1)} t`} />
             ) : null}
