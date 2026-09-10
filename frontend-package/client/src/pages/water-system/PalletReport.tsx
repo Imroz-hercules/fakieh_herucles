@@ -3,6 +3,7 @@ import {
   Activity,
   AlertCircle,
   ArrowRight,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -35,34 +36,56 @@ import {
 } from '@/utils/timezone'
 
 type LineName = 'P1' | 'P2' | 'P3' | 'P4'
+type OrderStatus = 'RUNNING' | 'COMPLETED'
 
-interface HistoryItem {
+interface Movement {
   id: number
-  line: LineName
   source1: number | null
   source2: number | null
   destination1: number | null
   destination2: number | null
-  quantity: number
-  running: boolean
+  quantity: number | null
   selection: number | null
-  recorded_at: string
-  created_at: string
+  observed_at: string
+}
+
+interface PalletOrder {
+  id: number
+  line: LineName
+  order_sequence: number
+  order_description: string
+  source1: number | null
+  source2: number | null
+  destination1: number | null
+  destination2: number | null
+  production_name: string | null
+  material: string | null
+  start_qty: number | null
+  latest_qty: number | null
+  final_qty: number | null
+  product_kg: number | null
+  running: boolean
+  status: OrderStatus
+  selection: number | null
+  actual_start_time: string
+  actual_end_time: string | null
+  duration_seconds: number | null
+  movements: Movement[]
 }
 
 interface HistoryResponse {
   success: boolean
-  items: HistoryItem[]
+  items: PalletOrder[]
   pagination: { page: number; page_size: number; total: number; pages: number }
   error?: string
 }
 
 interface SummaryResponse {
   success: boolean
-  total_samples: number
-  running_samples: number
-  line_count: number
-  latest_quantity_kg: number
+  total_orders: number
+  running_orders: number
+  completed_orders: number
+  total_product_kg: number
   per_line: Record<LineName, number>
   error?: string
 }
@@ -119,6 +142,8 @@ const validCode = (value?: number | null) => value != null && value !== 0
 const uniqueValues = (values: Array<number | null | undefined>) =>
   Array.from(new Set(values.filter(validCode) as number[]))
 
+const displayTrail = (values: number[]) => values.length ? values.join(' → ') : '—'
+
 const selectionMeaning = (selection?: number | null) => {
   if (selection === 3) return 'P3'
   if (selection === 4) return 'P4'
@@ -147,10 +172,11 @@ function KpiCard({ label, value, icon: Icon, accent }: {
 
 function HistoryPanel() {
   const [defaults] = useState(getDefaultProductionDayRange)
-  const [items, setItems] = useState<HistoryItem[]>([])
+  const [items, setItems] = useState<PalletOrder[]>([])
   const [summary, setSummary] = useState<SummaryResponse | null>(null)
   const [pagination, setPagination] = useState({ page: 1, page_size: 50, total: 0, pages: 0 })
   const [line, setLine] = useState('ALL')
+  const [status, setStatus] = useState('ALL')
   const [startDate, setStartDate] = useState(defaults.startDate)
   const [endDate, setEndDate] = useState(defaults.endDate)
   const [search, setSearch] = useState('')
@@ -159,7 +185,7 @@ function HistoryPanel() {
   const [refreshKey, setRefreshKey] = useState(0)
 
   const requestParams = useCallback((includePagination: boolean) => {
-    const params = new URLSearchParams({ line })
+    const params = new URLSearchParams({ line, status })
     if (includePagination) {
       params.set('page', String(pagination.page))
       params.set('page_size', String(pagination.page_size))
@@ -168,7 +194,7 @@ function HistoryPanel() {
     if (endDate) params.set('end_date', saudiDatetimeLocalToUtcIso(endDate))
     if (search.trim()) params.set('search', search.trim())
     return params
-  }, [line, pagination.page, pagination.page_size, startDate, endDate, search])
+  }, [line, status, pagination.page, pagination.page_size, startDate, endDate, search])
 
   const loadHistory = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
@@ -212,10 +238,10 @@ function HistoryPanel() {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="History records" value={(summary?.total_samples ?? 0).toLocaleString()} icon={PackageCheck} accent="bg-cyan-500/10 text-cyan-400" />
-        <KpiCard label="Lines recorded" value={(summary?.line_count ?? 0).toLocaleString()} icon={Activity} accent="bg-blue-500/10 text-blue-400" />
-        <KpiCard label="Running samples" value={(summary?.running_samples ?? 0).toLocaleString()} icon={PlayCircle} accent="bg-emerald-500/10 text-emerald-400" />
-        <KpiCard label="Latest line total" value={`${formatQuantity(summary?.latest_quantity_kg ?? 0)} KG`} icon={Gauge} accent="bg-amber-500/10 text-amber-400" />
+        <KpiCard label="Total orders" value={(summary?.total_orders ?? 0).toLocaleString()} icon={PackageCheck} accent="bg-cyan-500/10 text-cyan-400" />
+        <KpiCard label="Running" value={(summary?.running_orders ?? 0).toLocaleString()} icon={PlayCircle} accent="bg-emerald-500/10 text-emerald-400" />
+        <KpiCard label="Completed" value={(summary?.completed_orders ?? 0).toLocaleString()} icon={CheckCircle2} accent="bg-blue-500/10 text-blue-400" />
+        <KpiCard label="Total production" value={`${formatQuantity(summary?.total_product_kg ?? 0)} KG`} icon={Gauge} accent="bg-amber-500/10 text-amber-400" />
       </div>
 
       <Card className="border-border bg-card text-card-foreground">
@@ -225,6 +251,17 @@ function HistoryPanel() {
             <Select value={line} onValueChange={(value) => updateFilter(setLine, value)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{['ALL', 'P1', 'P2', 'P3', 'P4'].map((value) => <SelectItem key={value} value={value}>{value === 'ALL' ? 'All lines' : value}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-36 space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</label>
+            <Select value={status} onValueChange={(value) => updateFilter(setStatus, value)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All statuses</SelectItem>
+                <SelectItem value="RUNNING">Running</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
@@ -239,7 +276,7 @@ function HistoryPanel() {
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Line, source, destination…" value={search} onChange={(event) => updateFilter(setSearch, event.target.value)} />
+              <Input className="pl-9" placeholder="Order, source, destination…" value={search} onChange={(event) => updateFilter(setSearch, event.target.value)} />
             </div>
           </div>
           <Button variant="outline" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}>
@@ -253,10 +290,10 @@ function HistoryPanel() {
       <Card className="overflow-hidden border-border bg-card text-card-foreground">
         <div className="border-b border-border px-4 py-3 text-lg font-bold">Production information</div>
         <div className="max-h-[56vh] overflow-auto">
-          <Table className="pallet-report-table min-w-[1000px] border-collapse">
+          <Table className="pallet-report-table min-w-[1120px] border-collapse">
             <TableHeader className="pallet-report-table-head sticky top-0 z-10">
               <TableRow>
-                {['Recorded Time', 'Line', 'Source 1', 'Source 2', 'Destination 1', 'Destination 2', 'Quantity', 'Selection'].map((heading) => (
+                {['Batch Information', 'Order Description', 'Batch Description', 'Sources', 'Recipe', 'Product Name', 'Product KG', 'Selection'].map((heading) => (
                   <TableHead key={heading} className="whitespace-nowrap border px-3 py-3 font-semibold">{heading}</TableHead>
                 ))}
               </TableRow>
@@ -264,26 +301,42 @@ function HistoryPanel() {
             <TableBody>
               {loading ? Array.from({ length: 4 }).map((_, index) => (
                 <TableRow key={index}>{Array.from({ length: 8 }).map((__, cell) => <TableCell key={cell} className="border py-5"><Skeleton className="h-12 w-28" /></TableCell>)}</TableRow>
-              )) : items.length ? items.map((item) => (
-                <TableRow key={item.id} className="transition-colors">
-                  <TableCell className="whitespace-nowrap border p-3 font-medium">{formatTimestamp(item.recorded_at)}</TableCell>
-                  <TableCell className="border p-3"><Badge className="bg-cyan-600 hover:bg-cyan-600">{item.line}</Badge></TableCell>
-                  <TableCell className="border p-3">{formatQuantity(item.source1)}</TableCell>
-                  <TableCell className="border p-3">{formatQuantity(item.source2)}</TableCell>
-                  <TableCell className="border p-3">{formatQuantity(item.destination1)}</TableCell>
-                  <TableCell className="border p-3">{formatQuantity(item.destination2)}</TableCell>
-                  <TableCell className="border p-3 text-lg font-bold">{formatQuantity(item.quantity)} KG</TableCell>
-                  <TableCell className="border p-3 font-semibold">
-                    {item.line === 'P1' || item.line === 'P2' || item.selection == null ? '—' : selectionMeaning(item.selection)}
-                  </TableCell>
-                </TableRow>
-              )) : <TableRow><TableCell colSpan={8} className="h-36 border text-center text-muted-foreground">No stored pallet history matches these filters.</TableCell></TableRow>}
+              )) : items.length ? items.map((order) => {
+                const sources = uniqueValues(order.movements.flatMap((movement) => [movement.source1, movement.source2]))
+                const destination1 = uniqueValues(order.movements.map((movement) => movement.destination1))
+                const destination2 = uniqueValues(order.movements.map((movement) => movement.destination2))
+                const running = order.status === 'RUNNING'
+                return (
+                  <TableRow key={`${order.line}-${order.id}`} className="align-top transition-colors">
+                    <TableCell className="min-w-[280px] border p-3 text-sm leading-6">
+                      <div className="mb-1 font-bold">{order.line} · {running ? 'Running' : 'Completed'}</div>
+                      <div><span className="font-medium">Actual Start:</span> {formatTimestamp(order.actual_start_time)}</div>
+                      <div><span className="font-medium">Ended:</span> {running ? 'Live' : formatTimestamp(order.actual_end_time)}</div>
+                      <div><span className="font-medium">Destination bin1:</span> {displayTrail(destination1)}</div>
+                      <div><span className="font-medium">Destination bin2:</span> {displayTrail(destination2)}</div>
+                      <div><span className="font-medium">Duration:</span> {running ? 'Live · ' : ''}{formatDuration(order.duration_seconds)}</div>
+                    </TableCell>
+                    <TableCell className="min-w-36 border p-3 text-lg font-semibold">{order.order_description}</TableCell>
+                    <TableCell className="min-w-40 border p-3 text-sm">
+                      <div>Batch ID: {order.id}</div>
+                      <div>Order #{order.order_sequence}</div>
+                    </TableCell>
+                    <TableCell className="min-w-32 border p-3 font-medium">{displayTrail(sources)}</TableCell>
+                    <TableCell className="min-w-32 border p-3">{order.material || '—'}</TableCell>
+                    <TableCell className="min-w-40 border p-3">{order.production_name || '—'}</TableCell>
+                    <TableCell className="min-w-32 border p-3 text-lg font-bold">{formatQuantity(order.product_kg)} KG</TableCell>
+                    <TableCell className="min-w-28 border p-3 font-semibold">
+                      {order.line === 'P1' || order.line === 'P2' || order.selection == null ? '—' : selectionMeaning(order.selection)}
+                    </TableCell>
+                  </TableRow>
+                )
+              }) : <TableRow><TableCell colSpan={8} className="h-36 border text-center text-muted-foreground">No production runs match these filters.</TableCell></TableRow>}
             </TableBody>
             {!loading && items.length > 0 && (
               <TableFooter className="pallet-report-total-row">
                 <TableRow>
-                  <TableCell colSpan={6} className="border px-3 py-3 font-bold">Latest recorded quantity across filtered lines</TableCell>
-                  <TableCell className="border px-3 py-3 text-lg font-bold">{formatQuantity(summary?.latest_quantity_kg ?? 0)} KG</TableCell>
+                  <TableCell colSpan={6} className="border px-3 py-3 font-bold">Total</TableCell>
+                  <TableCell className="border px-3 py-3 text-lg font-bold">{formatQuantity(summary?.total_product_kg ?? 0)} KG</TableCell>
                   <TableCell className="border px-3 py-3" />
                 </TableRow>
               </TableFooter>
@@ -296,7 +349,7 @@ function HistoryPanel() {
               <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
               <SelectContent>{[25, 50, 100].map((size) => <SelectItem key={size} value={String(size)}>{size} per page</SelectItem>)}</SelectContent>
             </Select>
-            <span className="text-sm text-muted-foreground">{pagination.total.toLocaleString()} stored records</span>
+            <span className="text-sm text-muted-foreground">{pagination.total.toLocaleString()} production runs</span>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" disabled={loading || pagination.page <= 1} onClick={() => setPagination((current) => ({ ...current, page: current.page - 1 }))}><ChevronLeft className="mr-1 h-4 w-4" /> Previous</Button>

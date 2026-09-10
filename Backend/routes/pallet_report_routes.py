@@ -3,11 +3,16 @@
 from datetime import datetime, time, timezone
 
 from flask import Blueprint, jsonify, request
-from sqlalchemy import String, cast, func, or_
+from sqlalchemy import String, cast, or_
 
 from models.pallet_order import PalletOrder
 from models.pallet_report import PalletReport
-from services.pallet_report_service import PalletPLCReadError, build_live_lines, read_pallet_db7
+from services.pallet_report_service import (
+    PalletPLCReadError,
+    build_history_sessions,
+    build_live_lines,
+    read_pallet_db7,
+)
 from utils.timezone import BUSINESS_TZ
 
 pallet_report_bp = Blueprint("pallet_report", __name__, url_prefix="/api/pallet-report")
@@ -86,20 +91,43 @@ def _filtered_history_query():
                 request.args["end_date"], end_of_date=True
             )
         )
-    search = request.args.get("search", "").strip()
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                PalletReport.line.ilike(pattern),
-                cast(PalletReport.source1, String).ilike(pattern),
-                cast(PalletReport.source2, String).ilike(pattern),
-                cast(PalletReport.destination1, String).ilike(pattern),
-                cast(PalletReport.destination2, String).ilike(pattern),
-                cast(PalletReport.selection, String).ilike(pattern),
-            )
-        )
     return query
+
+
+def _filtered_history_sessions():
+    rows = (
+        _filtered_history_query()
+        .order_by(PalletReport.line, PalletReport.recorded_at, PalletReport.id)
+        .all()
+    )
+    sessions = build_history_sessions(rows)
+    status = request.args.get("status", "ALL").strip().upper()
+    if status not in VALID_STATUSES:
+        raise ValueError("status must be ALL, RUNNING, or COMPLETED")
+    if status != "ALL":
+        sessions = [session for session in sessions if session["status"] == status]
+
+    search = request.args.get("search", "").strip().lower()
+    if search:
+        sessions = [
+            session
+            for session in sessions
+            if any(
+                search in str(value).lower()
+                for value in (
+                    session["line"],
+                    session["order_description"],
+                    session["source1"],
+                    session["source2"],
+                    session["destination1"],
+                    session["destination2"],
+                    session["selection"],
+                    f"P{session['selection']}" if session["selection"] else None,
+                )
+                if value is not None
+            )
+        ]
+    return sessions
 
 
 @pallet_report_bp.get("/live")
@@ -166,25 +194,21 @@ def pallet_orders():
 
 @pallet_report_bp.get("/history")
 def pallet_history():
-    """Return the exact snapshots persisted by the one-minute historian."""
+    """Return one production report row per inferred line run."""
     try:
         page = max(1, int(request.args.get("page", 1)))
         page_size = int(request.args.get("page_size", 50))
         if page_size not in (25, 50, 100):
             raise ValueError("page_size must be 25, 50, or 100")
-        query = _filtered_history_query()
-        total = query.count()
+        sessions = _filtered_history_sessions()
+        total = len(sessions)
         pages = (total + page_size - 1) // page_size
-        items = (
-            query.order_by(PalletReport.recorded_at.desc(), PalletReport.id.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-            .all()
-        )
+        start = (page - 1) * page_size
+        items = sessions[start:start + page_size]
         return jsonify(
             {
                 "success": True,
-                "items": [item.to_dict() for item in items],
+                "items": items,
                 "pagination": {
                     "page": page,
                     "page_size": page_size,
@@ -196,32 +220,29 @@ def pallet_history():
     except (TypeError, ValueError) as exc:
         return jsonify({"success": False, "error": f"Invalid query parameter: {exc}"}), 400
 
+
 @pallet_report_bp.get("/summary")
 def pallet_summary():
     try:
-        query = _filtered_history_query()
-        total_samples = query.count()
-        running_samples = query.filter(PalletReport.running.is_(True)).count()
-        per_line = dict(
-            query.with_entities(PalletReport.line, func.count(PalletReport.id))
-            .group_by(PalletReport.line)
-            .all()
-        )
-        latest_rows = [
-            query.filter(PalletReport.line == line)
-            .order_by(PalletReport.recorded_at.desc(), PalletReport.id.desc())
-            .first()
+        sessions = _filtered_history_sessions()
+        per_line = {
+            line: sum(1 for session in sessions if session["line"] == line)
             for line in VALID_LINES[1:]
-        ]
-        latest_rows = [row for row in latest_rows if row is not None]
+        }
         return jsonify(
             {
                 "success": True,
-                "total_samples": total_samples,
-                "running_samples": running_samples,
-                "line_count": len(latest_rows),
-                "latest_quantity_kg": float(sum(row.quantity for row in latest_rows)),
-                "per_line": {line: int(per_line.get(line, 0)) for line in VALID_LINES[1:]},
+                "total_orders": len(sessions),
+                "running_orders": sum(
+                    1 for session in sessions if session["status"] == "RUNNING"
+                ),
+                "completed_orders": sum(
+                    1 for session in sessions if session["status"] == "COMPLETED"
+                ),
+                "total_product_kg": float(
+                    sum(session["product_kg"] for session in sessions)
+                ),
+                "per_line": per_line,
             }
         )
     except (TypeError, ValueError) as exc:

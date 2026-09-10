@@ -1,9 +1,11 @@
 import struct
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 from services.pallet_report_service import (
     PalletPLCReadError,
+    build_history_sessions,
     build_live_lines,
     build_snapshot_rows,
     collect_pallet_history,
@@ -86,6 +88,43 @@ class PalletBusinessLogicTests(unittest.TestCase):
         row = build_snapshot_rows(pallet_data(p1=True), timestamp)[0]
         self.assertEqual(0, row["recorded_at"].second)
         self.assertEqual(0, row["recorded_at"].microsecond)
+
+    def test_history_sessions_use_last_captured_quantity(self):
+        from datetime import datetime, timedelta, timezone
+
+        base = datetime(2026, 9, 10, 10, 0, tzinfo=timezone.utc)
+
+        def snapshot(row_id, minute, quantity, destination=848):
+            recorded_at = base + timedelta(minutes=minute)
+            return SimpleNamespace(
+                id=row_id,
+                line="P1",
+                source1=602,
+                source2=0,
+                destination1=destination,
+                destination2=848,
+                quantity=quantity,
+                selection=None,
+                recorded_at=recorded_at,
+                created_at=recorded_at,
+            )
+
+        rows = [
+            snapshot(1, 0, 28000),
+            snapshot(2, 1, 28000),
+            snapshot(3, 2, 18000),
+            snapshot(4, 421, 9000, destination=847),
+            snapshot(5, 422, 9000, destination=847),
+        ]
+        sessions = build_history_sessions(rows, now=base + timedelta(minutes=423))
+
+        self.assertEqual(2, len(sessions))
+        current, completed = sessions
+        self.assertEqual("RUNNING", current["status"])
+        self.assertEqual(9000, current["product_kg"])
+        self.assertEqual("COMPLETED", completed["status"])
+        self.assertEqual(18000, completed["final_qty"])
+        self.assertEqual((base + timedelta(minutes=3)).isoformat(), completed["actual_end_time"])
 
 
 class PalletDecoderTests(unittest.TestCase):

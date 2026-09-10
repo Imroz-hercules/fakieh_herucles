@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import math
 import struct
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 logger = logging.getLogger(__name__)
@@ -14,6 +14,8 @@ PALLET_DB_NUMBER = 7
 PALLET_DB_START = 0
 PALLET_DB_SIZE = 42
 PALLET_HISTORY_LOCK_KEY = 7_061_001
+PALLET_HISTORY_SAMPLE_SECONDS = 60
+PALLET_HISTORY_SESSION_GAP_SECONDS = 150
 
 P1_SOURCE1_OFFSET = 0
 P1_SOURCE2_OFFSET = 2
@@ -198,6 +200,108 @@ def build_snapshot_rows(
                 }
             )
     return rows
+
+
+def build_history_sessions(
+    snapshots: List[Any],
+    now: Optional[datetime] = None,
+    session_gap_seconds: int = PALLET_HISTORY_SESSION_GAP_SECONDS,
+) -> List[Dict[str, Any]]:
+    """Collapse consecutive minute snapshots into one production run per line.
+
+    The historian stores rows only while a line is running. A gap larger than
+    the tolerated collection interval therefore marks a stop/start boundary.
+    The last stored quantity is the report quantity for that run.
+    """
+    current_time = now or datetime.now(timezone.utc)
+    ordered = sorted(snapshots, key=lambda row: (row.line, row.recorded_at, row.id))
+    grouped: Dict[str, List[List[Any]]] = {}
+
+    for snapshot in ordered:
+        line_sessions = grouped.setdefault(snapshot.line, [])
+        if not line_sessions:
+            line_sessions.append([snapshot])
+            continue
+        previous = line_sessions[-1][-1]
+        gap = (snapshot.recorded_at - previous.recorded_at).total_seconds()
+        if gap > session_gap_seconds:
+            line_sessions.append([snapshot])
+        else:
+            line_sessions[-1].append(snapshot)
+
+    result: List[Dict[str, Any]] = []
+    for line, line_sessions in grouped.items():
+        for sequence, session_rows in enumerate(line_sessions, start=1):
+            first = session_rows[0]
+            last = session_rows[-1]
+            is_latest = sequence == len(line_sessions)
+            last_age = (current_time - last.recorded_at).total_seconds()
+            running = is_latest and 0 <= last_age <= session_gap_seconds
+            end_time = None if running else last.recorded_at + timedelta(
+                seconds=PALLET_HISTORY_SAMPLE_SECONDS
+            )
+            duration_end = current_time if running else end_time
+
+            movements: List[Dict[str, Any]] = []
+            previous_route = None
+            for row in session_rows:
+                route = (
+                    row.source1,
+                    row.source2,
+                    row.destination1,
+                    row.destination2,
+                    row.selection,
+                )
+                if route == previous_route:
+                    continue
+                movements.append(
+                    {
+                        "id": row.id,
+                        "source1": row.source1,
+                        "source2": row.source2,
+                        "destination1": row.destination1,
+                        "destination2": row.destination2,
+                        "quantity": row.quantity,
+                        "selection": row.selection,
+                        "observed_at": row.recorded_at.isoformat(),
+                    }
+                )
+                previous_route = route
+
+            result.append(
+                {
+                    "id": first.id,
+                    "line": line,
+                    "order_sequence": sequence,
+                    "order_description": f"L{sequence}",
+                    "source1": last.source1,
+                    "source2": last.source2,
+                    "destination1": last.destination1,
+                    "destination2": last.destination2,
+                    "production_name": None,
+                    "material": None,
+                    "start_qty": first.quantity,
+                    "latest_qty": last.quantity,
+                    "final_qty": None if running else last.quantity,
+                    "product_kg": last.quantity,
+                    "running": running,
+                    "status": "RUNNING" if running else "COMPLETED",
+                    "selection": last.selection,
+                    "actual_start_time": first.recorded_at.isoformat(),
+                    "actual_end_time": end_time.isoformat() if end_time else None,
+                    "duration_seconds": max(
+                        0, int((duration_end - first.recorded_at).total_seconds())
+                    ),
+                    "created_at": first.created_at.isoformat() if first.created_at else None,
+                    "updated_at": last.created_at.isoformat() if last.created_at else None,
+                    "movements": movements,
+                }
+            )
+    return sorted(
+        result,
+        key=lambda session: (session["actual_start_time"], session["id"]),
+        reverse=True,
+    )
 
 
 def collect_pallet_history(
