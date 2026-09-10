@@ -179,9 +179,18 @@ export interface ProductionPerformanceCardProps {
    * rather than being the one panel that ignores the controls above it.
    */
   range?: { start: Date; end: Date } | null
+  /**
+   * Clear the range and go back to the live window. Without this the filter
+   * is a one-way door: the pickers above can narrow the card but have no
+   * setting that means "whatever is happening now".
+   */
+  onGoLive?: () => void
 }
 
-export default function ProductionPerformanceCard({ range }: ProductionPerformanceCardProps = {}) {
+export default function ProductionPerformanceCard({
+  range,
+  onGoLive,
+}: ProductionPerformanceCardProps = {}) {
   const [kpi, setKpi] = useState<ProductionKpi | null>(null)
   // Operators read this card, so the visible message stays plain; whatever the
   // browser or the server actually said is kept for the tooltip.
@@ -362,7 +371,26 @@ export default function ProductionPerformanceCard({ range }: ProductionPerforman
                 : 'Rolling 24-hour window · plant time'}
           </p>
         </div>
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Only while a filter is holding the card off the live window --
+              on the live window itself the button would do nothing. */}
+          {range && onGoLive ? (
+            <button
+              type="button"
+              onClick={onGoLive}
+              title="Show the last 24 hours instead of the filtered range"
+              /* The same class list the page's own Apply Filters button uses.
+                 index.css carries ~120 global `button[class*="..."]` rules,
+                 several of which force colour and border to `inherit` on any
+                 button wearing a `light:` class -- an outline treatment came
+                 out as black text on nothing. This exact combination is the
+                 one the app already renders correctly in both themes. */
+              className="inline-flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-700 text-white light:bg-cyan-600 light:hover:bg-cyan-700 light:text-white px-2.5 py-1 rounded-md text-xs font-medium transition-colors duration-200 shadow-md"
+            >
+              <Activity className="h-3.5 w-3.5" />
+              Go Live
+            </button>
+          ) : null}
           <div
             className={`w-3 h-3 rounded-full ${
               error ? 'bg-orange-400' : 'bg-cyan-500 animate-pulse'
