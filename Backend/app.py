@@ -220,12 +220,20 @@ if __name__ == '__main__':
             print(f"Queue dispatcher not started: {_queue_disp_err}")
 
         # DB7 event monitor: translates running/selection changes into
-        # restart-safe pallet orders without writing periodic sample rows.
+        # restart-safe pallet orders used by the live view.
         try:
             from scheduler import start_pallet_order_monitor
             start_pallet_order_monitor(app)
         except Exception as _pallet_sched_err:
             print(f"Pallet order monitor not started: {_pallet_sched_err}")
+
+        # Persist the exact running-line values once per minute. Historical
+        # reports query these rows and never substitute the current PLC value.
+        try:
+            from scheduler import start_pallet_historian
+            start_pallet_historian(app)
+        except Exception as _pallet_history_err:
+            print(f"Pallet historian not started: {_pallet_history_err}")
 
         # Always-on PLC broadcast: live plant orders + silo snapshot for the UI.
         # Operators no longer Start/Stop this from Live Orders.

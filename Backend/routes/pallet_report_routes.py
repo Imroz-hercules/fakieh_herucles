@@ -1,4 +1,4 @@
-"""REST API for event-based pallet orders and current DB7 state."""
+"""REST API for stored pallet history, event orders, and current DB7 state."""
 
 from datetime import datetime, time, timezone
 
@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import String, cast, func, or_
 
 from models.pallet_order import PalletOrder
+from models.pallet_report import PalletReport
 from services.pallet_report_service import PalletPLCReadError, build_live_lines, read_pallet_db7
 from utils.timezone import BUSINESS_TZ
 
@@ -67,6 +68,40 @@ def _filtered_order_query():
     return query
 
 
+def _filtered_history_query():
+    """Build a query against persisted minute snapshots, never live PLC state."""
+    query = PalletReport.query
+    line = request.args.get("line", "ALL").strip().upper()
+    if line not in VALID_LINES:
+        raise ValueError("line must be ALL, P1, P2, P3, or P4")
+    if line != "ALL":
+        query = query.filter(PalletReport.line == line)
+    if request.args.get("start_date"):
+        query = query.filter(
+            PalletReport.recorded_at >= _parse_datetime(request.args["start_date"])
+        )
+    if request.args.get("end_date"):
+        query = query.filter(
+            PalletReport.recorded_at <= _parse_datetime(
+                request.args["end_date"], end_of_date=True
+            )
+        )
+    search = request.args.get("search", "").strip()
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                PalletReport.line.ilike(pattern),
+                cast(PalletReport.source1, String).ilike(pattern),
+                cast(PalletReport.source2, String).ilike(pattern),
+                cast(PalletReport.destination1, String).ilike(pattern),
+                cast(PalletReport.destination2, String).ilike(pattern),
+                cast(PalletReport.selection, String).ilike(pattern),
+            )
+        )
+    return query
+
+
 @pallet_report_bp.get("/live")
 def pallet_live():
     try:
@@ -97,9 +132,8 @@ def pallet_live():
 
 
 @pallet_report_bp.get("/orders")
-@pallet_report_bp.get("/history")
 def pallet_orders():
-    """Paginated event orders; /history remains as a compatibility alias."""
+    """Return event-based production orders for integrations that need them."""
     try:
         page = max(1, int(request.args.get("page", 1)))
         page_size = int(request.args.get("page_size", 50))
@@ -129,28 +163,64 @@ def pallet_orders():
     except (TypeError, ValueError) as exc:
         return jsonify({"success": False, "error": f"Invalid query parameter: {exc}"}), 400
 
-@pallet_report_bp.get("/summary")
-def pallet_summary():
+
+@pallet_report_bp.get("/history")
+def pallet_history():
+    """Return the exact snapshots persisted by the one-minute historian."""
     try:
-        query = _filtered_order_query()
-        total_orders = query.count()
-        running_orders = query.filter(PalletOrder.status == "RUNNING").count()
-        completed_orders = query.filter(PalletOrder.status == "COMPLETED").count()
-        total_kg = query.with_entities(
-            func.coalesce(func.sum(func.coalesce(PalletOrder.final_qty, PalletOrder.latest_qty)), 0.0)
-        ).scalar()
-        per_line = dict(
-            query.with_entities(PalletOrder.line, func.count(PalletOrder.id))
-            .group_by(PalletOrder.line)
+        page = max(1, int(request.args.get("page", 1)))
+        page_size = int(request.args.get("page_size", 50))
+        if page_size not in (25, 50, 100):
+            raise ValueError("page_size must be 25, 50, or 100")
+        query = _filtered_history_query()
+        total = query.count()
+        pages = (total + page_size - 1) // page_size
+        items = (
+            query.order_by(PalletReport.recorded_at.desc(), PalletReport.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
             .all()
         )
         return jsonify(
             {
                 "success": True,
-                "total_orders": total_orders,
-                "running_orders": running_orders,
-                "completed_orders": completed_orders,
-                "total_product_kg": float(total_kg or 0),
+                "items": [item.to_dict() for item in items],
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total": total,
+                    "pages": pages,
+                },
+            }
+        )
+    except (TypeError, ValueError) as exc:
+        return jsonify({"success": False, "error": f"Invalid query parameter: {exc}"}), 400
+
+@pallet_report_bp.get("/summary")
+def pallet_summary():
+    try:
+        query = _filtered_history_query()
+        total_samples = query.count()
+        running_samples = query.filter(PalletReport.running.is_(True)).count()
+        per_line = dict(
+            query.with_entities(PalletReport.line, func.count(PalletReport.id))
+            .group_by(PalletReport.line)
+            .all()
+        )
+        latest_rows = [
+            query.filter(PalletReport.line == line)
+            .order_by(PalletReport.recorded_at.desc(), PalletReport.id.desc())
+            .first()
+            for line in VALID_LINES[1:]
+        ]
+        latest_rows = [row for row in latest_rows if row is not None]
+        return jsonify(
+            {
+                "success": True,
+                "total_samples": total_samples,
+                "running_samples": running_samples,
+                "line_count": len(latest_rows),
+                "latest_quantity_kg": float(sum(row.quantity for row in latest_rows)),
                 "per_line": {line: int(per_line.get(line, 0)) for line in VALID_LINES[1:]},
             }
         )
