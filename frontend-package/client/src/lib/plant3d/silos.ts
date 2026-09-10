@@ -83,14 +83,14 @@ export const VERTICAL_EXAGGERATION = 1.25;
  *   - drawn volume is STRICTLY increasing in capacity (SIZE_COMPRESSION > 0),
  *     so a bigger bin can never draw smaller than a smaller one
  *
- * THIS USED TO BE KEYED TO ZONE, NOT CAPACITY, AND IT WAS WRONG. The 100, 200
- * series returned scale 1 unconditionally; every other group ran a
- * curve keyed to its own assumed DIAMETER. That treated "which zone is this"
- * and "how big is this" as the same question, and on this plant they are not:
+ * THIS USED TO BE KEYED TO ZONE, NOT CAPACITY, AND IT WAS WRONG. The 100 and
+ * 200 series returned scale 1 unconditionally; every other group ran a curve
+ * keyed to its own assumed DIAMETER. That treated "which zone is this" and
+ * "how big is this" as the same question, and on this plant they are not:
  * two groups can share a capacity and be given different assumed diameters
  * (this plant had exactly that — 160 t in both the 300 and the since-retired
- * 500 series, 4 m
- * assumed for one, 5 m for the other), and a diameter-keyed curve has no way
+ * 500 series, 4 m assumed for one and 5 m for the other), and a
+ * diameter-keyed curve has no way
  * to know they are supposed to match. Measured on the layout this replaced:
  * the 300 series (indoor, 160 t) drew at 266 m3 and the 500 series (outdoor,
  * the SAME 160 t) drew at 213 m3 — a 24% mismatch for one number on the
@@ -894,9 +894,9 @@ function buildPlacements(): SiloPlacement[] {
      * would look worse than any drift. So the question is only how far anything
      * actually moves. Measured, worst bin per group, against its group centre:
      *
-     *   s100  1600 t  scale 1.000  drift 0.00 m      s500  160 t  1.122  1.95 m
-     *   s200  1600 t  scale 1.000  drift 0.00 m      s300  160 t  1.122  2.73 m
-     *   s800    45 t  scale 1.195  drift 3.78 m      s900a 0.1 t  2.889  3.41 m
+     *   s100  1600 t  scale 1.000  drift 0.00 m      s300  160 t  1.122  2.73 m
+     *   s200  1600 t  scale 1.000  drift 0.00 m      s900a 0.1 t  2.889  3.41 m
+     *   s800    45 t  scale 1.195  drift 3.78 m
      *
      * The two groups with real outside evidence behind them — the satellite-
      * traced 100 and 200 series — do not move AT ALL, because they hold the
@@ -905,16 +905,16 @@ function buildPlacements(): SiloPlacement[] {
      * of `SIZE_REFERENCE_CAPACITY_KG` being the maximum, and it is the reason
      * this mapping is safe to apply outdoors as well as in.
      *
-     * The one evidence-backed group that does move is the 500 series, by
-     * 1.95 m. Weigh that against what is actually known about where it is: the
-     * georeferencing pass could not pin the outdoor bank's position to better
-     * than about 20 m, because its sawtooth roof alternates between shadow and
-     * sunlit ridge and is photometrically indistinguishable from the loading
-     * apron in front of it. A 1.95 m drift sits an order of magnitude inside
-     * the uncertainty that was already there and openly recorded.
+     * No other group has outside evidence behind it. Every one of their
+     * positions was ASSUMED to begin with, and this file says so at the top,
+     * so a drift of a few metres is well inside an uncertainty that was
+     * already there and openly recorded.
      *
-     * Every other group's position was ASSUMED to begin with, and this file
-     * says so at the top.
+     * (This argument used to turn on the 500 series, the one evidence-backed
+     * group that did move -- by 1.95 m, against a georeferencing pass that
+     * could not pin the outdoor bank to better than about 20 m. The client
+     * retired those tanks on 2026-09-10, so the awkward case is gone and the
+     * groups that remain either do not move at all or were never surveyed.)
      */
     const pts = maskPositions(g.mask, g.pitchX * scale, g.pitchZ * scale, g.cx, g.cz);
     pts.forEach(([x, z], i) => {
