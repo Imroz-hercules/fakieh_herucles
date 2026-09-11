@@ -369,37 +369,37 @@ function LiveCard({ line, item, timestamp }: { line: LineName; item?: PalletLine
   const destinationLabel = destinations.length ? destinations.join(' / ') : '—'
   const running = Boolean(item?.running)
   return (
-    <Card className="relative overflow-hidden border-slate-700/50 bg-slate-900/80 light:border-gray-200 light:bg-white">
-      <div className={`absolute inset-x-0 top-0 h-1 ${running ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+    <Card className="pallet-live-card relative overflow-hidden border-slate-700/50 bg-slate-900/80">
+      <div className={`pallet-live-status-bar absolute inset-x-0 top-0 h-1 ${running ? 'bg-emerald-500' : 'bg-slate-600'}`} />
       <CardHeader className="pb-3 pt-5">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-xl"><PackageSearch className="h-5 w-5 text-cyan-400" />{line}</CardTitle>
-          {item ? <Badge className={running ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-slate-600 hover:bg-slate-600'}><span className={`mr-1.5 h-2 w-2 rounded-full ${running ? 'bg-emerald-200 animate-pulse' : 'bg-slate-300'}`} />{running ? 'Running' : 'Stopped'}</Badge> : <Skeleton className="h-6 w-20" />}
+          <CardTitle className="pallet-live-card-title flex items-center gap-2 text-xl"><PackageSearch className="pallet-live-accent h-5 w-5 text-cyan-400" />{line}</CardTitle>
+          {item ? <Badge data-running={running} className={`pallet-live-status-badge ${running ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-slate-600 hover:bg-slate-600'}`}><span className={`pallet-live-status-dot mr-1.5 h-2 w-2 rounded-full ${running ? 'bg-emerald-200 animate-pulse' : 'bg-slate-300'}`} />{running ? 'Running' : 'Stopped'}</Badge> : <Skeleton className="h-6 w-20" />}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-700/50 bg-slate-950/35 p-3 light:border-slate-200 light:bg-slate-50">
-          <div><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Current order</p><p className="mt-1 text-xl font-bold text-cyan-400">{item?.current_order?.order_description || '—'}</p></div>
-          <div className="text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Quantity</p><p className="mt-1 text-xl font-bold text-amber-400 light:text-amber-700">{formatQuantity(item?.quantity)} <span className="text-xs">KG</span></p></div>
+        <div className="pallet-live-order-panel grid grid-cols-2 gap-3 rounded-lg border border-slate-700/50 bg-slate-950/35 p-3">
+          <div><p className="pallet-live-label text-[10px] font-semibold uppercase tracking-wider text-slate-500">Current order</p><p className="pallet-live-order-value mt-1 text-xl font-bold text-cyan-400">{item?.current_order?.order_description || '—'}</p></div>
+          <div className="text-right"><p className="pallet-live-label text-[10px] font-semibold uppercase tracking-wider text-slate-500">Quantity</p><p className="pallet-live-quantity mt-1 text-xl font-bold text-amber-400">{formatQuantity(item?.quantity)} <span className="text-xs">KG</span></p></div>
         </div>
 
-        <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-800/55 px-3 py-2.5 text-sm light:bg-slate-100">
-          <span className="max-w-[35%] truncate font-semibold text-cyan-300 light:text-cyan-700">{sourceLabel}</span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" />
-          <Badge variant="outline" className="shrink-0">{line}</Badge>
-          <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" />
-          <span className="max-w-[35%] truncate text-right font-semibold text-blue-300 light:text-blue-700">{destinationLabel}</span>
+        <div className="pallet-live-route flex items-center justify-between gap-2 rounded-lg bg-slate-800/55 px-3 py-2.5 text-sm">
+          <span className="pallet-live-source max-w-[35%] truncate font-semibold text-cyan-300">{sourceLabel}</span>
+          <ArrowRight className="pallet-live-arrow h-4 w-4 shrink-0 text-slate-500" />
+          <Badge variant="outline" className="pallet-live-line-badge shrink-0">{line}</Badge>
+          <ArrowRight className="pallet-live-arrow h-4 w-4 shrink-0 text-slate-500" />
+          <span className="pallet-live-destination max-w-[35%] truncate text-right font-semibold text-blue-300">{destinationLabel}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-x-5 gap-y-3 text-sm">
-          <div><p className="flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3 w-3" /> Source</p><p className="mt-0.5 font-medium text-slate-200 light:text-slate-800">{sourceLabel}</p></div>
-          <div><p className="flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3 w-3" /> Destination</p><p className="mt-0.5 font-medium text-slate-200 light:text-slate-800">{destinationLabel}</p></div>
-          <div><p className="flex items-center gap-1 text-xs text-slate-500"><Clock3 className="h-3 w-3" /> Started</p><p className="mt-0.5 font-medium text-slate-200 light:text-slate-800">{formatTimestamp(item?.current_order?.actual_start_time)}</p></div>
-          <div><p className="flex items-center gap-1 text-xs text-slate-500"><Timer className="h-3 w-3" /> Elapsed</p><p className="mt-0.5 font-medium text-slate-200 light:text-slate-800">{item?.current_order ? formatDuration(item.current_order.elapsed_seconds) : '—'}</p></div>
-          <div><p className="text-xs text-slate-500">Production</p><p className="mt-0.5 font-medium text-slate-400">{item?.production_name || 'Not mapped'}</p></div>
-          {(line === 'P3' || line === 'P4') && <div><p className="text-xs text-slate-500">Selection</p><p className="mt-0.5 font-medium text-violet-300 light:text-violet-700">{item?.selection ?? '—'} · {selectionMeaning(item?.selection)}</p></div>}
+          <div><p className="pallet-live-label flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3 w-3" /> Source</p><p className="pallet-live-detail-value mt-0.5 font-medium text-slate-200">{sourceLabel}</p></div>
+          <div><p className="pallet-live-label flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3 w-3" /> Destination</p><p className="pallet-live-detail-value mt-0.5 font-medium text-slate-200">{destinationLabel}</p></div>
+          <div><p className="pallet-live-label flex items-center gap-1 text-xs text-slate-500"><Clock3 className="h-3 w-3" /> Started</p><p className="pallet-live-detail-value mt-0.5 font-medium text-slate-200">{formatTimestamp(item?.current_order?.actual_start_time)}</p></div>
+          <div><p className="pallet-live-label flex items-center gap-1 text-xs text-slate-500"><Timer className="h-3 w-3" /> Elapsed</p><p className="pallet-live-detail-value mt-0.5 font-medium text-slate-200">{item?.current_order ? formatDuration(item.current_order.elapsed_seconds) : '—'}</p></div>
+          <div><p className="pallet-live-label text-xs text-slate-500">Production</p><p className="pallet-live-muted-value mt-0.5 font-medium text-slate-400">{item?.production_name || 'Not mapped'}</p></div>
+          {(line === 'P3' || line === 'P4') && <div><p className="pallet-live-label text-xs text-slate-500">Selection</p><p className="pallet-live-selection mt-0.5 font-medium text-violet-300">{item?.selection ?? '—'} · {selectionMeaning(item?.selection)}</p></div>}
         </div>
-        <div className="border-t border-slate-700/50 pt-3 text-xs text-slate-500 light:border-slate-200">Last updated: {formatTimestamp(timestamp)}</div>
+        <div className="pallet-live-footer border-t border-slate-700/50 pt-3 text-xs text-slate-500">Last updated: {formatTimestamp(timestamp)}</div>
       </CardContent>
     </Card>
   )
@@ -426,10 +426,10 @@ function LivePanel({ active }: { active: boolean }) {
 
   const runningCount = useMemo(() => data ? Object.values(data.lines).filter((line) => line.running).length : 0, [data])
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-900/60 px-4 py-3 light:border-gray-200 light:bg-white">
-        <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-cyan-400" /><span className="text-sm font-medium">Live DB7 line monitor</span></div>
-        <span className="text-sm text-slate-400"><strong className="text-emerald-400">{runningCount}</strong> of 4 lines running</span>
+    <div className="pallet-live-page space-y-4">
+      <div className="pallet-live-monitor flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-900/60 px-4 py-3">
+        <div className="flex items-center gap-2"><Activity className="pallet-live-accent h-4 w-4 text-cyan-400" /><span className="pallet-live-monitor-title text-sm font-medium">Live DB7 line monitor</span></div>
+        <span className="pallet-live-monitor-summary text-sm text-slate-400"><strong className="pallet-live-running-count text-emerald-400">{runningCount}</strong> of 4 lines running</span>
       </div>
       {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>PLC Offline — {error}. No placeholder values are being shown.</AlertDescription></Alert>}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

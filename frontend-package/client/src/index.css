@@ -4569,3 +4569,152 @@ main {
   color: #111827 !important;
 }
 
+/*
+ * Pallet Live uses its own small theme contract. The generic light-mode
+ * remaps above cannot reliably translate translucent dark utilities such as
+ * bg-slate-950/35, which previously left muddy gray panels and faint text.
+ */
+.pallet-live-page {
+  --pallet-live-surface: rgba(15, 23, 42, 0.8);
+  --pallet-live-subtle: rgba(2, 6, 23, 0.35);
+  --pallet-live-route: rgba(30, 41, 59, 0.55);
+  --pallet-live-border: rgba(51, 65, 85, 0.5);
+  --pallet-live-text: #f1f5f9;
+  --pallet-live-label: #94a3b8;
+  --pallet-live-muted: #94a3b8;
+  --pallet-live-cyan: #22d3ee;
+  --pallet-live-blue: #93c5fd;
+  --pallet-live-amber: #fbbf24;
+  --pallet-live-violet: #c4b5fd;
+  --pallet-live-arrow: #64748b;
+}
+
+:root.light .pallet-live-page {
+  --pallet-live-surface: #ffffff;
+  --pallet-live-subtle: #f8fafc;
+  --pallet-live-route: #f1f5f9;
+  --pallet-live-border: #dbe3ec;
+  --pallet-live-text: #17233b;
+  --pallet-live-label: #64748b;
+  --pallet-live-muted: #475569;
+  --pallet-live-cyan: #007f9d;
+  --pallet-live-blue: #1d4ed8;
+  --pallet-live-amber: #b45309;
+  --pallet-live-violet: #6d28d9;
+  --pallet-live-arrow: #7890a8;
+}
+
+.pallet-live-monitor,
+.pallet-live-card {
+  border-color: var(--pallet-live-border) !important;
+  background: var(--pallet-live-surface) !important;
+  color: var(--pallet-live-text) !important;
+}
+
+.pallet-live-card {
+  box-shadow: 0 1px 2px rgb(2 6 23 / 0.14);
+}
+
+.pallet-live-order-panel {
+  border-color: var(--pallet-live-border) !important;
+  background: var(--pallet-live-subtle) !important;
+}
+
+.pallet-live-route {
+  background: var(--pallet-live-route) !important;
+}
+
+.pallet-live-card-title,
+.pallet-live-monitor-title,
+.pallet-live-detail-value,
+.pallet-live-line-badge {
+  color: var(--pallet-live-text) !important;
+}
+
+.pallet-live-accent,
+.pallet-live-order-value {
+  color: var(--pallet-live-cyan) !important;
+}
+
+.pallet-live-label,
+.pallet-live-monitor-summary,
+.pallet-live-footer {
+  color: var(--pallet-live-label) !important;
+}
+
+.pallet-live-muted-value {
+  color: var(--pallet-live-muted) !important;
+}
+
+.pallet-live-source {
+  color: var(--pallet-live-cyan) !important;
+}
+
+.pallet-live-destination {
+  color: var(--pallet-live-blue) !important;
+}
+
+.pallet-live-quantity {
+  color: var(--pallet-live-amber) !important;
+}
+
+.pallet-live-selection {
+  color: var(--pallet-live-violet) !important;
+}
+
+.pallet-live-running-count {
+  color: #34d399 !important;
+}
+
+.pallet-live-arrow {
+  color: var(--pallet-live-arrow) !important;
+}
+
+.pallet-live-footer {
+  border-color: var(--pallet-live-border) !important;
+}
+
+.pallet-live-status-badge[data-running='false'] {
+  border-color: #475569 !important;
+  background: #475569 !important;
+  color: #f8fafc !important;
+}
+
+.pallet-live-status-badge[data-running='true'] {
+  border-color: #059669 !important;
+  background: #059669 !important;
+  color: #ffffff !important;
+}
+
+:root.light .pallet-live-card {
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.08), 0 8px 24px rgb(15 23 42 / 0.04);
+}
+
+:root.light .pallet-live-status-bar.bg-slate-600 {
+  background-color: #cbd5e1 !important;
+}
+
+:root.light .pallet-live-running-count {
+  color: #15803d !important;
+}
+
+:root.light .pallet-live-status-badge[data-running='false'] {
+  border-color: #cbd5e1 !important;
+  background: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+:root.light .pallet-live-status-badge[data-running='false'] .pallet-live-status-dot {
+  background-color: #94a3b8 !important;
+}
+
+:root.light .pallet-live-status-badge[data-running='true'] {
+  border-color: #16a34a !important;
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+
+:root.light .pallet-live-status-badge[data-running='true'] .pallet-live-status-dot {
+  background-color: #22c55e !important;
+}
+
