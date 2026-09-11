@@ -4521,6 +4521,10 @@ main {
   border-color: #334155;
 }
 
+.pallet-report-table tbody tr {
+  transition: background-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+}
+
 .pallet-report-table-head {
   background-color: #637f12;
 }
@@ -4530,7 +4534,13 @@ main {
 }
 
 .pallet-report-table tbody tr:hover {
-  background-color: rgba(30, 41, 59, 0.7);
+  background-color: rgba(8, 145, 178, 0.16);
+  box-shadow: inset 4px 0 0 #22d3ee;
+  color: #f8fafc;
+}
+
+.pallet-report-table tbody tr:hover td {
+  color: inherit !important;
 }
 
 .pallet-report-total-row {
@@ -4561,12 +4571,107 @@ main {
 }
 
 :root.light .pallet-report-table tbody tr:hover {
-  background-color: #eef5dc !important;
+  background-color: #e8f7fb !important;
+  box-shadow: inset 4px 0 0 #0891b2;
+  color: #0f172a !important;
+}
+
+:root.light .pallet-report-table tbody tr:hover td {
+  color: inherit !important;
 }
 
 :root.light .pallet-report-total-row {
   background-color: #e5e7eb !important;
   color: #111827 !important;
+}
+
+/* Pallet History KPI motion: restrained enough for an operations dashboard. */
+@keyframes pallet-kpi-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pallet-report-kpi {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  animation: pallet-kpi-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.pallet-report-kpi:nth-child(2) { animation-delay: 55ms; }
+.pallet-report-kpi:nth-child(3) { animation-delay: 110ms; }
+.pallet-report-kpi:nth-child(4) { animation-delay: 165ms; }
+
+.pallet-report-kpi::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: '';
+  background: linear-gradient(110deg, transparent 18%, rgba(34, 211, 238, 0.11) 46%, transparent 72%);
+  transform: translateX(-115%);
+  transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pallet-report-kpi:hover {
+  border-color: rgba(34, 211, 238, 0.5) !important;
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.24), 0 0 0 1px rgba(34, 211, 238, 0.12);
+  transform: translateY(-4px);
+}
+
+.pallet-report-kpi:hover::before {
+  transform: translateX(115%);
+}
+
+.pallet-report-kpi-icon {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease;
+}
+
+.pallet-report-kpi:hover .pallet-report-kpi-icon {
+  box-shadow: 0 8px 20px rgba(8, 145, 178, 0.16);
+  transform: translateY(-2px) rotate(-5deg) scale(1.08);
+}
+
+.pallet-report-kpi-value {
+  transition: letter-spacing 220ms ease, color 220ms ease;
+}
+
+.pallet-report-kpi:hover .pallet-report-kpi-value {
+  letter-spacing: 0.015em;
+}
+
+:root.light .pallet-report-kpi:hover {
+  border-color: rgba(8, 145, 178, 0.45) !important;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.11), 0 0 0 1px rgba(8, 145, 178, 0.08);
+}
+
+:root.light .pallet-report-kpi::before {
+  background: linear-gradient(110deg, transparent 18%, rgba(8, 145, 178, 0.09) 46%, transparent 72%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pallet-report-kpi,
+  .pallet-report-kpi-icon,
+  .pallet-report-kpi-value,
+  .pallet-report-table tbody tr {
+    animation: none;
+    transition: none;
+  }
+
+  .pallet-report-kpi:hover,
+  .pallet-report-kpi:hover .pallet-report-kpi-icon {
+    transform: none;
+  }
+
+  .pallet-report-kpi::before {
+    display: none;
+  }
 }
 
 /*

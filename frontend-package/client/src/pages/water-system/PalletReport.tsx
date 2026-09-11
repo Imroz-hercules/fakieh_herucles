@@ -158,13 +158,13 @@ function KpiCard({ label, value, icon: Icon, accent }: {
   accent: string
 }) {
   return (
-    <Card className="border-border bg-card text-card-foreground">
+    <Card className="pallet-report-kpi border-border bg-card text-card-foreground">
       <CardContent className="flex items-center justify-between p-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+          <p className="pallet-report-kpi-label text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+          <p className="pallet-report-kpi-value mt-1 text-2xl font-bold text-foreground">{value}</p>
         </div>
-        <div className={`rounded-xl p-2.5 ${accent}`}><Icon className="h-5 w-5" /></div>
+        <div className={`pallet-report-kpi-icon rounded-xl p-2.5 ${accent}`}><Icon className="h-5 w-5" /></div>
       </CardContent>
     </Card>
   )
